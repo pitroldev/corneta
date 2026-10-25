@@ -2,16 +2,21 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import type { Locale, MessageKey, T } from "@/lib/i18n";
 import {
+  BellIcon,
   BoltIcon,
+  ChatIcon,
   ClapperIcon,
   CropIcon,
   GaugeIcon,
   KeyboardIcon,
   LayersIcon,
+  PauseIcon,
+  PinIcon,
   PlayIcon,
   PopoutIcon,
   PowerIcon,
   SaveIcon,
+  SequenceIcon,
   SheetIcon,
   ThemeIcon,
   TrayIcon,
@@ -82,6 +87,47 @@ function Card({
   );
 }
 
+// A phone screen in a thick ink bezel, so the capture reads as a device rather than a crop.
+function Phone({
+  still,
+  alt,
+  className,
+}: {
+  still: Still;
+  alt: string;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-xl border-[5px] border-ink bg-night shadow-[7px_7px_0_0_var(--ink)] max-[760px]:border-4 max-[760px]:shadow-[5px_5px_0_0_var(--ink)]",
+        className,
+      )}
+    >
+      <Image
+        src={still.src}
+        width={still.width}
+        height={still.height}
+        alt={alt}
+        sizes="(max-width: 760px) 44vw, 280px"
+        className="h-auto w-full"
+      />
+    </div>
+  );
+}
+
+const DECK = [
+  ["feat.deck.does.mark", <PinIcon key="m" />],
+  ["feat.deck.does.brb", <PauseIcon key="b" />],
+  ["feat.deck.does.scene", <ClapperIcon key="s" />],
+  ["feat.deck.does.alerts", <BellIcon key="a" />],
+  ["feat.deck.does.chat", <ChatIcon key="c" />],
+  ["feat.deck.does.combos", <SequenceIcon key="k" />],
+] as const;
+
+const CHIP =
+  "inline-flex items-center gap-1.5 rounded-md border-2 border-ink bg-paper px-2.5 py-1 text-[0.86rem] font-bold [&>svg]:size-4 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:2.2]";
+
 const EXPORTS = [
   ["feat.report.export.chapters", <PlayIcon key="c" />],
   ["feat.report.export.csv", <SheetIcon key="s" />],
@@ -125,18 +171,8 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
             <h3 className="text-[clamp(1.35rem,2vw,1.7rem)] leading-[1.08]">
               {t("feat.protection.title")}
             </h3>
-            <p className="mt-2 text-[0.98rem] leading-[1.55] font-medium text-ink-muted">
+            <p className="mt-2 mb-5 text-[0.98rem] leading-[1.55] font-medium text-ink-muted">
               {t("feat.protection.text")}
-            </p>
-            <p className="mt-3 mb-5 text-[0.86rem] leading-[1.5] font-medium text-ink-muted">
-              <strong className="font-bold text-ink">
-                {t("protection.guard.privacy.title")}
-              </strong>{" "}
-              <span className="mx-0.5 inline-block -rotate-2 rounded-sm bg-tomato px-1.5 py-0.5 text-[0.62rem] font-extrabold tracking-[0.08em] text-brass-ink uppercase">
-                {t("protection.guard.privacy.switch")}
-              </span>{" "}
-              {t("protection.guard.privacy.body")}{" "}
-              {t("protection.guard.privacy.cost")}
             </p>
             <div className="mt-auto">
               <Shot
@@ -154,6 +190,46 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
           >
             <p>{t("feat.chat.text")}</p>
           </Card>
+
+          <article className={cn(CARD, "col-span-2 max-[980px]:col-span-1")}>
+            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-center gap-x-[clamp(28px,4.4vw,64px)] gap-y-8 max-[860px]:grid-cols-1">
+              <div>
+                <h3 className="text-[clamp(1.6rem,2.6vw,2.3rem)] leading-[1.04]">
+                  {t("feat.deck.title")}
+                </h3>
+                <p className="mt-3 max-w-[48ch] text-[1.02rem] leading-[1.55] font-medium text-ink-muted">
+                  {t("feat.deck.text")}
+                </p>
+                <p className="mt-6 text-[0.72rem] font-extrabold tracking-[0.1em] text-ink-faint uppercase">
+                  {t("feat.deck.does.label")}
+                </p>
+                <ul className="mt-2 flex flex-wrap gap-2" role="list">
+                  {DECK.map(([key, icon]) => (
+                    <li key={key} className={CHIP}>
+                      {icon}
+                      {t(key)}
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-6 max-w-[54ch] text-[0.86rem] leading-[1.5] font-medium text-ink-muted">
+                  {t("feat.deck.cost")}
+                </p>
+              </div>
+              {/* The chat phone leans on the keys phone, like the report's highlights sheet on its chart. */}
+              <div className="flex items-start justify-center px-[3%] pb-2 max-[860px]:px-0">
+                <Phone
+                  className="w-[48%] max-w-[280px]"
+                  still={media.features.deckKeys}
+                  alt={t("feat.deck.keys.alt")}
+                />
+                <Phone
+                  className="relative mt-[16%] -ml-[3%] w-[48%] max-w-[280px]"
+                  still={media.features.deckChat}
+                  alt={t("feat.deck.chat.alt")}
+                />
+              </div>
+            </div>
+          </article>
 
           <article className={cn(CARD, "col-span-2 max-[980px]:col-span-1")}>
             <div className="flex flex-wrap items-end justify-between gap-x-10 gap-y-2">
@@ -184,10 +260,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
                 </p>
                 <ul className="mt-2 flex flex-wrap gap-2" role="list">
                   {EXPORTS.map(([key, icon]) => (
-                    <li
-                      key={key}
-                      className="inline-flex items-center gap-1.5 rounded-md border-2 border-ink bg-paper px-2.5 py-1 text-[0.86rem] font-bold [&>svg]:size-4 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:2.2]"
-                    >
+                    <li key={key} className={CHIP}>
                       {icon}
                       {t(key)}
                     </li>

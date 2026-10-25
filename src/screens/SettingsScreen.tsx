@@ -24,7 +24,6 @@ import {
   Card,
   CopyField,
   EmptyState,
-  ExperimentalBadge,
   Input,
   SectionTitle,
   Toggle,
@@ -47,7 +46,6 @@ import { cn } from "../lib/utils";
 import { sanitizeHost } from "../lib/validation";
 import { draftInputProps, useDraft } from "../lib/useDraft";
 import { BrbPreview, BrbSlateChooser } from "./settings/BrbSettings";
-import { GuardianEditor, GuardianPreview } from "./settings/GuardianSettings";
 import { ObsTestButton } from "./settings/ObsTestButton";
 import {
   BitratePreview,
@@ -444,27 +442,6 @@ export function SettingsScreen() {
                 {settings.loudnessNormalize && (
                   <SubSettings>
                     <LoudnessTarget />
-                  </SubSettings>
-                )}
-              </div>
-
-              <div>
-                <SecurityFeature
-                  preview={<GuardianPreview />}
-                  on={settings.guardianEnabled}
-                  title={t("settings.safety.guardian.title")}
-                  badge={<ExperimentalBadge />}
-                  desc={t("settings.safety.guardian.desc")}
-                >
-                  <Toggle
-                    checked={settings.guardianEnabled}
-                    onChange={(v) => setSettings({ guardianEnabled: v })}
-                    label={t("settings.safety.guardian.title")}
-                  />
-                </SecurityFeature>
-                {settings.guardianEnabled && (
-                  <SubSettings>
-                    <GuardianEditor />
                   </SubSettings>
                 )}
               </div>

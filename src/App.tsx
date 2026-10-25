@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, m } from "framer-motion";
-import { FileText, RefreshCw, Shield } from "lucide-react";
+import { FileText, RefreshCw } from "lucide-react";
 import { downTargets, useStore } from "./lib/store";
 import { api, IS_TAURI, type ShortcutAction } from "./lib/api";
 import { errMsg } from "./lib/utils";
@@ -26,7 +26,6 @@ const SCREENS: Screen[] = NAV_ORDER;
 import { TitleBar } from "./components/TitleBar";
 import { UpdateBanner } from "./components/UpdateBanner";
 import { LiveBar } from "./components/LiveBar";
-import { GuardianStatus } from "./components/GuardianStatus";
 import { shortcutErrorKey } from "./lib/shortcuts";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
@@ -107,14 +106,10 @@ export default function App() {
   const bindChatRunning = useStore((s) => s.bindChatRunning);
   const bindAlerts = useStore((s) => s.bindAlerts);
   const bindViewers = useStore((s) => s.bindViewers);
-  const bindGuardian = useStore((s) => s.bindGuardian);
   const bindAlertStatus = useStore((s) => s.bindAlertStatus);
   const bindChatAuth = useStore((s) => s.bindChatAuth);
   const bindAuthFlow = useStore((s) => s.bindAuthFlow);
   const setupOauth = useStore((s) => s.setupOauth);
-  const leaks = useStore((s) => s.leaks);
-  const censored = useStore((s) => s.censored);
-  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
   const liveState = useStore((s) => s.snapshot.state);
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const down = useStore((s) => downTargets(s.snapshot));
@@ -132,9 +127,8 @@ export default function App() {
     addStep("app_ready");
   }, [loaded]);
 
-  const liveLabel = censored
-    ? t("components.app.live.aria.censored")
-    : liveState === "live"
+  const liveLabel =
+    liveState === "live"
       ? down > 0
         ? tp("components.app.live.aria.live.down", down)
         : t("components.app.live.aria.live")
@@ -190,7 +184,6 @@ export default function App() {
     const unbindChatRunning = bindChatRunning();
     const unbindAlerts = bindAlerts();
     const unbindViewers = bindViewers();
-    const unbindGuardian = bindGuardian();
     const unbindAlertStatus = bindAlertStatus();
     const unbindChatAuth = bindChatAuth();
     const unbindAuthFlow = bindAuthFlow(t);
@@ -247,7 +240,6 @@ export default function App() {
       unbindChatRunning();
       unbindAlerts();
       unbindViewers();
-      unbindGuardian();
       unbindAlertStatus();
       unbindChatAuth();
       unbindAuthFlow();
@@ -265,20 +257,10 @@ export default function App() {
     bindChatRunning,
     bindAlerts,
     bindViewers,
-    bindGuardian,
     bindAlertStatus,
     bindChatAuth,
     bindAuthFlow,
   ]);
-
-  const leakSeen = useRef(0);
-  useEffect(() => {
-    if (leaks.length > leakSeen.current) {
-      const l = leaks[leaks.length - 1];
-      toast.error(t("components.app.leak.toast", { snippet: l.snippet }));
-    }
-    leakSeen.current = leaks.length;
-  }, [leaks, t]);
 
   const firstTheme = useRef(true);
   useEffect(() => {
@@ -436,26 +418,6 @@ export default function App() {
         <div className="sr-only" role="status" aria-live="polite">
           {liveLabel}
         </div>
-
-        <GuardianStatus status={guardianStatus} />
-        {censored &&
-          guardianStatus !== "unavailable" &&
-          guardianStatus !== "starting" && (
-            <div className="flex items-start gap-3 border-b border-border bg-surface-2 px-4 py-2 text-ink">
-              <Shield
-                aria-hidden="true"
-                className="size-5 shrink-0 text-warn"
-              />
-              <div className="min-w-0 flex-1">
-                <div className="font-display text-sm font-extrabold leading-tight">
-                  {t("components.app.censored.title")}
-                </div>
-                <div className="mt-1 max-w-[72ch] text-sm leading-relaxed text-ink-muted">
-                  {t("components.app.censored.body")}
-                </div>
-              </div>
-            </div>
-          )}
 
         <UpdateBanner />
 

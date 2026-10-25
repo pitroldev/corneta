@@ -612,8 +612,6 @@ export const en: Dict = {
     "In {mode} mode the stream uses about {mbps} Mbps — it fits with room to spare.",
   "components.setup.quality.fit.warn":
     "In {mode} mode the stream uses about {mbps} Mbps — it fits, with no room to spare.",
-  "components.setup.quality.guardian":
-    "Covers the picture if a term from your list shows up. It keeps the stream 12s behind, only looks for listed terms and doesn't cover audio. Set it up later in Settings → Safety nets.",
   "components.setup.quality.lead":
     "Every platform uses your internet's upload. I'll measure it to pick a quality that fits.",
   "components.setup.quality.modes": "Quality",
@@ -816,9 +814,6 @@ export const en: Dict = {
     "Warns here if the picture goes black",
   "deck.health.protect.brb": "BE RIGHT BACK",
   "deck.health.protect.brb.desc": "If OBS drops, the break screen steps in",
-  "deck.health.protect.guardian": "Privacy guard",
-  "deck.health.protect.guardian.desc":
-    "Covers the screen if something on your list shows up",
   "deck.health.protections": "Protections",
   "deck.health.watching": "{n} watching",
   "deck.how.control": "You're in charge",
@@ -1082,7 +1077,6 @@ export const en: Dict = {
   "deck.tabs.unread": "{n} new messages",
   "deck.target.bitrate": "Bitrate",
   "deck.target.brb": "BE RIGHT BACK",
-  "deck.target.censor": "Privacy guard on",
   "deck.target.connecting": "Connecting",
   "deck.target.dropped": "Dropped frames",
   "deck.target.droppedHint": "Since the stream started",
@@ -1231,8 +1225,7 @@ export const en: Dict = {
   "golive.drawer.platforms.youtubeAuto":
     "automatic — I create the broadcast when you GO LIVE",
   "golive.drawer.safety.more": "More safety settings",
-  "golive.drawer.safety.note":
-    "Protection helps, but it isn't a guarantee. Guardian is experimental: it keeps the stream 12s behind, only looks for the terms on your list, and doesn't cover audio.",
+  "golive.drawer.safety.note": "Protection helps, but it isn't a guarantee.",
   "golive.drawer.safety.subtitle":
     "What I do on my own if something goes wrong mid-stream.",
   "golive.drawer.safety.title": "Safety nets",
@@ -1426,22 +1419,6 @@ export const en: Dict = {
   "chat.youtube.guide.warn.text":
     "while your app stays in **“Testing”** mode — the normal thing, without going through Google's verification — the YouTube sign-in **expires every ~7 days**. When it drops, come back here and click **Sign in** again. That's why adding yourself as a **Test user** isn't optional (publishing/verifying the app is, and it's a lot more paperwork).",
 
-  "components.app.censored.body":
-    "The Privacy Guard is covering the picture. The stream returns once the segment is checked and no terms are detected. The Privacy Guard does not mute audio.",
-  "components.app.censored.title": "BE RIGHT BACK on air",
-  "components.app.leak.toast":
-    '🛡️ "{snippet}" showed up on screen — so I cut to BE RIGHT BACK',
-  "components.app.live.aria.censored":
-    "BE RIGHT BACK is on air — picture covered by the Privacy Guard",
-  "guardian.status.starting.title": "Preparing the Privacy Guard",
-  "guardian.status.starting.body":
-    "The picture stays covered until the first check. The Privacy Guard does not mute audio.",
-  "guardian.status.unavailable.title":
-    "The Privacy Guard could not check the picture",
-  "guardian.status.unavailable.body":
-    "Unchecked segments stay covered by BE RIGHT BACK. The picture returns after a valid check. The Privacy Guard does not mute audio. If this continues, end and restart the stream.",
-  "guardian.status.starting.short": "Preparing",
-  "guardian.status.unavailable.short": "Check unavailable",
   "components.app.live.aria.error": "The stream hit an error",
   "components.app.live.aria.live": "Live on every platform",
   "components.app.live.aria.live.down.one": "On air, but {count} platform down",
@@ -1664,8 +1641,6 @@ export const en: Dict = {
     "Couldn't check this machine's encoders — try again under Quality.",
   "encoding.guide.encoder.checking": "Checking your graphics card…",
   "encoding.guide.encoder.cpuOnly": "Processor — it's what this machine has",
-  "encoding.guide.guardian":
-    "Privacy guard is on — get the best signal you can out of OBS.",
   "encoding.guide.noPlatforms":
     "(no platform on yet — the numbers below assume 1080p)",
   "encoding.guide.nohw.fps30":
@@ -1694,8 +1669,7 @@ export const en: Dict = {
   "encoding.guide.title": "Getting the OBS quality right",
   "encoding.guide.why.cbr":
     "**CBR + a 2 s keyframe** is what the platforms require — anything else and the stream buffers for whoever's watching.",
-  "encoding.guide.why.changed.strong":
-    "Changed platforms or turned the privacy guard on?",
+  "encoding.guide.why.changed.strong": "Changed platforms?",
   "encoding.guide.why.changed.text":
     "Come back here — the numbers up top follow your setup.",
   "encoding.guide.why.onepass.strong": "One pass only.",
@@ -1844,7 +1818,6 @@ export const en: Dict = {
   "golive.bar.panel": "Panel",
   "golive.bar.protection.bitrate": "Auto-bitrate",
   "golive.bar.protection.brb": "BE RIGHT BACK",
-  "golive.bar.protection.guardian": "Privacy guard",
   "golive.bar.connectingTargets":
     "OBS connected · connecting to the platforms…",
   "golive.bar.waitingObs": "Waiting for OBS…",
@@ -1929,13 +1902,6 @@ export const en: Dict = {
   "golive.security.brb.desc.off":
     "if OBS drops, everyone's staring at a frozen frame",
   "golive.security.brb.label": "BE RIGHT BACK",
-  "golive.security.guardian.desc.off":
-    "if a word that can't leak shows up on screen, it goes on air",
-  "golive.security.guardian.label": "Privacy guard",
-  "golive.security.guardian.noTerms":
-    "on, but nothing to watch yet — add a word",
-  "golive.security.guardian.watching":
-    "watching {n} word(s) — if one shows up, I cut to BE RIGHT BACK",
   "golive.security.loudness.desc": "I level your volume on my own",
   "golive.security.loudness.label": "Audio normalizer",
   "golive.blackScreen.body":
@@ -1956,7 +1922,6 @@ export const en: Dict = {
   "golive.stat.fps": "FPS",
   "golive.stat.uptime": "On air",
   "golive.state.brb": "BE RIGHT BACK on air",
-  "golive.state.censor": "BE RIGHT BACK (Privacy guard)",
   "golive.state.connecting": "Connecting",
   "golive.state.error": "Error",
   "golive.state.idle": "Waiting",
@@ -2760,37 +2725,6 @@ export const en: Dict = {
     "Telemetry isn't working in this version of Corneta — I didn't send anything.",
   "settings.telemetry.usage.desc":
     "Only if you enable it: future stages and outcomes in categories, without text or stream content.",
-  "settings.guardian.cost.chat":
-    "Chat and alerts reach you with that same delay.",
-  "settings.guardian.cost.delay": "Your stream runs {delay} real time.",
-  "settings.guardian.cost.delay.value": "12s behind",
-  "settings.guardian.cost.intro":
-    "When a term from your list shows up, Corneta switches to the {jaVolto} screen before that moment goes on air — it never gets out, not even in a clip. To pull that off:",
-  "settings.guardian.cost.scope":
-    "It only watches the terms you list — {no} “anything private”.",
-  "settings.guardian.cost.scope.no": "not",
-  "settings.guardian.cost.memory":
-    "This PC has {gb} GB of RAM, and Guardian keeps about 1.2 GB of video in memory to cover the delay. With less than 16 GB, close heavy apps before going live.",
-  "settings.guardian.cost.smallText":
-    "Really small text can still slip through.",
-  "settings.guardian.cost.title": "🛡️ What this protection costs",
-  "settings.guardian.list.empty":
-    "No terms with 3+ letters means the privacy guard has nothing to watch — add at least one.",
-  "settings.guardian.list.hint":
-    "(one per line — your email, real name, address, your @)",
-  "settings.guardian.list.label": "Terms to watch",
-  "settings.guardian.list.placeholder":
-    "me@myemail.com\n42 Oak Street\nMy Real Name",
-  "settings.guardian.list.watching.one": "Watching 1 term.",
-  "settings.guardian.list.watching.other": "Watching {count} terms.",
-  "settings.guardian.list.watchingManyShort.one":
-    "Watching 1 term — {short} skipped for being too short (3 letters minimum): {terms}.",
-  "settings.guardian.list.watchingManyShort.other":
-    "Watching {count} terms — {short} skipped for being too short (3 letters minimum): {terms}.",
-  "settings.guardian.list.watchingOneShort.one":
-    "Watching 1 term — 1 skipped for being too short (3 letters minimum): {terms}.",
-  "settings.guardian.list.watchingOneShort.other":
-    "Watching {count} terms — 1 skipped for being too short (3 letters minimum): {terms}.",
   // Navigation labels must match screen titles and cross-screen references.
   "sidebar.about": "About",
   "sidebar.live.title": "Open the live panel",
@@ -2902,10 +2836,7 @@ export const en: Dict = {
     "If OBS drops mid-stream, the “BE RIGHT BACK” screen goes on air without dropping the platforms — from the viewer's side the stream doesn't even blink, and it comes back on its own when the signal returns.",
   "settings.safety.brb.title": "Drop protection (BE RIGHT BACK)",
   "settings.safety.desc":
-    "What holds your stream up when OBS drops, your internet chokes, or something private of yours shows up on screen.",
-  "settings.safety.guardian.desc":
-    "If one of your terms (list below) shows up on screen, Corneta cuts to “BE RIGHT BACK” before it goes on air. Safety net, not a guarantee. The cost: your whole stream goes out 12s behind (the chat too).",
-  "settings.safety.guardian.title": "Privacy guard",
+    "What holds your stream up when OBS drops or your internet chokes.",
   "settings.safety.loudness.desc":
     "Corneta evens out your audio before it goes out — no “can't hear you” from chat, no blown-out ears when you switch scenes. If you already normalize in OBS, leave this off so the two don't fight.",
   "settings.safety.loudness.title": "Audio normalizer",

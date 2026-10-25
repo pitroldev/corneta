@@ -247,11 +247,6 @@ pub struct Settings {
     /// Adaptive bitrate applies only to transcoded destinations.
     #[serde(default = "default_true")]
     pub auto_bitrate: bool,
-    #[serde(default)]
-    pub guardian_enabled: bool,
-    /// Only explicitly supplied terms participate in privacy detection.
-    #[serde(default)]
-    pub guardian_watchlist: Vec<String>,
     /// Opt-in: single-pass loudness correction may pump or conflict with normalization in OBS.
     #[serde(default)]
     pub loudness_normalize: bool,
@@ -469,8 +464,6 @@ impl Default for Settings {
             brb_enabled: false,
             brb_slate_kind: default_brb_slate_kind(),
             auto_bitrate: true,
-            guardian_enabled: false,
-            guardian_watchlist: Vec::new(),
             loudness_normalize: false,
             loudness_target_lufs: -14.0,
             black_screen_alert: false,
@@ -638,10 +631,6 @@ impl AppConfig {
         s.stream_title = s.stream_title.chars().take(200).collect();
         if !YOUTUBE_PRIVACY.contains(&s.youtube_privacy.as_str()) {
             s.youtube_privacy = default_youtube_privacy();
-        }
-        s.guardian_watchlist.truncate(100);
-        for term in &mut s.guardian_watchlist {
-            *term = term.trim().chars().take(200).collect();
         }
         s.chat_sources.truncate(32);
         s.alert_sources.truncate(16);

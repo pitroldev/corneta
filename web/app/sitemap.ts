@@ -1,6 +1,6 @@
 import type { MetadataRoute } from "next";
 import { CONTENT_UPDATED_ISO } from "../lib/content";
-import { LEGAL_UPDATED_ISO, legalHref } from "../lib/legal";
+import { LEGAL_UPDATED_ISO, TERMS_UPDATED_ISO, legalHref } from "../lib/legal";
 import { LOCALES, localePath } from "../lib/i18n";
 import { siteUrl } from "../lib/site";
 import {
@@ -47,7 +47,10 @@ function latestUpdate(documents: readonly PublishedEditorialDocument[]) {
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const legal = at(LEGAL_UPDATED_ISO);
+  const legal = {
+    privacy: at(LEGAL_UPDATED_ISO),
+    terms: at(TERMS_UPDATED_ISO),
+  };
   const editorial = await listPublishedEditorial();
 
   // Emit reciprocal alternates only for complete published translation pairs.
@@ -165,7 +168,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
       };
       return LOCALES.map((locale) => ({
         url: abs(legalHref(locale, doc)),
-        lastModified: legal,
+        lastModified: legal[doc],
         changeFrequency: "yearly" as const,
         priority: 0.3,
         alternates,

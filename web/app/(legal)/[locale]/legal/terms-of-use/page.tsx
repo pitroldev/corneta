@@ -22,7 +22,13 @@ import {
   termsTldrEn,
 } from "../_content/terms.en";
 import { isLocale, type Locale } from "@/lib/i18n";
-import { LEGAL_ROUTES, legalHref } from "@/lib/legal";
+import {
+  LEGAL_ROUTES,
+  TERMS_UPDATED_ISO,
+  TERMS_UPDATED_LABEL_EN,
+  TERMS_UPDATED_LABEL_PT,
+  legalHref,
+} from "@/lib/legal";
 import { jsonLdScript, legalJsonLd } from "@/lib/seo";
 import { siteUrl } from "@/lib/site";
 import { socialImage } from "@/lib/social-image";
@@ -109,7 +115,11 @@ export default async function TermsPage({
         kicker={hero.kicker}
         title={hero.title}
         intro={hero.intro}
-        version="1.0"
+        version="1.1"
+        updated={{
+          iso: TERMS_UPDATED_ISO,
+          label: pt ? TERMS_UPDATED_LABEL_PT : TERMS_UPDATED_LABEL_EN,
+        }}
         path={PATH}
       />
 

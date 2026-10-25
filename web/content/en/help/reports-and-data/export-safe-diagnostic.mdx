@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-10-25
+reviewedAt: 2026-10-25
+productVersion: 0.13.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta diagnostic export command
     kind: internal
     repoPath: src-tauri/src/commands.rs
-    reviewedAt: 2026-10-19
+    reviewedAt: 2026-10-25
   - title: Corneta telemetry and diagnostics runbook
     kind: internal
     repoPath: docs/RUNBOOK-POSTHOG.md
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-10-25
 images: []
 ---
 
@@ -66,9 +66,8 @@ The file is built from a fixed set of fields:
 - the telemetry ID: the file marks the field as omitted;
 - stream keys, tokens and the WebSocket password;
 - channel names, stream title and chat messages;
-- images, audio, video and text read from the screen;
+- images, audio and video from the stream;
 - local paths, computer name and IP as a property;
-- the privacy guard watchlist;
 - raw logs.
 
 The telemetry ID helps match a technical event in PostHog, but it isn't

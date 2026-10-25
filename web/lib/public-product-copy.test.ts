@@ -120,38 +120,6 @@ describe("public product claims", () => {
     expect(enTerms).not.toContain("depends on OBS to produce");
   });
 
-  it("discloses the experimental guard's fail-closed video and uncensored audio", () => {
-    const ptTerms = source(
-      "../app/(legal)/[locale]/legal/_content/terms.pt.tsx",
-    );
-    const enTerms = source(
-      "../app/(legal)/[locale]/legal/_content/terms.en.tsx",
-    );
-    // The landing page only states what the guard does and costs; the terms carry the fail-closed detail.
-    for (const text of [ptTerms]) {
-      expect(text).toContain("imagens não verificadas também ficam cobertas");
-      expect(text).toContain("falhar ou ficar atrasada");
-      expect(text).toContain("automaticamente");
-    }
-    for (const text of [enTerms]) {
-      expect(text).toContain("Unverified images also stay covered");
-      expect(text).toContain("fails or falls behind");
-      expect(text).toContain("automatically");
-    }
-    for (const text of [pt["protection.guard.privacy.cost"], ptTerms]) {
-      expect(text).toContain("pode deixar passar termos");
-      expect(text).toContain("não censura o áudio");
-    }
-    for (const text of [en["protection.guard.privacy.cost"], enTerms]) {
-      expect(text).toContain("can miss terms");
-      expect(text).toContain("not censor audio");
-    }
-    expect(pt["protection.guard.privacy.switch"]).toBe("experimental");
-    expect(en["protection.guard.privacy.switch"]).toBe("experimental");
-    expect(pt["protection.guard.privacy.cost"]).not.toContain("o chat também");
-    expect(en["protection.guard.privacy.cost"]).not.toContain("the chat too");
-  });
-
   it("documents the fixed WebSocket port used by the OBS integration", () => {
     const native = source("../../src-tauri/src/commands.rs");
     const port = native.match(/const OBS_WS_PORT: u16 = (\d+);/)?.[1];

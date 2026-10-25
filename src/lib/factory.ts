@@ -63,8 +63,6 @@ export function defaultConfig(): AppConfig {
       brbEnabled: false,
       brbSlateKind: "auto",
       autoBitrate: true,
-      guardianEnabled: false,
-      guardianWatchlist: [],
       loudnessNormalize: false,
       loudnessTargetLufs: -14,
       blackScreenAlert: false,

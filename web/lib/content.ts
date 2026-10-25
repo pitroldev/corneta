@@ -41,7 +41,7 @@ const FEATURE_IDS = [
   "alerts",
   "overlay",
   "brb_screen",
-  "privacy_guard",
+  "deck_mode",
   "auto_bitrate",
   "post_live_report",
   "report_per_channel",

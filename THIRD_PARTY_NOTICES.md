@@ -58,20 +58,6 @@ o projeto não reivindica sua titularidade ou afiliação oficial. Emotes e outr
 elementos de plataforma vistos no chat não passam a ser de autoria da Corneta por
 aparecerem numa captura. A licença do código não concede direitos de marca de terceiros.
 
-## OCR e modelos baixados em runtime
-
-O backend usa OAR-OCR e ONNX Runtime, com suas licenças próprias no inventário Rust.
-Os três arquivos de modelo/dicionário PP-OCRv6 Tiny são obtidos da release OAR-OCR
-`v0.7.0`, com nomes, tamanhos e hashes fixados em `src-tauri/src/guardian/ocr.rs`.
-Eles não estão versionados como assets neste repositório.
-
-O [repositório OAR-OCR nessa versão](https://github.com/GreatV/oar-ocr/blob/v0.7.0/LICENSE)
-e o [projeto PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR/blob/main/LICENSE)
-publicam licença Apache-2.0. Isso identifica a licença declarada pelos projetos;
-não substitui conferir a procedência e os avisos dos pesos exatos antes de
-redistribuí-los ou criar um espelho. Não presumir que todo arquivo baixado tem
-a mesma licença do wrapper Rust.
-
 ## Evidência de conformidade da distribuição
 
 O estado das fontes verificadas do FFmpeg e do que ainda falta está em

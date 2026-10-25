@@ -15,6 +15,11 @@ export const LEGAL_UPDATED_ISO = "2026-09-09";
 export const LEGAL_UPDATED_LABEL_PT = "9 de setembro de 2026";
 export const LEGAL_UPDATED_LABEL_EN = "September 9, 2026";
 
+// The terms were revised after the privacy notice; the notice keeps its own date and telemetry version.
+export const TERMS_UPDATED_ISO = "2026-10-25";
+export const TERMS_UPDATED_LABEL_PT = "25 de outubro de 2026";
+export const TERMS_UPDATED_LABEL_EN = "October 25, 2026";
+
 // Mirror src/lib/legal.ts; change only for material terms that require renewed acceptance.
 export const LEGAL_ACCEPT_VERSION = "2026-08-01";
 

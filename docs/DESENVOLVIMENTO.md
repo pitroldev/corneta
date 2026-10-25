@@ -118,21 +118,6 @@ Não combine `-ToolDirectory` com `-AllowSystemFfmpeg`. As ferramentas ficam em
 `.artifacts/media-tools/`; o bloco restaura o `PATH` da sessão e não inicia o app
 ou uma live. Os testes geram mídia sintética em diretórios temporários.
 
-O teste de OCR é separado. Nas configurações de idioma do Windows, confira se há
-um pacote com reconhecimento óptico de caracteres instalado para um dos idiomas
-preferidos do usuário. Instalar apenas o idioma de exibição pode não fornecer a
-capacidade OCR. Execute, ainda na raiz:
-
-```powershell
-cargo test --manifest-path src-tauri/Cargo.toml --locked --lib guardian::ocr::bitmap_tests::native_ocr_accepts_direct_gray_input -- --ignored --exact --nocapture
-```
-
-Confirme que o teste foi encontrado e leia a saída. Se aparecer
-`Skipping OCR integration: no Windows OCR language pack available`, registre OCR
-como **não validado**: esse caminho retorna sem exercitar o motor, mesmo com
-status final de sucesso. Não confunda esse teste do OCR nativo do Windows com
-validação dos modelos PaddleOCR, detecção em jogo ou proteção durante uma live.
-
 ## Se não funcionar
 
 - **Versão de Node/pnpm:** confira os executáveis realmente usados pelo shell; abra um terminal novo após mudar o gerenciador.

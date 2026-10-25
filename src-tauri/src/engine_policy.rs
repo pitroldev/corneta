@@ -401,7 +401,6 @@ mod tests {
             obs: None,
             forced_brb: false,
             black_screen: false,
-            guardian_status: None,
         }
     }
 

@@ -14,9 +14,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-18
-reviewedAt: 2026-10-19
-productVersion: 0.9.0
+updatedAt: 2026-10-25
+reviewedAt: 2026-10-25
+productVersion: 0.13.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -31,11 +31,11 @@ sources:
   - title: Corneta diagnostic export command
     kind: internal
     repoPath: src-tauri/src/commands.rs
-    reviewedAt: 2026-10-19
+    reviewedAt: 2026-10-25
   - title: Corneta telemetry and diagnostics runbook
     kind: internal
     repoPath: docs/RUNBOOK-POSTHOG.md
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-10-25
 images: []
 ---
 
@@ -66,9 +66,8 @@ O arquivo é montado a partir de campos fechados:
 - o ID de telemetria: o arquivo marca o campo como omitido;
 - stream keys, tokens e senha do WebSocket;
 - nomes de canal, título da live e mensagens de chat;
-- imagem, áudio, vídeo e texto lido da tela;
+- imagem, áudio e vídeo da live;
 - caminhos locais, nome do computador e IP como propriedade;
-- watchlist do Guardião;
 - logs crus.
 
 O ID de telemetria ajuda a cruzar um evento técnico no PostHog, mas não é

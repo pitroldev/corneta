@@ -75,7 +75,6 @@ function deckState(over: Partial<DeckState> = {}): DeckState {
       brb: true,
       autoBitrate: true,
       blackScreen: false,
-      guardian: false,
     },
     title: "",
     layout: [],

@@ -19,7 +19,7 @@ export function BrbNowButton({
   const settings = useStore((s) => s.config!.settings);
   const forced = useStore((s) => s.snapshot.forcedBrb ?? false);
   const [busy, setBusy] = useState(false);
-  const armed = settings.brbEnabled || settings.guardianEnabled;
+  const armed = settings.brbEnabled;
 
   // Keep the resume action available even if BRB is disabled while a manual pause is active.
   if (!armed && !forced) {
@@ -193,11 +193,6 @@ export function StatePill({ state }: { state: TargetState }) {
         label: t("golive.state.brb"),
         cls: "text-brass",
         dot: "bg-brass animate-pulse",
-      },
-      censor: {
-        label: t("golive.state.censor"),
-        cls: "text-bad",
-        dot: "bg-bad animate-pulse",
       },
     };
   const m = map[state] ?? map.idle;

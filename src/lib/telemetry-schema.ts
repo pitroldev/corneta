@@ -214,7 +214,6 @@ export type SafeTargetState =
   | "signal-lost"
   | "auth-error"
   | "brb"
-  | "censor"
   | "stopped";
 
 export const TELEMETRY_STAGES = [
@@ -357,7 +356,6 @@ export type TelemetryEventMap = {
     target_count: number;
     platforms: SafePlatform[];
     brb_enabled: boolean;
-    guardian_enabled: boolean;
     record_video_enabled: boolean;
   };
   live_start_completed: {
@@ -448,7 +446,6 @@ const EVENT_KEYS: Record<TelemetryEventName, readonly string[]> = {
     "target_count",
     "platforms",
     "brb_enabled",
-    "guardian_enabled",
     "record_video_enabled",
   ],
   live_start_completed: ["operation_id", "duration_bucket", "encoder_kind"],
@@ -615,7 +612,6 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "signal-lost",
     "auth-error",
     "brb",
-    "censor",
     "stopped",
   ]),
   to: new Set([
@@ -629,7 +625,6 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "signal-lost",
     "auth-error",
     "brb",
-    "censor",
     "stopped",
   ]),
   reason: new Set([
@@ -673,7 +668,6 @@ function validProperty(key: string, value: unknown): boolean {
     key === "cancelled" ||
     key === "handled" ||
     key === "brb_enabled" ||
-    key === "guardian_enabled" ||
     key === "record_video_enabled"
   )
     return typeof value === "boolean";

@@ -589,17 +589,6 @@ export function QualityStep({
           onChange={(brbEnabled) => setSettings({ brbEnabled })}
           recommended
         />
-        <div className="flex items-start gap-3 py-3.5">
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-sm font-bold">
-              {t("golive.security.guardian.label")}
-              <ExperimentalBadge />
-            </div>
-            <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
-              {t("components.setup.quality.guardian")}
-            </p>
-          </div>
-        </div>
       </div>
     </div>
   );
@@ -657,7 +646,6 @@ export function DoneStep({
   const nets = [
     s.autoBitrate && t("golive.security.bitrate.label"),
     s.brbEnabled && t("golive.security.brb.label"),
-    s.guardianEnabled && t("golive.security.guardian.label"),
   ].filter((x): x is string => !!x);
   const need = estimate(config).uploadKbps / 1000;
   const rows: {

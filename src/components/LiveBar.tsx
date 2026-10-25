@@ -13,7 +13,6 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   // Keep destination counts consistent with the App live-region announcement.
   const down = useStore((s) => downTargets(s.snapshot));
   const viewers = useStore((s) => s.viewers);
-  const guardianOn = useStore((s) => s.snapshot.guardianStatus === "ready");
   const brbOn = useStore((s) => s.config?.settings.brbEnabled ?? false);
   const autoBitrateOn = useStore(
     (s) => s.config?.settings.autoBitrate ?? false,
@@ -71,7 +70,6 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
 
   const secs = live && startedAt ? (now - startedAt) / 1000 : 0;
   const protections = [
-    guardianOn && t("golive.bar.protection.guardian"),
     brbOn && t("golive.bar.protection.brb"),
     autoBitrateOn && t("golive.bar.protection.bitrate"),
   ].filter(Boolean) as string[];

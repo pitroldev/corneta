@@ -126,6 +126,8 @@ export const pt = {
     "Cada plataforma com conexão independente: se uma cai, as outras continuam no ar",
   "content.features.keys_in_vault":
     "Chaves de transmissão guardadas no cofre de credenciais do Windows",
+  "content.features.deck_mode":
+    "Modo deck: o celular vira o painel da live pelo Wi-Fi de casa, com marcar momento, JÁ VOLTO, cena, microfone, avisos, chat e saúde da live, sem instalar app",
   "content.features.load_estimate":
     "Estimativa de upload somado e de carga na placa antes de entrar ao vivo",
   "content.features.multistream":
@@ -134,8 +136,6 @@ export const pt = {
     "Overlay de alertas e chat para OBS servido localmente como Browser Source",
   "content.features.post_live_report":
     "Relatório pós-live com audiência, chat, alertas e seguidores por canal, comparação com a live anterior e exportação em HTML, CSV e JSON",
-  "content.features.privacy_guard":
-    "Guardião experimental: procura os termos que você listou e cobre o vídeo com “JÁ VOLTO” ao detectar um deles ou quando a leitura falha; não censura o áudio",
   "content.features.quality_modes":
     "Três modos de qualidade — copiar o sinal, converter só o que precisa ou converter tudo",
   "content.features.report_per_channel":
@@ -195,13 +195,6 @@ export const pt = {
   "page-data.tiny.tray.title": "Vive na bandeja",
   "page-data.tiny.youtube.title": "YouTube automático",
 
-  "protection.guard.privacy.body":
-    "esconde a tela quando aparece um termo da sua lista.",
-  "protection.guard.privacy.cost":
-    "Atrasa a live em 12s, pode deixar passar termos e não censura o áudio.",
-  "protection.guard.privacy.switch": "experimental",
-  "protection.guard.privacy.title": "Guardião de privacidade",
-
   "steps.accounts.lede":
     "Conectar a conta é opcional. Com ela, a Corneta cria a live no YouTube, pega a chave e traz o chat; o que ela faz com cada permissão está na",
   "steps.accounts.privacy.link": "política de privacidade",
@@ -236,8 +229,24 @@ export const pt = {
   "feat.chat.text":
     "Twitch, YouTube e Kick no mesmo feed, com alertas e overlay pro OBS.",
   "feat.chat.title": "Chat, alertas e overlay",
+  "feat.deck.title": "Seu celular vira o painel da live",
+  "feat.deck.text":
+    "Marque momentos, ligue o JÁ VOLTO, troque de cena e responda o chat sem dar alt-tab no jogo, sem instalar app nem criar conta.",
+  "feat.deck.does.label": "No celular",
+  "feat.deck.does.mark": "marcar momento",
+  "feat.deck.does.brb": "JÁ VOLTO",
+  "feat.deck.does.scene": "cena e microfone",
+  "feat.deck.does.alerts": "avisos com a solução",
+  "feat.deck.does.chat": "chat e saúde da live",
+  "feat.deck.does.combos": "combos",
+  "feat.deck.cost":
+    "Vem desligado, só funciona no mesmo Wi-Fi do PC e a conexão não é criptografada: nada de rede pública.",
+  "feat.deck.keys.alt":
+    "Modo deck no celular durante a live, com o botão grande de marcar momento e os de JÁ VOLTO, microfone, cena, título, recado no chat e cortar",
+  "feat.deck.chat.alt":
+    "Chat da Twitch, do YouTube e da Kick no celular, com o aviso de que alguém te marcou e o botão Responder",
   "feat.protection.alt":
-    "Proteções da Corneta: JÁ VOLTO, auto-bitrate e Guardião",
+    "Gaveta de proteções da Corneta com o JÁ VOLTO e o auto-bitrate ligados",
   "feat.protection.text":
     "Se o OBS cair, a tela JÁ VOLTO entra sem derrubar a live. Se a internet apertar, o auto-bitrate alivia os destinos recodificados.",
   "feat.protection.title": "Rede de proteção",

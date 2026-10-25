@@ -131,9 +131,6 @@ export interface AppSettings {
   chatBothAlertsFirst: boolean;
   /** Percentage of the combined popout occupied by alerts. */
   chatBothSplit: number;
-  guardianEnabled: boolean;
-  /** Explicit user watchlist; the engine ignores terms shorter than three characters. */
-  guardianWatchlist: string[];
   loudnessNormalize: boolean;
   /** Integrated loudness target in LUFS. */
   loudnessTargetLufs: number;
@@ -436,11 +433,6 @@ export interface Alert {
   title?: string;
 }
 
-export interface Leak {
-  label: string;
-  snippet: string;
-}
-
 export interface Profile {
   id: string;
   name: string;
@@ -471,8 +463,7 @@ export type TargetState =
   | "waiting"
   /** OBS signal loss after going live, distinct from preflight waiting. */
   | "signal-lost"
-  | "brb"
-  | "censor";
+  | "brb";
 
 export interface TargetStatus {
   targetId: string;
@@ -513,7 +504,6 @@ export interface EngineSnapshot {
   forcedBrb?: boolean;
   /** The OBS picture has stayed fully black long enough to warn. */
   blackScreen?: boolean;
-  guardianStatus?: "starting" | "ready" | "unavailable";
 }
 
 /** What a platform did with a moment marked during the live. */

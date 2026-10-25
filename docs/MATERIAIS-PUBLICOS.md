@@ -15,7 +15,7 @@ o material nem comprova direitos de uso.
   a data reais de cada imagem; atualizar o aplicativo não atualiza uma captura.
 - Marcas e emotes de plataforma mostrados na interface não se tornam propriedade
   da Corneta. Uma revisão de exposição não concede direitos sobre esses elementos.
-- Modelos ONNX, fontes binárias e dependências obtidas no install/build/runtime
+- Fontes binárias e dependências obtidas no install/build/runtime
   exigem seus próprios avisos e verificações de distribuição. Consulte os
   [avisos de terceiros](../THIRD_PARTY_NOTICES.md) e a
   [conformidade do FFmpeg](CONFORMIDADE-FFMPEG.md).

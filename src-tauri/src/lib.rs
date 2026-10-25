@@ -10,7 +10,6 @@ mod engine;
 mod engine_policy;
 mod frame_pool;
 mod gpu_pipeline;
-mod guardian;
 mod http_client;
 mod i18n;
 mod job;
@@ -123,6 +122,25 @@ fn shutdown_engine(app: &tauri::AppHandle) {
     deck::shutdown(app);
     commands::kill_engine_for_shutdown(app);
     commands::close_auto_broadcasts(app, generation, false);
+}
+
+/// Versions up to 0.13 downloaded OCR models for the removed privacy guard; delete only those files.
+fn remove_retired_ocr_models(app: &tauri::AppHandle) {
+    let Ok(dir) = app.path().app_config_dir().map(|d| d.join("ocr-models")) else {
+        return;
+    };
+    for name in [
+        "pp-ocrv6_tiny_det.onnx",
+        "pp-ocrv6_tiny_det.part",
+        "pp-ocrv6_tiny_rec.onnx",
+        "pp-ocrv6_tiny_rec.part",
+        "ppocrv6_tiny_dict.txt",
+        "ppocrv6_tiny_dict.part",
+    ] {
+        let _ = std::fs::remove_file(dir.join(name));
+    }
+    // Fails while anything else remains, so unknown files are left alone.
+    let _ = std::fs::remove_dir(&dir);
 }
 
 /// Explain the first tray hide, and always confirm that an active stream continues.
@@ -319,7 +337,6 @@ pub fn run() {
             commands::export_diagnostics,
             commands::register_shortcut,
             commands::obs_check,
-            resources::system_memory_bytes,
             commands::mark_moment,
             commands::deck_status,
             commands::deck_pair_start,
@@ -362,6 +379,7 @@ pub fn run() {
             {
                 let handle = app.handle().clone();
                 std::thread::spawn(move || {
+                    remove_retired_ocr_models(&handle);
                     let cfg = config::load(&handle);
                     let dir = recorder::resolve_dir(&handle, &cfg.settings.record_video_dir);
                     if let Some(dir) = dir.as_deref() {

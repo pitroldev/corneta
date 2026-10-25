@@ -147,7 +147,7 @@ Uma imagem é reprovada se mostrar, mesmo parcialmente:
 - e-mail, conta, chat, avatar ou nome de uma pessoa real;
 - ID real de telemetria, operação, relatório ou erro;
 - caminho local, username do Windows, IP ou notificação pessoal;
-- watchlist, tela adjacente ou dado que não seja necessário para a tarefa.
+- tela adjacente ou dado que não seja necessário para a tarefa.
 
 Não use blur como única proteção de segredo. Prepare dados fictícios antes da
 captura e prefira cortar a região. OCR e busca por padrões podem complementar,

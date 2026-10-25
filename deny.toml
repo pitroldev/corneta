@@ -4,8 +4,6 @@ targets = ["x86_64-pc-windows-msvc"]
 [advisories]
 version = 2
 ignore = [
-  { id = "RUSTSEC-2024-0436", reason = "paste is transitive through image/rav1e/simba; informational advisory, no vulnerability and no safe upgrade" },
-  { id = "RUSTSEC-2026-0192", reason = "ttf-parser is transitive through oar-ocr/imageproc; informational advisory, no vulnerability and no safe upgrade" },
   { id = "RUSTSEC-2025-0081", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
   { id = "RUSTSEC-2025-0075", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
   { id = "RUSTSEC-2025-0080", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },

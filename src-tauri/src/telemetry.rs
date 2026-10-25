@@ -1324,7 +1324,6 @@ fn property_allowed(event: &str, key: &str) -> bool {
                 | "target_count"
                 | "platforms"
                 | "brb_enabled"
-                | "guardian_enabled"
                 | "record_video_enabled"
         ),
         "live_start_completed" => {
@@ -1412,7 +1411,6 @@ fn validate_property_value(event: &str, key: &str, value: &Value) -> Result<(), 
         | "cancelled"
         | "live_was_active"
         | "brb_enabled"
-        | "guardian_enabled"
         | "record_video_enabled" => value.is_boolean(),
         // Identifiers must not become free-text, URL, or path dimensions.
         "screen_id" | "step_id" | "entry_point" | "encoder_kind" => value
@@ -1485,7 +1483,6 @@ fn normalize_target_state(value: &str) -> Option<&'static str> {
         "auth-error" => Some("auth-error"),
         "error" => Some("error"),
         "brb" => Some("brb"),
-        "censor" => Some("censor"),
         "stopped" => Some("stopped"),
         _ => None,
     }
@@ -1897,7 +1894,6 @@ pub fn diagnostic_config_summary(config: &AppConfig) -> Value {
             "autoStartObs": config.settings.auto_start_obs,
             "autoBitrate": config.settings.auto_bitrate,
             "brb": config.settings.brb_enabled,
-            "guardian": config.settings.guardian_enabled,
             "loudnessNormalize": config.settings.loudness_normalize,
             "youtubeAutoLive": config.settings.youtube_auto_live,
             "chatAutoConnect": config.settings.chat_auto_connect,
@@ -3147,11 +3143,9 @@ mod tests {
         let mut config = AppConfig::default();
         config.settings.stream_title = "Meu nome real".into();
         config.settings.record_video_dir = r"C:\Users\Pessoa\Videos".into();
-        config.settings.guardian_watchlist = vec!["segredo".into()];
         let text = serde_json::to_string(&diagnostic_config_summary(&config)).unwrap();
         assert!(!text.contains("Meu nome real"));
         assert!(!text.contains("Pessoa"));
-        assert!(!text.contains("segredo"));
         assert!(!text.contains("record_video_dir"));
     }
 

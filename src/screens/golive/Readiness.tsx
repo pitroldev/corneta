@@ -27,14 +27,7 @@ import { useReadiness, useReadinessContext } from "../../lib/useReadiness";
 import { cn } from "../../lib/utils";
 import { rich, useI18n, useT, type I18n } from "../../lib/i18n";
 import type { TargetIssue } from "../../lib/validation";
-import {
-  Badge,
-  Button,
-  CopyField,
-  ExperimentalBadge,
-  PlatformGlyph,
-  Toggle,
-} from "../../components/ui";
+import { Button, CopyField, PlatformGlyph, Toggle } from "../../components/ui";
 import { Drawer } from "../../components/Drawer";
 import { QualityModeCards, modeTitleKey } from "../../components/QualityModes";
 import { QuickConnect } from "../../components/platforms/TargetConnect";
@@ -47,14 +40,6 @@ type Tone = "ok" | "warn" | "bad" | "neutral" | "loading";
 function useSafetyItems() {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
-  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
-  const watchCount = settings.guardianWatchlist.filter(
-    (term) => term.trim().length >= 3,
-  ).length;
-  const guardianOn =
-    settings.guardianEnabled &&
-    watchCount > 0 &&
-    (!guardianStatus || guardianStatus === "ready");
   return [
     {
       key: "brb",
@@ -65,11 +50,6 @@ function useSafetyItems() {
       key: "bitrate",
       on: settings.autoBitrate,
       label: t("golive.security.bitrate.label"),
-    },
-    {
-      key: "guardian",
-      on: guardianOn,
-      label: t("golive.security.guardian.label"),
     },
     {
       key: "blackScreen",
@@ -707,18 +687,12 @@ function SafetyPanel() {
   const t = useT();
   const settings = useStore((s) => s.config!.settings);
   const setSettings = useStore((s) => s.setSettings);
-  const guardianStatus = useStore((s) => s.snapshot.guardianStatus);
-  const watchCount = settings.guardianWatchlist.filter(
-    (term) => term.trim().length >= 3,
-  ).length;
   const rows: {
     key: string;
     label: string;
     desc: string;
     on: boolean;
     set: (v: boolean) => void;
-    experimental?: boolean;
-    status?: string;
   }[] = [
     {
       key: "brb",
@@ -737,25 +711,6 @@ function SafetyPanel() {
         : t("golive.security.bitrate.desc.off"),
       on: settings.autoBitrate,
       set: (autoBitrate) => setSettings({ autoBitrate }),
-    },
-    {
-      key: "guardian",
-      label: t("golive.security.guardian.label"),
-      desc:
-        guardianStatus && guardianStatus !== "ready"
-          ? t(`guardian.status.${guardianStatus}.body`)
-          : settings.guardianEnabled
-            ? watchCount > 0
-              ? t("golive.security.guardian.watching", { n: watchCount })
-              : t("golive.security.guardian.noTerms")
-            : t("golive.security.guardian.desc.off"),
-      on: settings.guardianEnabled,
-      set: (guardianEnabled) => setSettings({ guardianEnabled }),
-      experimental: true,
-      status:
-        guardianStatus && guardianStatus !== "ready"
-          ? t(`guardian.status.${guardianStatus}.short`)
-          : undefined,
     },
     {
       key: "blackScreen",
@@ -783,11 +738,7 @@ function SafetyPanel() {
           className="flex items-start gap-3 rounded-lg bg-surface-2 p-3.5"
         >
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="font-display font-bold">{row.label}</span>
-              {row.experimental && <ExperimentalBadge />}
-              {row.status && <Badge tone="warn">{row.status}</Badge>}
-            </div>
+            <span className="font-display font-bold">{row.label}</span>
             <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
               {row.desc}
             </p>

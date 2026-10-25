@@ -68,7 +68,7 @@ Cada plataforma vive na própria pasta, e o núcleo só conhece o registro.
 
 O slice de chat preserva o processamento em lotes e os limites de mensagens/alertas, além do encerramento das assinaturas e timers. O de OAuth concentra configuração, modos e estado dos fluxos; trocar entre credenciais próprias e oficiais não equivale a apagá-las. O de navegação mantém pedidos consumíveis de foco, abas e telas. Os testes em [store.slices.test.ts](../src/lib/store.slices.test.ts) cobrem falhas de exclusão de credenciais, sincronização sem regravação e limpeza de lotes de chat; não substituem um ensaio real com provedores.
 
-`ChatScreen.tsx` e `SettingsScreen.tsx` são os pontos de entrada e coordenadores de suas telas. `screens/chat/` agrupa contas, fontes, alertas, overlays, primitivas e constantes; `screens/settings/` agrupa JÁ VOLTO, Guardião, gravação, teste do OBS, atalhos e prévias. Esses componentes usam o design system existente e o store/API comuns. Uma extração não deve criar outra assinatura global, fila de configuração ou cópia local persistente do mesmo estado.
+`ChatScreen.tsx` e `SettingsScreen.tsx` são os pontos de entrada e coordenadores de suas telas. `screens/chat/` agrupa contas, fontes, alertas, overlays, primitivas e constantes; `screens/settings/` agrupa JÁ VOLTO, gravação, teste do OBS, atalhos e prévias. Esses componentes usam o design system existente e o store/API comuns. Uma extração não deve criar outra assinatura global, fila de configuração ou cópia local persistente do mesmo estado.
 
 ## Como extrair módulos sem parar o produto
 

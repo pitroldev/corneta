@@ -219,8 +219,7 @@ jobs de qualidade passarem.
     O job reconfere os arquivos e o deployment contra a configuração aprovada no build antes
     de publicar. Não altere o draft ou o deployment durante a promoção.
 
-O job Rust usa deliberadamente a toolchain 1.97.1, alinhada ao projeto e acima do MSRV 1.95
-exigido por `oar-ocr` 0.8.1.
+O job Rust usa deliberadamente a toolchain 1.97.1, alinhada ao `rust-version` do projeto.
 `notify-rust` está temporariamente pinado ao commit imutável do PR oficial que troca
 `tauri-winrt-notification` 0.7 por 0.8.1 e remove `quick-xml` vulnerável. Remova o patch de
 `Cargo.toml` quando uma release equivalente chegar ao crates.io, nunca substituindo-o por branch

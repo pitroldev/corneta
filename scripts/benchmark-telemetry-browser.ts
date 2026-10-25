@@ -143,7 +143,6 @@ async function run(scenario: Scenario) {
         target_count: 1,
         platforms: ["twitch"],
         brb_enabled: false,
-        guardian_enabled: false,
         record_video_enabled: false,
       };
       let error: Error | undefined;

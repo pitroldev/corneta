@@ -90,7 +90,7 @@ Timestamps de relatório/chat são milissegundos inteiros; métricas como CPU ma
 12. Salto do relógio do sistema e ajuste manual de sincronia.
 13. Relatório legado schema v1 sem os campos modernos.
 14. Metadado de gravação cujo arquivo foi removido externamente.
-15. Estados JÁ VOLTO e censura do Guardião sem falso positivo de queda.
+15. Estado JÁ VOLTO sem falso positivo de queda.
 16. Sessão abortada antes da primeira amostra, sem dados úteis.
 17. Navegador disputando CPU com a transmissão.
 18. Pressão de memória atribuível ao navegador.
