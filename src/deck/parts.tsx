@@ -121,8 +121,6 @@ export function stateText(
       return t("deck.target.paused");
     case "signal-lost":
       return t("deck.target.signalLost");
-    case "censor":
-      return t("deck.target.censor");
     case "error":
       return t("deck.target.error");
     default:

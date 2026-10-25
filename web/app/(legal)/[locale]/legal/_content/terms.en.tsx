@@ -9,8 +9,8 @@ import {
   LEGAL_AUTHOR,
   LEGAL_CNPJ,
   LEGAL_OPERATOR,
-  LEGAL_UPDATED_LABEL_EN,
   LEGAL_VENUE,
+  TERMS_UPDATED_LABEL_EN,
   legalHref,
 } from "@/lib/legal";
 
@@ -49,7 +49,7 @@ export const termsTldrEn = {
     "Corneta’s core is open source under the MIT licence: use it, study it, modify it, share it.",
     "There’s no subscription and no account to create; the app runs on your computer.",
     "You stay responsible for what you stream and for following each platform’s rules.",
-    "Features marked experimental can fail; the privacy guard is a safety net, not a guarantee.",
+    "Features marked experimental can fail, change or be removed.",
     "The software comes “as is”, with no warranty — but your consumer rights under Brazilian law still stand.",
   ],
   note: "This summary is a reading courtesy and does not replace the full text below.",
@@ -228,16 +228,6 @@ export function TermsBodyEn() {
             account.
           </li>
           <li>
-            <strong>The privacy guard</strong> is a safety net that watches for
-            terms you define and covers video with “BE RIGHT BACK” when it
-            detects one. Unverified images also stay covered while reading
-            starts up, fails or falls behind, without ending the connection.
-            Video can return automatically once reading recovers and finds no
-            listed term. The feature adds stream delay, can miss terms and does
-            not censor audio, which keeps being transmitted. It is not a
-            guarantee that nothing leaks.
-          </li>
-          <li>
             <strong>Automatic safety nets</strong> like “BE RIGHT BACK” and
             auto-bitrate react to conditions they can detect; failures outside
             what they expect can still cut your stream.
@@ -323,7 +313,7 @@ export function TermsBodyEn() {
           Corneta is under active development. Features can be added, changed or
           removed, and new versions can require reconfiguration steps. These
           terms may be updated to keep up; the revision date at the top marks
-          the version in force, today {LEGAL_UPDATED_LABEL_EN}.
+          the version in force, today {TERMS_UPDATED_LABEL_EN}.
         </p>
         <p>
           Wording fixes take effect on publication. A <strong>material</strong>{" "}

@@ -61,9 +61,6 @@ export function createChatSlice({
   | "clearAlerts"
   | "viewers"
   | "bindViewers"
-  | "leaks"
-  | "censored"
-  | "bindGuardian"
 > {
   let discardPendingChat = () => {};
   return {
@@ -276,14 +273,6 @@ export function createChatSlice({
     viewers: { total: 0, anyLive: false, items: [] },
     bindViewers() {
       return api.subscribeViewers((v) => set({ viewers: v }));
-    },
-    leaks: [],
-    censored: false,
-    bindGuardian() {
-      return api.subscribeGuardian(
-        (l) => set((s) => ({ leaks: [...s.leaks, l].slice(-20) })),
-        (on) => set({ censored: on }),
-      );
     },
   };
 }

@@ -332,8 +332,8 @@ const scenarios = [
     note: "Exercita player/estado de gravação ausente sem criar MP4.",
   },
   {
-    slug: "brb-e-censura",
-    title: "JÁ VOLTO e proteção de privacidade",
+    slug: "brb",
+    title: "JÁ VOLTO no meio da live",
     ago: 14 * DAY,
     durationMs: 20 * 60_000,
     stepMs: 10_000,
@@ -341,13 +341,13 @@ const scenarios = [
     platforms: [TWITCH, YOUTUBE, KICK],
     stateWindows: [
       { state: "brb", from: 0.28, to: 0.36 },
-      { state: "censor", from: 0.66, to: 0.7 },
+      { state: "brb", from: 0.66, to: 0.7 },
     ],
     markers: [
       [0.28, "JÁ VOLTO ativado"],
-      [0.66, "Guardião ocultou dado sensível"],
+      [0.66, "JÁ VOLTO de novo"],
     ],
-    note: "Estados brb/censor sem falso positivo de queda de plataforma.",
+    note: "Estado brb sem falso positivo de queda de plataforma.",
   },
   {
     slug: "abortada-sem-dados",
@@ -727,7 +727,7 @@ function generateSession(s, index, now) {
             drops[targetIndex] += 4;
           }
         }
-        if (state === "brb" || state === "censor") bitrate *= 0.72;
+        if (state === "brb") bitrate *= 0.72;
         return {
           id: p.id,
           name: p.name,

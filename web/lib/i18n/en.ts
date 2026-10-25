@@ -126,6 +126,8 @@ export const en: Dict = {
     "Each platform on its own connection: if one drops, the others stay on air",
   "content.features.keys_in_vault":
     "Stream keys kept in Windows Credential Manager",
+  "content.features.deck_mode":
+    "Deck mode: your phone becomes the stream panel over your home Wi-Fi, with mark a moment, BE RIGHT BACK, scene, mic, warnings, chat and stream health, no app to install",
   "content.features.load_estimate":
     "Estimate of your total upload and of the load on your graphics card before you go live",
   "content.features.multistream":
@@ -134,8 +136,6 @@ export const en: Dict = {
     "Alert and chat overlay for OBS, served from your own machine as a Browser Source",
   "content.features.post_live_report":
     "Post-stream report with audience, chat, alerts and followers per channel, comparison with your previous stream and export to HTML, CSV and JSON",
-  "content.features.privacy_guard":
-    "Experimental privacy guard: looks for the terms you listed and covers the video with BE RIGHT BACK when it detects one or reading fails; it does not censor audio",
   "content.features.quality_modes":
     "Three quality modes — copy the signal, convert only what needs it, or convert everything",
   "content.features.report_per_channel":
@@ -195,13 +195,6 @@ export const en: Dict = {
   "page-data.tiny.tray.title": "Lives in the tray",
   "page-data.tiny.youtube.title": "YouTube on autopilot",
 
-  "protection.guard.privacy.body":
-    "hides the picture when a term from your list shows up.",
-  "protection.guard.privacy.cost":
-    "Adds a 12s delay, can miss terms and does not censor audio.",
-  "protection.guard.privacy.switch": "experimental",
-  "protection.guard.privacy.title": "Privacy guard",
-
   "steps.accounts.lede":
     "Connecting your account is optional. With it, Corneta creates the YouTube broadcast, gets the key and brings in the chat; what it does with each permission is in the",
   "steps.accounts.privacy.link": "privacy policy",
@@ -236,8 +229,24 @@ export const en: Dict = {
   "feat.chat.text":
     "Twitch, YouTube and Kick in one feed, plus alerts and an OBS overlay.",
   "feat.chat.title": "Chat, alerts and overlay",
+  "feat.deck.title": "Your phone becomes your stream panel",
+  "feat.deck.text":
+    "Mark moments, turn on BE RIGHT BACK, switch scenes and answer chat without alt-tabbing out of your game, with no app to install and no account.",
+  "feat.deck.does.label": "On your phone",
+  "feat.deck.does.mark": "mark a moment",
+  "feat.deck.does.brb": "BE RIGHT BACK",
+  "feat.deck.does.scene": "scene and mic",
+  "feat.deck.does.alerts": "warnings with the fix",
+  "feat.deck.does.chat": "chat and stream health",
+  "feat.deck.does.combos": "combos",
+  "feat.deck.cost":
+    "Off by default, works only on the PC's Wi-Fi, and the connection isn't encrypted: skip public networks.",
+  "feat.deck.keys.alt":
+    "Deck mode on a phone mid-stream, with the big mark-a-moment button plus BE RIGHT BACK, mic, scene, title, chat message and end stream",
+  "feat.deck.chat.alt":
+    "Twitch, YouTube and Kick chat on a phone, with the warning that someone mentioned you and the Reply button",
   "feat.protection.alt":
-    "Corneta safety nets: BE RIGHT BACK, auto-bitrate and privacy guard",
+    "Corneta's safety nets drawer with BE RIGHT BACK and auto-bitrate turned on",
   "feat.protection.text":
     "If OBS drops, BE RIGHT BACK goes on air without ending the stream. If your internet chokes, auto-bitrate eases the re-encoded destinations.",
   "feat.protection.title": "Safety nets",

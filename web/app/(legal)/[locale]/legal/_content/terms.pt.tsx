@@ -10,8 +10,8 @@ import {
   LEGAL_CNPJ,
   LEGAL_OPERATOR,
   LEGAL_ROUTES,
-  LEGAL_UPDATED_LABEL_PT,
   LEGAL_VENUE,
+  TERMS_UPDATED_LABEL_PT,
 } from "@/lib/legal";
 
 // Binding Portuguese text; keep the English translation aligned.
@@ -49,7 +49,7 @@ export const termsTldrPt = {
     "O núcleo da Corneta é open source sob licença MIT: pode usar, estudar, modificar e distribuir.",
     "Não cobramos assinatura e não há conta para criar; o app roda no seu computador.",
     "Você continua responsável pelo que transmite e por seguir as regras de cada plataforma.",
-    "Recursos marcados como experimentais podem falhar; o Guardião é rede de segurança, não garantia.",
+    "Recursos marcados como experimentais podem falhar, mudar ou ser removidos.",
     "O software é oferecido “como está”, sem garantia — mas os seus direitos de consumidor continuam valendo.",
   ],
   note: "Este resumo é uma cortesia de leitura e não substitui o texto completo abaixo.",
@@ -234,17 +234,6 @@ export function TermsBodyPt() {
             para a sua conta.
           </li>
           <li>
-            <strong>Guardião de privacidade</strong> é uma rede de segurança que
-            procura termos definidos por você e cobre o vídeo com “JÁ VOLTO” ao
-            detectar um deles. Durante a preparação, ou se a leitura falhar ou
-            ficar atrasada, as imagens não verificadas também ficam cobertas,
-            sem encerrar a conexão. O vídeo pode retornar automaticamente quando
-            a leitura se recupera e não encontra um termo listado. O recurso
-            adiciona atraso à transmissão, pode deixar passar termos e não
-            censura o áudio, que continua sendo transmitido. Não é garantia de
-            que nada vazará.
-          </li>
-          <li>
             <strong>Proteções automáticas</strong> como “JÁ VOLTO” e
             auto-bitrate reagem a condições detectáveis; falhas fora do previsto
             podem, ainda assim, interromper a sua live.
@@ -332,7 +321,7 @@ export function TermsBodyPt() {
           adicionados, alterados ou removidos, e versões novas podem exigir
           passos de reconfiguração. Estes termos podem ser atualizados para
           acompanhar essas mudanças; a data de revisão no topo indica a versão
-          vigente, hoje de {LEGAL_UPDATED_LABEL_PT}.
+          vigente, hoje de {TERMS_UPDATED_LABEL_PT}.
         </p>
         <p>
           Correções de redação valem a partir da publicação. Já uma mudança{" "}

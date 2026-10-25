@@ -189,7 +189,7 @@
     },
     {
       "file": "web/content/assets/originals/operations/corneta-live-safety-settings.png",
-      "sha256": "fd7e99912056335407f758f18be7e5db84c91b9d39e1a51433c0001e547eeac9"
+      "sha256": "43439e055c2f8b48c7dea4e4de35157631502350755353c2b414d59b33fdca85"
     },
     {
       "file": "web/content/assets/originals/quality/corneta-quality-modes.png",
@@ -233,7 +233,7 @@
     },
     {
       "file": "web/public/images/editorial/operations/corneta-live-safety-settings.webp",
-      "sha256": "e4c2a04f592f66edb6ec10d29bcc3f760a191260a923ab3d901dfc1b0a72e26e"
+      "sha256": "0628eb5b3f5b46f424cf2edd5086095b3813a4746a7b66dd0cc38a0ece4b38f3"
     },
     {
       "file": "web/public/images/editorial/quality/corneta-quality-modes.webp",
@@ -254,6 +254,18 @@
       "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
     },
     {
+      "file": "web/public/images/lp/en/feat-deck-chat.webp",
+      "sha256": "0169725c6b376250293465b4d213675f6d9eff505f39a518d7b539ffca33efcb",
+      "reviewedAt": "2026-10-25",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/en/feat-deck-keys.webp",
+      "sha256": "52ed6a56951176048814164c959dc2538c98a2f09c884fb2c4f2bca5a52804c7",
+      "reviewedAt": "2026-10-25",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
       "file": "web/public/images/lp/en/feat-independent.webp",
       "sha256": "6675a8384ddec79601e5f736059ef8503b2d245c6354800b14d85f7bc45ee909",
       "reviewedAt": "2026-10-22",
@@ -261,8 +273,8 @@
     },
     {
       "file": "web/public/images/lp/en/feat-protection.webp",
-      "sha256": "18f170f3412dd1764c512bd321958a9a25d5870f5d648d2f5bc73ae49818fa9f",
-      "reviewedAt": "2026-10-22",
+      "sha256": "fe39154336438ee09daa5b35ca41e10bcf2ca45ae0fa38f06cec909ac84c8b84",
+      "reviewedAt": "2026-10-25",
       "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
     },
     {
@@ -302,6 +314,18 @@
       "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
     },
     {
+      "file": "web/public/images/lp/pt-BR/feat-deck-chat.webp",
+      "sha256": "21b403ce267767304ae249e363494714c8fe7a3d7ea03c3db3746d6e67ec75bb",
+      "reviewedAt": "2026-10-25",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
+      "file": "web/public/images/lp/pt-BR/feat-deck-keys.webp",
+      "sha256": "badeecea7d8a2b3bdbe99e0707f495ba1e59cccb7aeaff1b6ace594455b7a7cc",
+      "reviewedAt": "2026-10-25",
+      "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
+    },
+    {
       "file": "web/public/images/lp/pt-BR/feat-independent.webp",
       "sha256": "31cad3e4fc5692590539e3ec8d97b646c6368d73827cacca69bfbd8995c7273b",
       "reviewedAt": "2026-10-22",
@@ -309,8 +333,8 @@
     },
     {
       "file": "web/public/images/lp/pt-BR/feat-protection.webp",
-      "sha256": "bffb00518c95cbf8763279d1a5d8eae7e61699fdf00fe9d6a6171acaa15c09dc",
-      "reviewedAt": "2026-10-22",
+      "sha256": "912aa7326f287118c0a1a3eefa2a4ad9ce18ae802f6559f7f00e5b8a21b989a9",
+      "reviewedAt": "2026-10-25",
       "reviewScope": "Visual privacy inspection by a coding agent of this landing-page capture or poster (synthetic demo personas and numbers, illustrative photo without an identifiable face, platform logos); not a human sign-off or legal approval."
     },
     {
@@ -373,7 +397,7 @@
     },
     {
       "file": "web/content/assets/originals/operations/corneta-live-safety-settings-en.png",
-      "sha256": "c0ff51a6e6592ad8e7f995c8a9d0ba21166f2a0ab2fee31131155703e06efbd7"
+      "sha256": "15d9597775206cd11ec6194205fd3ecc5794efb0d5be2a31f2961d167d123e11"
     },
     {
       "file": "web/content/assets/originals/quality/corneta-quality-modes-en.png",
@@ -417,7 +441,7 @@
     },
     {
       "file": "web/public/images/editorial/operations/corneta-live-safety-settings-en.webp",
-      "sha256": "f3b716dd487857bf2e3d6b71a5f2c070cc94b4ee92fe24ac6cb920a4a4a16987"
+      "sha256": "8784b4e53d2e76594a37e8b2c19fb2860d09d6034e85fcfcfb57cdce4239a0c6"
     },
     {
       "file": "web/public/images/editorial/quality/corneta-quality-modes-en.webp",

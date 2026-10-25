@@ -55,7 +55,6 @@ describe("destination registry", () => {
           target_count: 1,
           platforms: [id],
           brb_enabled: false,
-          guardian_enabled: false,
           record_video_enabled: false,
         },
         context,

@@ -96,10 +96,6 @@ pub fn build(input: &Input) -> Value {
         })
         .collect();
     let signal_lost = snap.is_some_and(|x| x.targets.values().any(|t| t.state == "signal-lost"));
-    let guardian = s.guardian_enabled
-        && s.guardian_watchlist
-            .iter()
-            .any(|t| t.trim().chars().count() >= 3);
     let chat_platforms: Vec<&str> = {
         let mut list: Vec<&str> = s
             .chat_sources
@@ -121,7 +117,7 @@ pub fn build(input: &Input) -> Value {
             "state": engine_state,
             "startedAt": snap.and_then(|x| x.started_at),
             "forcedBrb": snap.is_some_and(|x| x.forced_brb),
-            "brbArmed": s.brb_enabled || guardian,
+            "brbArmed": s.brb_enabled,
             "blackScreen": snap.is_some_and(|x| x.black_screen),
             "signalLost": signal_lost,
             "ingestLive": snap.is_some_and(|x| x.ingest_live),
@@ -139,7 +135,6 @@ pub fn build(input: &Input) -> Value {
             "brb": s.brb_enabled,
             "autoBitrate": s.auto_bitrate,
             "blackScreen": s.black_screen_alert,
-            "guardian": guardian,
         },
         "title": s.stream_title,
         "layout": s.deck_layout,

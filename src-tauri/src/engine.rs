@@ -315,20 +315,6 @@ pub fn ffmpeg_args_for_target(
         ]
         .map(String::from),
     );
-
-    // Only the raw Guardian program guarantees AAC-LC/48k/stereo/160k; other sources must be encoded.
-    let known_audio = config.settings.guardian_enabled
-        && config
-            .settings
-            .guardian_watchlist
-            .iter()
-            .any(|term| !term.trim().is_empty())
-        && source_url == program_url(config)
-        && audio_kbps == 160
-        && !config.settings.loudness_normalize;
-    if known_audio {
-        copy_encoded_audio(&mut args);
-    }
     args
 }
 
@@ -363,9 +349,6 @@ pub(crate) fn ffmpeg_args_for_rendition_egress(
     args
 }
 
-/// Must exceed full-frame OCR plus stationary-text rescan latency to keep protection preventive.
-pub const GUARD_DELAY_SEC: u32 = 12;
-
 /// Program PCM is s16le, 48 kHz stereo, aligned to video ticks.
 pub const PROG_AUDIO_HZ: u32 = 48_000;
 pub const PROG_AUDIO_CH: u32 = 2;
@@ -389,11 +372,10 @@ impl ProgramSpec {
     }
 }
 
-// Guardian OCR is calibrated at 1080p; other streams can use 720p unless a target needs more.
-fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
+// 720p is enough unless a target needs more.
+fn program_resolution(config: &AppConfig) -> (u32, u32) {
     let enabled: Vec<&Target> = config.targets.iter().filter(|t| t.enabled).collect();
-    let needs_full_hd = guard
-        || enabled.is_empty()
+    let needs_full_hd = enabled.is_empty()
         || enabled.iter().any(|t| {
             let p = effective_preset(t);
             p.height > p.width || p.width.min(p.height) > 720
@@ -405,8 +387,8 @@ fn program_resolution(config: &AppConfig, guard: bool) -> (u32, u32) {
     }
 }
 
-// Guardian stays at 30 fps to bound the raw delay buffer; copy targets inherit the program bitrate.
-pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
+// Copy targets inherit the program bitrate.
+pub fn program_spec(config: &AppConfig) -> ProgramSpec {
     let mut max_fps = 30u32;
     let mut max_kbps = 4500u32;
     for t in config.targets.iter().filter(|t| t.enabled) {
@@ -414,11 +396,11 @@ pub fn program_spec(config: &AppConfig, guard: bool) -> ProgramSpec {
         max_fps = max_fps.max(p.fps);
         max_kbps = max_kbps.max(p.video_bitrate_kbps);
     }
-    let (w, h) = program_resolution(config, guard);
+    let (w, h) = program_resolution(config);
     ProgramSpec {
         w,
         h,
-        fps: if guard { 30 } else { max_fps.clamp(30, 60) },
+        fps: max_fps.clamp(30, 60),
         video_kbps: max_kbps.clamp(2500, 12_000),
     }
 }
@@ -682,8 +664,6 @@ pub struct EngineSnapshot {
     pub forced_brb: bool,
     /// The OBS picture has stayed fully black long enough to warn; set only with the opt-in watch.
     pub black_screen: bool,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub guardian_status: Option<crate::guardian::GuardianStatus>,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -713,7 +693,6 @@ impl EngineSnapshot {
             obs: None,
             forced_brb: false,
             black_screen: false,
-            guardian_status: None,
         }
     }
 
@@ -755,13 +734,6 @@ impl EngineSnapshot {
             obs: None,
             forced_brb: false,
             black_screen: false,
-            guardian_status: (config.settings.guardian_enabled
-                && config
-                    .settings
-                    .guardian_watchlist
-                    .iter()
-                    .any(|term| term.trim().chars().count() >= 3))
-            .then_some(crate::guardian::GuardianStatus::Starting),
         }
     }
 }
@@ -1058,30 +1030,16 @@ mod tests {
     }
 
     #[test]
-    fn audio_copy_requires_a_proven_program_contract() {
+    fn program_audio_is_always_encoded_for_destinations() {
         let target = tgt("twitch", Some(preset(1280, 720, 30, 4000)));
         let mut config = cfg("per-platform", vec![target.clone()]);
-        config.settings.guardian_enabled = true;
-        config.settings.guardian_watchlist = vec!["private".into()];
-        let audio = |config: &AppConfig, target: &Target, source: &str| {
-            let args = ffmpeg_args_for_target(config, target, "key", None, source, None);
+        config.settings.brb_enabled = true;
+        let audio = |config: &AppConfig, source: &str| {
+            let args = ffmpeg_args_for_target(config, &target, "key", None, source, None);
             args.windows(2).find(|pair| pair[0] == "-c:a").unwrap()[1].clone()
         };
-        assert_eq!(audio(&config, &target, &program_url(&config)), "copy");
-        assert_eq!(audio(&config, &target, "rtmp://127.0.0.1/live/obs"), "aac");
-        let mut different = target.clone();
-        different
-            .encoding
-            .preset
-            .as_mut()
-            .unwrap()
-            .audio_bitrate_kbps = 128;
-        assert_eq!(audio(&config, &different, &program_url(&config)), "aac");
-        config.settings.loudness_normalize = true;
-        assert_eq!(audio(&config, &target, &program_url(&config)), "aac");
-        config.settings.loudness_normalize = false;
-        config.settings.guardian_watchlist.clear();
-        assert_eq!(audio(&config, &target, &program_url(&config)), "aac");
+        assert_eq!(audio(&config, &program_url(&config)), "aac");
+        assert_eq!(audio(&config, "rtmp://127.0.0.1/live/obs"), "aac");
     }
 
     #[test]
@@ -1203,18 +1161,17 @@ mod tests {
             "hybrid",
             vec![tgt("facebook", Some(preset(1280, 720, 30, 4000)))],
         );
-        assert_eq!(program_resolution(&c, false), (1280, 720));
+        assert_eq!(program_resolution(&c), (1280, 720));
         let c2 = cfg(
             "hybrid",
             vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
         );
-        assert_eq!(program_resolution(&c2, false), (1920, 1080));
+        assert_eq!(program_resolution(&c2), (1920, 1080));
         let c3 = cfg(
             "hybrid",
             vec![tgt("tiktok", Some(preset(720, 1280, 30, 3000)))],
         );
-        assert_eq!(program_resolution(&c3, false), (1920, 1080));
-        assert_eq!(program_resolution(&c, true), (1920, 1080));
+        assert_eq!(program_resolution(&c3), (1920, 1080));
     }
 
     #[test]
@@ -1223,13 +1180,12 @@ mod tests {
             "hybrid",
             vec![tgt("twitch", Some(preset(1920, 1080, 60, 6000)))],
         );
-        assert_eq!(program_spec(&c, false).fps, 60);
-        assert_eq!(program_spec(&c, true).fps, 30);
+        assert_eq!(program_spec(&c).fps, 60);
         let low = cfg(
             "hybrid",
             vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))],
         );
-        assert!(program_spec(&low, false).video_kbps >= 2500);
+        assert!(program_spec(&low).video_kbps >= 2500);
     }
 
     #[test]

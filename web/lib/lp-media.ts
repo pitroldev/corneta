@@ -11,7 +11,13 @@ type LocaleMedia = {
   poster: Still;
   chapters: Record<ChapterId, number>;
   features: Record<
-    "independent" | "chat" | "protection" | "reportChart" | "reportMoments",
+    | "independent"
+    | "chat"
+    | "protection"
+    | "deckKeys"
+    | "deckChat"
+    | "reportChart"
+    | "reportMoments",
     Still
   >;
   // The quality screen wraps differently in each language, so these crops differ in height.
@@ -34,7 +40,9 @@ const shared = (locale: Locale) => ({
   features: {
     independent: still(locale, "feat-independent", 1496, 464),
     chat: still(locale, "feat-chat", 1496, 572),
-    protection: still(locale, "feat-protection", 832, 994),
+    protection: still(locale, "feat-protection", 832, 942),
+    deckKeys: still(locale, "feat-deck-keys", 780, 1688),
+    deckChat: still(locale, "feat-deck-chat", 780, 1688),
     reportChart: still(locale, "feat-report", 1496, 692),
     reportMoments: still(locale, "feat-report-moments", 800, 658),
   },

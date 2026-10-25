@@ -313,7 +313,7 @@ nela (no celular eles vêm depois das perguntas); e o CTA final. Abaixo de 980px
 colapsam em uma coluna; no celular, cada passo vira uma linha com o número ao lado.
 
 **A Regra da Frase Única.** Passo e cartão de recurso têm título e uma frase; o recorte da tela
-faz o resto. Ressalva cabe numa linha (a do Guardião é uma); o que de fato precisa de mais
+faz o resto. Ressalva cabe numa linha; o que de fato precisa de mais
 palavras — as permissões das contas — fica na política de privacidade, com uma linha e o link na
 página, nunca num parágrafo de venda. O FAQ não repete o que a página já mostra (plataformas, overlay, vídeo em pé). Se a página repete
 a mesma promessa em duas seções, uma delas sai.
@@ -433,10 +433,14 @@ As telas que aparecem nos recursos são recortes das telas reais do app em 2×,
 tirados do modo demo de contribuidor, com os mesmos dados de exemplo do vídeo e rotulados como
 "telas do app com dados de exemplo". Ficam dentro dos cartões de papel do mosaico, em moldura de
 tinta de 2px e canto 10px, embaixo do título e da frase. Como a tela Qualidade só foi capturada em português, o recorte em inglês troca cada texto pelo
-do dicionário do próprio app, chave por chave. Só o relatório empilha duas folhas: a
+do dicionário do próprio app, chave por chave. Dois cartões largos empilham peças. No relatório, a
 lista "Momentos de destaque (pra clipar)" pousa na borda direita da curva de audiência por
 plataforma, com Pop de Tinta, e as três exportações (capítulos do YouTube, CSV, EDL) ficam em
-chips embaixo da curva. Nunca se redesenha a interface do app em HTML para a página: quando o
+chips embaixo da curva. No modo deck, que vem antes do relatório porque é o "durante" da live,
+duas telas do celular em pé (os botões e o chat com um aviso) ficam lado a lado. A do chat desce
+e encosta na outra, as duas com moldura de tinta de 5px, canto 14px e Pop de Tinta, para lerem
+como aparelho e não como recorte. O texto fica ao lado: título, frase, chips do que o celular faz
+e a ressalva da rede numa linha. Nunca se redesenha a interface do app em HTML para a página: quando o
 app muda, os recortes são refeitos.
 
 ### Listra de acento
@@ -449,10 +453,7 @@ função, borda colorida grossa continua proibida.
 ### Bloco de proteção
 
 A rede de proteção é o cartão alto do mosaico de recursos: título em Baloo, uma frase em Inter,
-o recorte da gaveta de proteções do app (com os interruptores como o app os mostra) e —
-obrigatoriamente — uma linha com o adesivo tomate dizendo o que o Guardião faz e o que custa:
-esconde a tela, atrasa a live em 12s, pode deixar passar termos e não censura o áudio. O
-comportamento em falha (a tela fica coberta) mora nos termos de uso, não na página.
+o recorte da gaveta de proteções do app (com os interruptores como o app os mostra).
 
 **A Regra do Custo Visível.** Nenhum bloco de proteção fecha sem dizer o que ele cobra (atraso,
 carga, conflito com o OBS). Vender a rede sem o preço é o oposto do tom da marca.

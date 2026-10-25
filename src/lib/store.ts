@@ -468,7 +468,6 @@ export const useStore = create<State>((set, get) => {
           ...new Set(enabledTargets.map((target) => target.platformId)),
         ].sort() as SafePlatform[],
         brb_enabled: config?.settings.brbEnabled ?? false,
-        guardian_enabled: config?.settings.guardianEnabled ?? false,
         record_video_enabled: config?.settings.recordVideo ?? false,
       } as const;
       addStep("live_start_requested", {
@@ -478,11 +477,7 @@ export const useStore = create<State>((set, get) => {
       let requestCaptured = false;
       try {
         await flushSave();
-        set({
-          leaks: [],
-          censored: false,
-          viewers: { total: 0, anyLive: false, items: [] },
-        });
+        set({ viewers: { total: 0, anyLive: false, items: [] } });
         // The UI owns request intent before invoke; native code owns subsequent outcomes.
         capture("live_start_requested", requestProperties);
         requestCaptured = true;

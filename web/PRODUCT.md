@@ -44,7 +44,7 @@ O streamer prepara cenas, câmera e áudio no OBS ou em outro programa compatív
 - A implementação de Twitch não é uma certificação de operação real. Esta fonte não apresenta um ensaio verificável de live por plataforma; a matriz externa deve ser registrada e aprovada antes da distribuição.
 - TikTok, Instagram e X são experimentais.
 - Proteção por tela “JÁ VOLTO” em queda do OBS existe.
-- O Guardião de termos é experimental e depende de configuração explícita do usuário. Adiciona 12 s de atraso e procura apenas os termos listados; pode deixar passar texto. Durante preparação, falha ou atraso excessivo da leitura, cobre imagens não verificadas com JÁ VOLTO, sem encerrar a conexão. O vídeo pode retornar automaticamente após uma leitura válida sem termo listado. Essa proteção não censura o áudio, que continua sendo transmitido.
+- Modo deck existe: o celular, pelo navegador e sem instalar app, vira o painel da live na rede local. Ele marca momentos, liga o JÁ VOLTO, troca cena e microfone, muda título, manda recado no chat, pausa um destino e roda combos. Também mostra avisos com a ação que resolve, o chat e a saúde da live. Vem desligado e pareia por QR, com código de 4 dígitos e permissão no PC. Só funciona com o PC e o celular na mesma rede, e a conexão não é criptografada, então a página tem que dizer para evitar Wi-Fi público.
 - Detecção de tela preta ou congelada não deve ser apresentada como concluída.
 - Cada destino consome upload; transcode também pode consumir CPU ou GPU.
 - O núcleo local é gratuito e o projeto usa licença MIT.

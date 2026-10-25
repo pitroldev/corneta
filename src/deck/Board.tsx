@@ -357,12 +357,12 @@ export function Ready({
   const names = [
     ...new Set(state.targets.map((target) => platformLabel(target.platform))),
   ];
-  const armed = [
-    state.protections.brb && t("deck.health.protect.brb"),
-    state.protections.autoBitrate && t("deck.health.protect.autoBitrate"),
-    state.protections.blackScreen && t("deck.health.protect.blackScreen"),
-    state.protections.guardian && t("deck.health.protect.guardian"),
-  ].filter((x): x is string => !!x);
+  const protections = [
+    [state.protections.brb, t("deck.health.protect.brb")],
+    [state.protections.autoBitrate, t("deck.health.protect.autoBitrate")],
+    [state.protections.blackScreen, t("deck.health.protect.blackScreen")],
+  ] as const;
+  const armed = protections.filter(([on]) => on).map(([, name]) => name);
   const blocked = offline
     ? t("deck.link.offToast")
     : platforms === 0
@@ -442,7 +442,10 @@ export function Ready({
           }
           end={{
             kind: "text",
-            text: t("deck.ready.count", { n: armed.length, total: 4 }),
+            text: t("deck.ready.count", {
+              n: armed.length,
+              total: protections.length,
+            }),
             tone: armed.length ? "ok" : "faint",
           }}
         />

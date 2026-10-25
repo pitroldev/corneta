@@ -29,7 +29,7 @@ Use estes procedimentos para complementar os gates sintéticos. A matriz e as ev
 | Live longa                       | Pelo menos 2 h no ensaio inicial; capturar série após aquecimento e comparar crescimento sustentado com volume e limites. Para distribuição, seguir a duração exigida no guia de publicação. | Um pico isolado de RSS não demonstra vazamento; avalie crescimento sustentado. |
 | Encerramento                     | Parar/fechar/cancelar setup durante reconexão; verificar liberação de portas/arquivos e ausência dos filhos pertencentes à sessão.                                                           | Testes de política não substituem ensaio real.                                 |
 
-Registre modelo CPU/GPU, RAM, Windows, driver, Node/Rust/WebView2/OBS, energia, gravação, Guardião e processos concorrentes relevantes. Não publique hostname, caminho pessoal, token, chat ou janela privada. Defina o orçamento de CPU/GPU/RSS depois dessa baseline: números inventados podem aprovar uma regressão ou excluir hardware sem evidência.
+Registre modelo CPU/GPU, RAM, Windows, driver, Node/Rust/WebView2/OBS, energia, gravação e processos concorrentes relevantes. Não publique hostname, caminho pessoal, token, chat ou janela privada. Defina o orçamento de CPU/GPU/RSS depois dessa baseline: números inventados podem aprovar uma regressão ou excluir hardware sem evidência.
 
 Para uma comparação, use ao menos três execuções equivalentes. Uma piora reproduzível de p95 superior a 20% merece investigação, mesmo abaixo do teto absoluto; esse percentual é um critério de revisão, não falha automática em runner compartilhado. Para memória, avalie inclinação após aquecimento e limites de retenção, não só memória alocada no fim.
 
@@ -57,12 +57,6 @@ O JSON em `.artifacts/performance/telemetry.json` registra versões, hardware se
 O SDK real é `posthog-js/dist/module.no-external`, com suas opções da aplicação, exceto o destino local. No documento sintético, `webdriver` fica desligado, o marcador `HeadlessChrome` é removido do user agent, `userAgentData` fica ausente e DNT é `0`: isso representa uma WebView comum e impede que a filtragem de automação do SDK transforme a medição em chamadas descartadas antes do envio. As condições ligadas precisam enviar ao coletor local, inclusive no cenário 503. Essa simulação não testa políticas reais de DNT ou de automação.
 
 A fila de retries do SDK é medida separadamente e deve permanecer vazia, coerente com a política de tentativa única do transporte. Isso não permite recolher uma requisição já enviada nem prova a revogação de consentimento em todos os caminhos; testes próprios cobrem esse contrato. O cache HTTP fica desligado e cada medição usa outro documento, mas o processo do navegador e caches do sistema permanecem quentes. Esses números **não medem o startup completo do app**, o IPC, CPU/GPU da transmissão, RSS nativo nem provam ausência de vazamentos. As recomendações de carregamento condicional orientam a separação entre importar a facade, carregar o SDK e processar eventos; não autorizam concluir que toda a interface ficou mais rápida.
-
-## Memória do Guardião
-
-O atraso de 12 s do Guardião guarda os quadros crus do programa em memória. O Guardião força 1080p30, então são 360 quadros yuv420p de cerca de 3,1 MB, uns 1,12 GB. Enquanto o ajuste de deriva recupera o atraso, o buffer chega a 390 quadros (1,21 GB). Filas, pool de quadros e áudio somam por volta de 70 MB. O custo vale enquanto o Guardião estiver ligado e não depende da resolução do OBS.
-
-Quando o Windows reporta menos de 15 GiB de RAM, o que corresponde a menos de 16 GB instalados, o editor do Guardião mostra esse custo e sugere fechar programas pesados antes da live. Reduzir o buffer, com quadros comprimidos ou resolução menor, continua em aberto. Não encurte o atraso sem rever a cobertura do OCR, que precisa enxergar o atraso inteiro.
 
 ## Invariantes de implementação
 

@@ -1216,9 +1216,6 @@ export function mockApi(): CornetaApi {
       };
     },
     async obsVideoUndo() {},
-    async systemMemoryBytes() {
-      return 16 * 1024 ** 3;
-    },
     async markMoment() {
       return [];
     },
@@ -1269,9 +1266,6 @@ export function mockApi(): CornetaApi {
     },
     async captureFrame(t) {
       throw new Error(t("core.mock.captureFrame.unavailable"));
-    },
-    subscribeGuardian() {
-      return () => {};
     },
     async mesaStartServer() {
       return { port: 0, lanIp: "127.0.0.1" };

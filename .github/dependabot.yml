@@ -28,8 +28,6 @@ updates:
     ignore:
       # COM bindings must match the version Wry uses; update together with Tauri.
       - dependency-name: webview2-com
-      # OAR-OCR pins ort 2.0.0-rc.12; RC 13 removed the execution-provider API it uses.
-      - dependency-name: ort
       # Signature tests must use the minisign-verify release that tauri-plugin-updater uses.
       - dependency-name: minisign-verify
         update-types:

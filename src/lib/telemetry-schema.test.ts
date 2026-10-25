@@ -264,7 +264,6 @@ describe("telemetry schema", () => {
       mode: "per-platform" as const,
       platforms: ["custom" as const],
       brb_enabled: false,
-      guardian_enabled: false,
       record_video_enabled: false,
     };
     expect(

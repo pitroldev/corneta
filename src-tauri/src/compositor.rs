@@ -1,5 +1,5 @@
 //! A continuously paced program encoder keeps destination connections alive while OBS reconnects.
-//! Each emitted frame consumes matching PCM; delayed video and audio drain together.
+//! Each emitted frame consumes matching PCM; buffered video and audio drain together.
 //! Use binary process pipes rather than the line-oriented Tauri shell; audio enters over loopback TCP.
 
 use std::collections::VecDeque;
@@ -12,40 +12,12 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use bytes::Bytes;
-use tauri::{AppHandle, Emitter, Manager};
+use tauri::{AppHandle, Manager};
 
 use crate::engine::{self, ProgramSpec};
-use crate::guardian;
 use crate::queue_probe::{QueueProbe, Timed};
 use crate::telemetry::AppError;
 use crate::AppState;
-
-#[derive(Debug, PartialEq, Eq)]
-enum FrameMode {
-    ManualPause,
-    CoveredImage,
-    Live,
-}
-
-fn frame_mode(forced: bool, censor: bool) -> FrameMode {
-    if forced {
-        FrameMode::ManualPause
-    } else if censor {
-        FrameMode::CoveredImage
-    } else {
-        FrameMode::Live
-    }
-}
-
-fn emit_censor(app: &AppHandle, running: &Arc<AtomicBool>, censor: bool) {
-    let state = app.state::<AppState>();
-    let engine = state.engine.lock().unwrap();
-    if Arc::ptr_eq(&engine.running, running)
-        && (!censor || (engine.live && running.load(Ordering::Relaxed)))
-    {
-        let _ = app.emit("leak://censor", censor);
-    }
-}
 
 fn capture_compositor_error(app: &AppHandle, code: &str, retryable: bool) {
     let state = app.state::<AppState>();
@@ -60,8 +32,6 @@ fn capture_compositor_error(app: &AppHandle, code: &str, retryable: bool) {
 
 /// Briefly freeze the last frame to bridge small input stalls before showing the slate.
 const HOLD_MS: u64 = 500;
-/// Drain already buffered content when new input stops.
-const DRAIN_MS: u64 = 250;
 const RESPAWN_MS: u64 = 1500;
 
 pub enum Slate {
@@ -75,11 +45,7 @@ pub enum Slate {
 
 pub struct CompositorOpts {
     pub spec: ProgramSpec,
-    /// Zero disables delay; Guardian uses GUARD_DELAY_SEC.
-    pub delay_sec: u32,
     pub hw_codec: Option<String>,
-    /// An empty watchlist disables OCR and privacy coverage.
-    pub watchlist: Vec<String>,
     pub slate: Slate,
     /// Manual pause replaces program audio as well as video, preventing microphone exposure.
     pub force_slate: Arc<AtomicBool>,
@@ -367,38 +333,18 @@ pub async fn run(
         };
         let cfg = opts.config.clone();
         let spec = opts.spec;
-        let delay_frames = (opts.delay_sec as usize) * (spec.fps as usize);
-        // Coverage spans nearly the full delay buffer; keep this aligned with Guardian sampling.
-        let max_gap = (delay_frames as u64).saturating_sub(spec.fps as u64);
         log::info!(
-            "compositor: {}x{}@{} {}kbps delay={}s hw={:?} terms={} slate={}",
+            "compositor: {}x{}@{} {}kbps hw={:?} slate={}",
             spec.w,
             spec.h,
             spec.fps,
             spec.video_kbps,
-            opts.delay_sec,
             opts.hw_codec,
-            opts.watchlist.len(),
             match &opts.slate {
                 Slate::Still(_) => "image",
                 Slate::Video { .. } => "video",
             },
         );
-
-        let shared = if opts.watchlist.is_empty() {
-            None
-        } else {
-            let sh = Arc::new(guardian::Shared::new());
-            guardian::spawn_ocr(
-                app.clone(),
-                running.clone(),
-                sh.clone(),
-                opts.watchlist.clone(),
-                spec.w as usize,
-                spec.h as usize,
-            );
-            Some(sh)
-        };
 
         let still = match &opts.slate {
             Slate::Still(f) => f.clone(),
@@ -408,24 +354,16 @@ pub async fn run(
             }
         };
 
-        let mut head: u64 = 0; // Keep frame indices monotonic across encoder generations for the privacy timeline.
-        let mut censoring = false;
         while running.load(Ordering::Relaxed) {
             let exit = generation(
-                &app,
                 &ffmpeg,
                 &cfg,
                 &spec,
-                delay_frames,
-                max_gap,
                 &opts,
                 &still,
-                shared.as_deref(),
                 &running,
                 &has_signal,
                 &slate_on,
-                &mut head,
-                &mut censoring,
             );
             match exit {
                 GenExit::Stop => break,
@@ -440,9 +378,6 @@ pub async fn run(
                 }
             }
         }
-        if censoring {
-            emit_censor(&app, &running, false);
-        }
         slate_on.store(false, Ordering::Relaxed);
         log::info!("compositor: stopped");
     })
@@ -451,26 +386,19 @@ pub async fn run(
 
 #[allow(clippy::too_many_arguments)]
 fn generation(
-    app: &AppHandle,
     ffmpeg: &std::path::Path,
     cfg: &crate::config::AppConfig,
     spec: &ProgramSpec,
-    delay_frames: usize,
-    max_gap: u64,
     opts: &CompositorOpts,
     still: &[u8],
-    shared: Option<&guardian::Shared>,
     running: &Arc<AtomicBool>,
     has_signal: &AtomicBool,
     slate_on: &AtomicBool,
-    head: &mut u64,
-    censoring: &mut bool,
 ) -> GenExit {
     let fsize = spec.frame_size();
     let abpf = spec.audio_bytes_per_frame();
-    let ysize = (spec.w as usize) * (spec.h as usize);
-    // Reserve delayed audio plus three seconds of decoder jitter.
-    let audio_cap = (opts.delay_sec as usize + 3) * (abpf * spec.fps as usize);
+    // Three seconds of headroom absorb decoder jitter.
+    let audio_cap = 3 * abpf * spec.fps as usize;
 
     while !has_signal.load(Ordering::Relaxed) {
         if !running.load(Ordering::Relaxed) {
@@ -606,7 +534,7 @@ fn generation(
     let accept_deadline = Instant::now() + Duration::from_secs(15);
 
     let tick_ns: u64 = 1_000_000_000 / (spec.fps as u64);
-    let mut delay_buf: VecDeque<(u64, Bytes)> = VecDeque::with_capacity(delay_frames + 8);
+    let mut frames: VecDeque<Bytes> = VecDeque::with_capacity(spec.fps as usize + 8);
     let mut afifo: VecDeque<u8> = VecDeque::new();
     let mut slate_afifo: VecDeque<u8> = VecDeque::new();
     let mut slate_vsrc: Option<FrameSource> = None;
@@ -619,11 +547,8 @@ fn generation(
     let mut brb_active = false;
     let mut drift_logged = false;
 
-    *head += 1;
-    let first = first.into_inner();
-    offer_scan(shared, *head, &first, ysize);
-    delay_buf.push_back((*head, first));
-    afifo.resize(delay_buf.len() * abpf, 0);
+    frames.push_back(first.into_inner());
+    afifo.resize(frames.len() * abpf, 0);
 
     let clock = Instant::now();
     let mut emitted: u64 = 0;
@@ -670,18 +595,14 @@ fn generation(
             }
         }
 
-        let (got, v_dead) = drain_frames(&mut vsrc, |f| {
-            *head += 1;
-            offer_scan(shared, *head, &f, ysize);
-            delay_buf.push_back((*head, f));
-        });
+        let (got, v_dead) = drain_frames(&mut vsrc, |f| frames.push_back(f));
         if got > 0 {
             last_arrival = Instant::now();
         }
         let a_dead = drain_audio(&mut asrc, &mut afifo, audio_cap);
         // Trim the oldest video/audio pair together when clock drift exceeds buffer headroom.
-        while delay_buf.len() > delay_frames + spec.fps as usize {
-            delay_buf.pop_front();
+        while frames.len() > spec.fps as usize {
+            frames.pop_front();
             let audio_to_drop = abpf.min(afifo.len());
             if audio_to_drop > 0 {
                 afifo.drain(..audio_to_drop);
@@ -711,7 +632,7 @@ fn generation(
                 Some("decoder"),
             )
             .ok();
-            repair_pairing(&mut afifo, delay_buf.len() * abpf);
+            repair_pairing(&mut afifo, frames.len() * abpf);
         }
         let a_wait = if a_fast_deaths >= 2 {
             Duration::from_secs(30)
@@ -721,12 +642,12 @@ fn generation(
         if asrc.is_none() && sig_now && a_spawned_at.elapsed() >= a_wait {
             a_spawned_at = Instant::now();
             asrc = spawn_byte_source(ffmpeg, &engine::ffmpeg_args_for_audio_decoder(cfg)).ok();
-            repair_pairing(&mut afifo, delay_buf.len() * abpf);
+            repair_pairing(&mut afifo, frames.len() * abpf);
         }
         let _ = v_dead;
 
         let forced = opts.force_slate.load(Ordering::Relaxed);
-        let want_slate_media = brb_active || *censoring || forced;
+        let want_slate_media = brb_active || forced;
         if let Slate::Video { path, has_audio } = &opts.slate {
             if want_slate_media
                 && slate_vsrc.is_none()
@@ -769,55 +690,31 @@ fn generation(
         while emitted < due {
             emitted += 1;
             let gap = last_arrival.elapsed();
-            // Emit delayed frames normally, or drain retained content after the input stalls.
-            let popped = if !delay_buf.is_empty()
-                && (delay_buf.len() > delay_frames || gap.as_millis() as u64 > DRAIN_MS)
-            {
-                delay_buf.pop_front()
-            } else {
-                None
-            };
+            let popped = frames.pop_front();
 
             let (frame_out, audio_out, brb_now): (Bytes, Vec<u8>, bool) = match &popped {
-                Some((idx, f)) => {
-                    // Guardian covers the image only; manual pause separately replaces program audio.
-                    let censor_now = shared
-                        .map(|sh| {
-                            let (s, status) = sh.coverage(*idx, max_gap);
-                            sh.publish_status(app, running, status);
-                            s
-                        })
-                        .unwrap_or(false);
-                    if censor_now != *censoring {
-                        *censoring = censor_now;
-                        emit_censor(app, running, censor_now);
-                    }
+                Some(f) => {
                     let audio = take_audio(&mut afifo, abpf);
-                    match frame_mode(forced, censor_now) {
-                        FrameMode::ManualPause => {
-                            // Keep consuming paired program audio during pause so resuming does not replay private content.
-                            let slate_audio = if matches!(
-                                &opts.slate,
-                                Slate::Video {
-                                    has_audio: true,
-                                    ..
-                                }
-                            ) {
-                                take_audio(&mut slate_afifo, abpf)
-                            } else {
-                                vec![0u8; abpf]
-                            };
-                            (slate_frame.clone(), slate_audio, true)
-                        }
-                        FrameMode::CoveredImage => (slate_frame.clone(), audio, false),
-                        FrameMode::Live => (f.clone(), audio, false),
+                    if forced {
+                        // Keep consuming paired program audio during pause so resuming does not replay private content.
+                        let slate_audio = if matches!(
+                            &opts.slate,
+                            Slate::Video {
+                                has_audio: true,
+                                ..
+                            }
+                        ) {
+                            take_audio(&mut slate_afifo, abpf)
+                        } else {
+                            vec![0u8; abpf]
+                        };
+                        (slate_frame.clone(), slate_audio, true)
+                    } else {
+                        (f.clone(), audio, false)
                     }
                 }
-                // Keep the slate until real frames resume; refilling the delay must not reveal a stale image.
-                None if forced
-                    || brb_active
-                    || (delay_buf.is_empty() && gap.as_millis() as u64 >= HOLD_MS) =>
-                {
+                // Keep the slate until real frames resume so a stale image is never shown.
+                None if forced || brb_active || gap.as_millis() as u64 >= HOLD_MS => {
                     let audio = if matches!(
                         &opts.slate,
                         Slate::Video {
@@ -836,7 +733,7 @@ fn generation(
 
             if brb_now != brb_active {
                 brb_active = brb_now;
-                slate_on.store(brb_active || *censoring, Ordering::Relaxed);
+                slate_on.store(brb_active, Ordering::Relaxed);
                 log::info!(
                     "compositor: BRB {}",
                     if brb_active {
@@ -846,7 +743,7 @@ fn generation(
                     }
                 );
             } else {
-                slate_on.store(brb_active || *censoring, Ordering::Relaxed);
+                slate_on.store(brb_active, Ordering::Relaxed);
             }
 
             // A full video queue skips the whole A/V pair; a full audio queue means the encoder stalled.
@@ -871,7 +768,7 @@ fn generation(
                     break;
                 }
             }
-            if let Some((_, f)) = popped {
+            if let Some(f) = popped {
                 last_out = f;
             }
         }
@@ -900,24 +797,10 @@ fn generation(
     exit
 }
 
-fn offer_scan(shared: Option<&guardian::Shared>, idx: u64, frame: &[u8], ysize: usize) {
-    if let Some(sh) = shared {
-        sh.offer_scan(idx, &frame[..ysize]);
-    }
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{frame_mode, take_audio, FrameMode};
+    use super::take_audio;
     use std::collections::VecDeque;
-
-    #[test]
-    fn manual_pause_always_selects_slate_audio_even_when_guardian_covers_video() {
-        assert_eq!(frame_mode(true, true), FrameMode::ManualPause);
-        assert_eq!(frame_mode(true, false), FrameMode::ManualPause);
-        assert_eq!(frame_mode(false, true), FrameMode::CoveredImage);
-        assert_eq!(frame_mode(false, false), FrameMode::Live);
-    }
 
     #[test]
     fn take_audio_copies_wrapped_fifo_and_pads_silence() {

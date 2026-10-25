@@ -66,6 +66,7 @@ export function LegalHero({
   title,
   intro,
   version,
+  updated,
   path,
 }: {
   locale: Locale;
@@ -73,6 +74,8 @@ export function LegalHero({
   title: string;
   intro: string;
   version: string;
+  /** Defaults to the shared legal revision date. */
+  updated?: { iso: string; label: string };
   // Keep the unprefixed Portuguese legal URL stable for installed clients.
   path: string;
 }) {
@@ -91,7 +94,9 @@ export function LegalHero({
       <div className="mt-6 flex flex-wrap items-center gap-x-2.5 gap-y-2 [&>span]:inline-flex [&>span]:items-center [&>span]:gap-[7px] [&>span]:rounded-sm [&>span]:bg-paper-sunk [&>span]:px-2.5 [&>span]:py-1.5 [&>span]:text-[0.74rem] [&>span]:font-bold [&>span]:text-ink">
         <span>
           {ui.updatedAt}{" "}
-          <time dateTime={LEGAL_UPDATED_ISO}>{ui.updatedLabel}</time>
+          <time dateTime={updated?.iso ?? LEGAL_UPDATED_ISO}>
+            {updated?.label ?? ui.updatedLabel}
+          </time>
         </span>
         <span>
           {ui.version} {version}

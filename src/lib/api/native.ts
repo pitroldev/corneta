@@ -10,7 +10,6 @@ import type {
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
-  Leak,
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
@@ -604,10 +603,6 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("obs_video_undo");
     },
-    async systemMemoryBytes() {
-      const { invoke } = await core();
-      return invoke<number>("system_memory_bytes");
-    },
     async markMoment(label) {
       const { invoke } = await core();
       return invoke<PlatformMark[]>("mark_moment", { label: label ?? null });
@@ -694,22 +689,6 @@ export function tauriApi(): CornetaApi {
     async captureFrame() {
       const { invoke } = await core();
       return invoke<string>("capture_frame");
-    },
-    subscribeGuardian(onLeak, onCensor) {
-      let cancelled = false;
-      const uns: Array<() => void> = [];
-      const add = (u: () => void) => (cancelled ? u() : uns.push(u));
-      void event().then(({ listen }) => {
-        void listen<Leak>("leak://alert", (e) => onLeak(e.payload)).then(add);
-        void listen<boolean>("leak://censor", (e) => onCensor(e.payload)).then(
-          add,
-        );
-      });
-      return () => {
-        cancelled = true;
-        uns.forEach((u) => u());
-        uns.length = 0;
-      };
     },
     async mesaStartServer() {
       const { invoke } = await core();

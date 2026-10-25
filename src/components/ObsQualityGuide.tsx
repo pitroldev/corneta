@@ -18,15 +18,10 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const { t, fmt } = useI18n();
 
   const enabled = config.targets.filter((x) => x.enabled);
-  const guardArmed =
-    config.settings.guardianEnabled &&
-    config.settings.guardianWatchlist.some((w) => w.trim().length >= 3);
-  // Only Privacy Guard re-encodes the complete program; the BRB splicer preserves stream copy.
-  const reencodesAll = guardArmed;
-
-  const copies = reencodesAll
-    ? []
-    : enabled.filter((x) => effectiveAction(config.mode, x) === "copy");
+  // The BRB splicer preserves stream copy, so only per-destination choices re-encode.
+  const copies = enabled.filter(
+    (x) => effectiveAction(config.mode, x) === "copy",
+  );
   const transcodes = enabled.filter((x) => !copies.includes(x));
 
   const fps = Math.min(
@@ -34,9 +29,8 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
     Math.max(30, ...enabled.map((x) => x.encoding.preset?.fps ?? 30)),
   );
 
-  // Keep resolution selection aligned with engine.rs::program_resolution, including vertical crops and OCR.
+  // Keep resolution selection aligned with engine.rs::program_resolution, including vertical crops.
   const needsFullHd =
-    guardArmed ||
     enabled.length === 0 ||
     enabled.some((x) => {
       const p = x.encoding.preset ?? PLATFORMS[x.platformId].recommended;
@@ -97,52 +91,39 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
           {bold(t, "encoding.guide.path.lede")}
         </p>
         <div className="mt-2 flex flex-col gap-1.5 text-xs">
-          {reencodesAll ? (
+          {copies.length > 0 && (
             <div className="flex flex-wrap items-center gap-1.5">
-              <Badge tone="brass">{t("encoding.guide.badge.redo")}</Badge>
-              <span className="text-ink-muted">
-                {t("encoding.guide.guardian")}
+              <Badge tone="neutral">{t("encoding.target.copy.badge")}</Badge>
+              {copies.map((x) => (
+                <span
+                  key={x.id}
+                  className="flex items-center gap-1 text-ink-muted"
+                >
+                  <PlatformGlyph id={x.platformId} size={14} /> {x.name}
+                </span>
+              ))}
+              <span className="text-ink-faint">
+                {bold(t, "encoding.guide.copy.suffix")}
               </span>
             </div>
-          ) : (
-            <>
-              {copies.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone="neutral">
-                    {t("encoding.target.copy.badge")}
-                  </Badge>
-                  {copies.map((x) => (
-                    <span
-                      key={x.id}
-                      className="flex items-center gap-1 text-ink-muted"
-                    >
-                      <PlatformGlyph id={x.platformId} size={14} /> {x.name}
-                    </span>
-                  ))}
-                  <span className="text-ink-faint">
-                    {bold(t, "encoding.guide.copy.suffix")}
-                  </span>
-                </div>
-              )}
-              {transcodes.length > 0 && (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Badge tone="brass">{t("encoding.guide.badge.redo")}</Badge>
-                  {transcodes.map((x) => (
-                    <span
-                      key={x.id}
-                      className="flex items-center gap-1 text-ink-muted"
-                    >
-                      <PlatformGlyph id={x.platformId} size={14} /> {x.name}
-                    </span>
-                  ))}
-                </div>
-              )}
-              {enabled.length === 0 && (
-                <span className="text-ink-faint">
-                  {t("encoding.guide.noPlatforms")}
+          )}
+          {transcodes.length > 0 && (
+            <div className="flex flex-wrap items-center gap-1.5">
+              <Badge tone="brass">{t("encoding.guide.badge.redo")}</Badge>
+              {transcodes.map((x) => (
+                <span
+                  key={x.id}
+                  className="flex items-center gap-1 text-ink-muted"
+                >
+                  <PlatformGlyph id={x.platformId} size={14} /> {x.name}
                 </span>
-              )}
-            </>
+              ))}
+            </div>
+          )}
+          {enabled.length === 0 && (
+            <span className="text-ink-faint">
+              {t("encoding.guide.noPlatforms")}
+            </span>
           )}
         </div>
       </div>

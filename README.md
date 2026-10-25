@@ -129,7 +129,7 @@ pwsh -NoProfile -File scripts/fetch-binaries.ps1
 pnpm contrib:app:dev
 ```
 
-O script baixa e verifica as versões fixadas de FFmpeg e MediaMTX. O primeiro build compila dependências Rust/OCR e é mais pesado que a demo; tempo, memória e espaço necessários variam conforme máquina e cache.
+O script baixa e verifica as versões fixadas de FFmpeg e MediaMTX. O primeiro build compila as dependências Rust e é mais pesado que a demo; tempo, memória e espaço necessários variam conforme máquina e cache.
 
 Para compilar somente o executável local, sem criar nem instalar um pacote de distribuição:
 

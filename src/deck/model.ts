@@ -53,7 +53,6 @@ export interface DeckState {
     brb: boolean;
     autoBitrate: boolean;
     blackScreen: boolean;
-    guardian: boolean;
   };
   title: string;
   layout: string[];
@@ -531,7 +530,6 @@ export function targetTone(state: string): Tone {
     case "reconnecting":
     case "waiting":
     case "signal-lost":
-    case "censor":
       return "warn";
     case "error":
       return "bad";

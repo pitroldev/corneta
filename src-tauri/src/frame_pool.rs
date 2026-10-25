@@ -1,5 +1,5 @@
 //! Recycle large video allocations only after the final immutable Bytes owner
-//! releases them. Free capacity is bounded; startup does not preallocate delay RAM.
+//! releases them. Free capacity is bounded; startup does not preallocate frame RAM.
 use bytes::Bytes;
 use std::sync::{
     atomic::{AtomicU64, Ordering},

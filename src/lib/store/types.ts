@@ -13,7 +13,6 @@ import type {
   EncodingMode,
   EngineSnapshot,
   IngestConfig,
-  Leak,
   ObsCheck,
   PlatformId,
   Target,
@@ -169,10 +168,6 @@ export interface State {
 
   viewers: Viewers;
   bindViewers: () => () => void;
-
-  leaks: Leak[];
-  censored: boolean;
-  bindGuardian: () => () => void;
 
   unseenReport: boolean;
   markReportSeen: () => void;

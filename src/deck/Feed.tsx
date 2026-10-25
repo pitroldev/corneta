@@ -255,12 +255,6 @@ export function Health({
       name: t("deck.health.protect.blackScreen"),
       desc: t("deck.health.protect.blackScreen.desc"),
     },
-    {
-      id: "guardian",
-      on: state.protections.guardian,
-      name: t("deck.health.protect.guardian"),
-      desc: t("deck.health.protect.guardian.desc"),
-    },
   ];
   return (
     <>

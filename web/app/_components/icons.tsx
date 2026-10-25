@@ -1,5 +1,6 @@
 import {
   ArrowRight,
+  BellRing,
   Check,
   Clapperboard,
   Crop,
@@ -9,9 +10,13 @@ import {
   Info,
   Keyboard,
   Layers,
+  ListOrdered,
   Lock,
+  MapPin,
+  MessagesSquare,
   Minimize2,
   Palette,
+  Pause,
   PictureInPicture2,
   Play,
   Power,
@@ -39,7 +44,9 @@ export function WindowsIcon() {
 }
 
 export const ArrowIcon = wrap(ArrowRight);
+export const BellIcon = wrap(BellRing);
 export const BoltIcon = wrap(Zap);
+export const ChatIcon = wrap(MessagesSquare);
 export const CheckIcon = wrap(Check);
 export const ClapperIcon = wrap(Clapperboard);
 export const CropIcon = wrap(Crop);
@@ -50,10 +57,13 @@ export const InfoIcon = wrap(Info);
 export const KeyboardIcon = wrap(Keyboard);
 export const LayersIcon = wrap(Layers);
 export const LockIcon = wrap(Lock);
+export const PauseIcon = wrap(Pause);
+export const PinIcon = wrap(MapPin);
 export const PlayIcon = wrap(Play);
 export const PopoutIcon = wrap(PictureInPicture2);
 export const PowerIcon = wrap(Power);
 export const SaveIcon = wrap(Save);
+export const SequenceIcon = wrap(ListOrdered);
 export const SheetIcon = wrap(Sheet);
 export const TrayIcon = wrap(Minimize2);
 export const ThemeIcon = wrap(Palette);

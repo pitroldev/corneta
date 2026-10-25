@@ -1667,14 +1667,6 @@ async fn start_engine_inner(
         }
     }
 
-    let guard_watchlist: Vec<String> = config
-        .settings
-        .guardian_watchlist
-        .iter()
-        .map(|t| t.trim().to_string())
-        .filter(|t| t.chars().count() >= 3)
-        .collect();
-    let guard = config.settings.guardian_enabled && !guard_watchlist.is_empty();
     log::info!("engine: starting MediaMTX ingest and FFmpeg fan-out");
 
     let app_m = app.clone();
@@ -1762,14 +1754,14 @@ async fn start_engine_inner(
     let auto_bitrate = config.settings.auto_bitrate;
 
     // A continuous program feed keeps output connections alive while the input is replaced.
-    let compositor_on = brb_enabled || guard;
+    let compositor_on = brb_enabled;
     let out_source = if compositor_on {
         engine::program_url(&config)
     } else {
         engine::ingest_url(&config)
     };
     log::info!(
-        "engine: compositor={compositor_on} guardian={guard} output-source={}",
+        "engine: compositor={compositor_on} output-source={}",
         if compositor_on { "_program" } else { "live" }
     );
 
@@ -1869,9 +1861,7 @@ async fn start_engine_inner(
             .as_deref()
             .map(brb_slate_is_video)
             .unwrap_or(false);
-        // OCR requires decoded pixels; only the BRB-only path can use the copy-based splicer.
-        let use_splicer = brb_enabled && !guard;
-        let spec = engine::program_spec(&config, guard);
+        let spec = engine::program_spec(&config);
         let slate = match (&slate_file, slate_is_video) {
             (Some(p), true) => {
                 let path = p.to_string_lossy().to_string();
@@ -1891,9 +1881,7 @@ async fn start_engine_inner(
         }
         let opts = crate::compositor::CompositorOpts {
             spec,
-            delay_sec: if guard { engine::GUARD_DELAY_SEC } else { 0 },
             hw_codec: hw_codec.clone(),
-            watchlist: if guard { guard_watchlist } else { Vec::new() },
             slate,
             force_slate: force_brb,
             config: config.clone(),
@@ -1904,15 +1892,10 @@ async fn start_engine_inner(
             has_signal.clone(),
             slate_on.clone(),
         );
-        if use_splicer {
-            tauri::async_runtime::spawn(async move {
-                crate::splicer::run(app_c, run_c, sig_c, slate_c, opts).await;
-            });
-        } else {
-            tauri::async_runtime::spawn(async move {
-                crate::compositor::run(app_c, run_c, sig_c, slate_c, opts).await;
-            });
-        }
+        // The splicer copies the OBS bitstream and falls back to the compositor when it cannot.
+        tauri::async_runtime::spawn(async move {
+            crate::splicer::run(app_c, run_c, sig_c, slate_c, opts).await;
+        });
     }
 
     let shared_signal = if compositor_on {
@@ -2338,7 +2321,7 @@ pub fn retry_target(app: AppHandle, target_id: String) -> Result<(), String> {
     Ok(())
 }
 
-/// Manual BRB requires a compositor started with BRB or the Privacy Guard enabled.
+/// Manual BRB requires a compositor, which runs only when BRB was enabled at start.
 #[tauri::command]
 pub fn set_force_brb(app: AppHandle, on: bool) -> Result<(), String> {
     use std::sync::atomic::Ordering;

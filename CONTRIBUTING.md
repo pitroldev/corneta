@@ -54,7 +54,7 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 ```
 
-Esses comandos podem ler a configuração pública de build do workspace; execute-os no clone limpo de contribuição, não reutilizando um `.env` oficial. Para os testes `ignored` de mídia/OCR, siga a [preparação e execução dos testes nativos de integração](docs/DESENVOLVIMENTO.md#testes-nativos-de-integração). Não informe que foram executados se rodou apenas testes unitários; OCR pode ser ignorado por falta de pacote de idioma mesmo quando o comando termina com sucesso.
+Esses comandos podem ler a configuração pública de build do workspace; execute-os no clone limpo de contribuição, não reutilizando um `.env` oficial. Para os testes `ignored` de mídia, siga a [preparação e execução dos testes nativos de integração](docs/DESENVOLVIMENTO.md#testes-nativos-de-integração). Não informe que foram executados se rodou apenas testes unitários.
 
 ## Invariantes que uma contribuição deve preservar
 

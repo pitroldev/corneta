@@ -12,14 +12,6 @@ const MAX_RECORDED_APPS: usize = 3;
 const MIN_RELEVANT_PRESSURE: f64 = 4.0;
 const MIN_RELEVANT_MEMORY_MB: f64 = 512.0;
 
-/// Usable physical memory as Windows reports it; a 16 GB machine reports slightly less.
-#[tauri::command]
-pub fn system_memory_bytes() -> u64 {
-    let mut system = System::new();
-    system.refresh_memory();
-    system.total_memory()
-}
-
 #[derive(Clone, Debug, Serialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ResourceAppSample {

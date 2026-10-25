@@ -189,15 +189,15 @@
           "src": "/images/editorial/operations/corneta-live-safety-settings.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 68694
+          "bytes": 70050
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "pt-BR",
-      "capturedAt": "2026-10-20",
-      "productVersion": "0.10.0"
+      "capturedAt": "2026-10-25",
+      "productVersion": "0.13.0"
     },
     {
       "baseName": "corneta-live-safety-settings-en",
@@ -207,15 +207,15 @@
           "src": "/images/editorial/operations/corneta-live-safety-settings-en.webp",
           "width": 1080,
           "height": 800,
-          "bytes": 69734
+          "bytes": 69926
         }
       ],
       "kind": "screenshot",
       "source": "corneta",
       "rights": "owned",
       "language": "en",
-      "capturedAt": "2026-10-24",
-      "productVersion": "0.11.0"
+      "capturedAt": "2026-10-25",
+      "productVersion": "0.13.0"
     },
     {
       "baseName": "corneta-upload-test-result",

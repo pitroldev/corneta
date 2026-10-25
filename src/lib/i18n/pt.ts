@@ -603,8 +603,6 @@ export const pt = {
     "No modo {mode}, a live usa uns {mbps} Mbps — cabe com folga.",
   "components.setup.quality.fit.warn":
     "No modo {mode}, a live usa uns {mbps} Mbps — cabe, mas sem folga.",
-  "components.setup.quality.guardian":
-    "Cobre a imagem se aparecer um termo da sua lista. Deixa a live 12s atrás, só procura os termos listados e não cobre o áudio. Configure depois em Configurações → Segurança ao vivo.",
   "components.setup.quality.lead":
     "Cada plataforma usa o upload da sua internet. Vou medir pra escolher a qualidade que cabe.",
   "components.setup.quality.modes": "Qualidade",
@@ -808,9 +806,6 @@ export const pt = {
   "deck.health.protect.blackScreen.desc": "Avisa aqui se a imagem ficar preta",
   "deck.health.protect.brb": "JÁ VOLTO",
   "deck.health.protect.brb.desc": "Se o OBS cair, a tela de pausa entra",
-  "deck.health.protect.guardian": "Guardião",
-  "deck.health.protect.guardian.desc":
-    "Cobre a tela se aparecer algo da sua lista",
   "deck.health.protections": "Proteções",
   "deck.health.watching": "{n} vendo",
   "deck.how.control": "Você manda",
@@ -1072,7 +1067,6 @@ export const pt = {
   "deck.tabs.unread": "{n} mensagens novas",
   "deck.target.bitrate": "Bitrate",
   "deck.target.brb": "JÁ VOLTO",
-  "deck.target.censor": "Guardião agindo",
   "deck.target.connecting": "Conectando",
   "deck.target.dropped": "Quadros perdidos",
   "deck.target.droppedHint": "Desde o começo da live",
@@ -1222,8 +1216,7 @@ export const pt = {
   "golive.drawer.platforms.youtubeAuto":
     "automático — eu crio a transmissão no BORA AO VIVO",
   "golive.drawer.safety.more": "Mais ajustes de segurança",
-  "golive.drawer.safety.note":
-    "Proteção ajuda, mas não é garantia. O Guardião é experimental: deixa a live 12s atrás, só procura os termos da sua lista e não cobre o áudio.",
+  "golive.drawer.safety.note": "Proteção ajuda, mas não é garantia.",
   "golive.drawer.safety.subtitle":
     "O que eu faço sozinha se algo der errado no meio da live.",
   "golive.drawer.safety.title": "Proteções",
@@ -1418,22 +1411,6 @@ export const pt = {
   "chat.youtube.guide.warn.text":
     "enquanto o app ficar em modo **“Teste” (Testing)** — o normal, sem passar pela verificação do Google — o login do YouTube **expira a cada ~7 dias**. Quando cair, é só voltar aqui e clicar em **Entrar** de novo. Por isso o passo de se colocar como **Usuário de teste** é obrigatório (publicar/verificar o app é opcional e bem mais burocrático).",
 
-  "components.app.censored.body":
-    "O Guardião está cobrindo a imagem. A live volta quando o trecho estiver verificado e sem termos detectados. O Guardião não silencia o áudio.",
-  "components.app.censored.title": "JÁ VOLTO no ar",
-  "components.app.leak.toast":
-    '🛡️ "{snippet}" apareceu na tela — cortei pro JÁ VOLTO',
-  "components.app.live.aria.censored":
-    "JÁ VOLTO no ar — imagem coberta pelo Guardião",
-  "guardian.status.starting.title": "Preparando o Guardião",
-  "guardian.status.starting.body":
-    "A imagem fica coberta até a primeira leitura. O Guardião não silencia o áudio.",
-  "guardian.status.unavailable.title":
-    "O Guardião não conseguiu verificar a imagem",
-  "guardian.status.unavailable.body":
-    "Os trechos não verificados ficam cobertos pelo JÁ VOLTO. A imagem volta após uma leitura válida. O Guardião não silencia o áudio. Se persistir, encerre e inicie a live novamente.",
-  "guardian.status.starting.short": "Preparando",
-  "guardian.status.unavailable.short": "Leitura indisponível",
   "components.app.live.aria.error": "Erro na transmissão",
   "components.app.live.aria.live": "No ar em todas as plataformas",
   "components.app.live.aria.live.down.one":
@@ -1654,8 +1631,6 @@ export const pt = {
     "Não consegui ver os encoders desta máquina — tenta de novo em Qualidade.",
   "encoding.guide.encoder.checking": "Verificando a placa de vídeo…",
   "encoding.guide.encoder.cpuOnly": "Processador — é o que essa máquina tem",
-  "encoding.guide.guardian":
-    "Guardião ligado — mande o melhor sinal que der do OBS.",
   "encoding.guide.noPlatforms":
     "(nenhuma plataforma ativa ainda — os números abaixo assumem 1080p)",
   "encoding.guide.nohw.fps30":
@@ -1683,8 +1658,7 @@ export const pt = {
   "encoding.guide.title": "Qualidade certa no OBS",
   "encoding.guide.why.cbr":
     "**CBR + quadro-chave 2 s** é exigência das plataformas — fora disso a live buferiza pros espectadores.",
-  "encoding.guide.why.changed.strong":
-    "Mudou as plataformas ou ligou o Guardião?",
+  "encoding.guide.why.changed.strong": "Mudou as plataformas?",
   "encoding.guide.why.changed.text":
     "Volta aqui — os números acima acompanham a sua config.",
   "encoding.guide.why.onepass.strong": "Uma passada só.",
@@ -1834,7 +1808,6 @@ export const pt = {
   "golive.bar.panel": "Painel",
   "golive.bar.protection.bitrate": "Auto-bitrate",
   "golive.bar.protection.brb": "JÁ VOLTO",
-  "golive.bar.protection.guardian": "Guardião",
   "golive.bar.connectingTargets": "OBS conectado · conectando às plataformas…",
   "golive.bar.waitingObs": "Aguardando o OBS…",
   "golive.bar.watching": "assistindo",
@@ -1917,13 +1890,6 @@ export const pt = {
   "golive.security.brb.desc.off":
     "se o OBS cair, a galera fica olhando uma tela congelada",
   "golive.security.brb.label": "JÁ VOLTO",
-  "golive.security.guardian.desc.off":
-    "se uma palavra que não pode vazar aparecer na tela, vai pro ar",
-  "golive.security.guardian.label": "Guardião",
-  "golive.security.guardian.noTerms":
-    "ligado, mas sem nada pra vigiar — adiciona um termo",
-  "golive.security.guardian.watching":
-    "de olho em {n} termo(s) — se um aparecer, corto pro JÁ VOLTO",
   "golive.security.loudness.desc": "acerto o seu volume sozinha",
   "golive.security.loudness.label": "Normalizador de áudio",
   "golive.blackScreen.body":
@@ -1944,7 +1910,6 @@ export const pt = {
   "golive.stat.fps": "FPS",
   "golive.stat.uptime": "No ar",
   "golive.state.brb": "JÁ VOLTO no ar",
-  "golive.state.censor": "JÁ VOLTO (Guardião)",
   "golive.state.connecting": "Conectando",
   "golive.state.error": "Erro",
   "golive.state.idle": "Aguardando",
@@ -2754,36 +2719,6 @@ export const pt = {
     "A telemetria não tá funcionando nesta versão da Corneta — não mandei nada.",
   "settings.telemetry.usage.desc":
     "Só com sua ativação: etapas e resultados futuros em categorias, sem texto ou conteúdo da live.",
-  "settings.guardian.cost.chat":
-    "O chat e a interação chegam até você com esse mesmo atraso.",
-  "settings.guardian.cost.delay": "A transmissão fica {delay} do tempo real.",
-  "settings.guardian.cost.delay.value": "12s atrás",
-  "settings.guardian.cost.intro":
-    "Quando um termo da sua lista aparece, a Corneta troca pra tela {jaVolto} antes daquele instante ir ao ar — nunca exposto, nem num clipe. Pra garantir isso:",
-  "settings.guardian.cost.scope":
-    "Só vigia os termos que você listar — {no} “qualquer segredo”.",
-  "settings.guardian.cost.scope.no": "não",
-  "settings.guardian.cost.memory":
-    "Este PC tem {gb} GB de RAM, e o Guardião segura cerca de 1,2 GB de vídeo pra cobrir o atraso. Com menos de 16 GB, feche programas pesados antes da live.",
-  "settings.guardian.cost.smallText": "Texto muito pequeno ainda pode escapar.",
-  "settings.guardian.cost.title": "🛡️ O preço da proteção",
-  "settings.guardian.list.empty":
-    "Sem termos (3+ letras), o guardião não faz nada — adicione ao menos um.",
-  "settings.guardian.list.hint":
-    "(um por linha — seu e-mail, nome real, endereço, seu @)",
-  "settings.guardian.list.label": "Termos a vigiar",
-  "settings.guardian.list.placeholder":
-    "meu@email.com\nRua das Flores, 42\nMeu Nome Real",
-  "settings.guardian.list.watching.one": "Vigiando 1 termo.",
-  "settings.guardian.list.watching.other": "Vigiando {count} termos.",
-  "settings.guardian.list.watchingManyShort.one":
-    "Vigiando 1 termo — {short} ignorados por serem curtos demais (mínimo 3 letras): {terms}.",
-  "settings.guardian.list.watchingManyShort.other":
-    "Vigiando {count} termos — {short} ignorados por serem curtos demais (mínimo 3 letras): {terms}.",
-  "settings.guardian.list.watchingOneShort.one":
-    "Vigiando 1 termo — 1 ignorado por ser curto demais (mínimo 3 letras): {terms}.",
-  "settings.guardian.list.watchingOneShort.other":
-    "Vigiando {count} termos — 1 ignorado por ser curto demais (mínimo 3 letras): {terms}.",
   // Navigation labels must match screen titles and cross-screen references.
   "sidebar.about": "Sobre",
   "sidebar.live.title": "Ver o painel ao vivo",
@@ -2897,10 +2832,7 @@ export const pt = {
     "Se o OBS cair no meio da live, a tela “JÁ VOLTO” entra no ar sem derrubar as plataformas — pro espectador a live nem pisca, e volta sozinha quando o sinal retorna.",
   "settings.safety.brb.title": "Proteção contra quedas (JÁ VOLTO)",
   "settings.safety.desc":
-    "O que segura a sua live quando o OBS cai, a internet aperta ou um dado seu aparece na tela.",
-  "settings.safety.guardian.desc":
-    "Se um termo seu (lista abaixo) aparece na tela, a Corneta corta pra “JÁ VOLTO” antes de ir ao ar. Rede de segurança, não garantia. Custo: a live inteira sai com 12s de atraso (o chat também).",
-  "settings.safety.guardian.title": "Guardião de privacidade",
+    "O que segura a sua live quando o OBS cai ou a internet aperta.",
   "settings.safety.loudness.desc":
     "A Corneta acerta o volume do seu som antes de enviar — sem “tá baixo” nem estourando na troca de cena. Se você já normaliza no OBS, deixe desligado pra não brigar.",
   "settings.safety.loudness.title": "Normalizador de áudio",

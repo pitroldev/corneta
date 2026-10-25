@@ -17,7 +17,6 @@ import type {
   ChatStatus,
   EncoderInfo,
   EngineSnapshot,
-  Leak,
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
@@ -234,7 +233,6 @@ export interface CornetaApi {
   obsVideoApply(): Promise<ObsVideo>;
   /** Restores the OBS video saved before Corneta's first adjustment. */
   obsVideoUndo(): Promise<void>;
-  systemMemoryBytes(): Promise<number>;
   /** The report marker is always written; the result lists the platforms that were asked too. */
   markMoment(label?: string): Promise<PlatformMark[]>;
   deckStatus(): Promise<DeckStatus>;
@@ -259,10 +257,6 @@ export interface CornetaApi {
   /** Base64 JPEG without a data: prefix; empty when unavailable. */
   getBrbSlatePreview(): Promise<string>;
   captureFrame(t: I18n["t"]): Promise<string>;
-  subscribeGuardian(
-    onLeak: (l: Leak) => void,
-    onCensor: (on: boolean) => void,
-  ): () => void;
   mesaStartServer(): Promise<MesaServerInfo>;
   mesaStopServer(): Promise<void>;
   mesaObsAddSource(url: string, width: number, height: number): Promise<void>;
