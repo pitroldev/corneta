@@ -100,8 +100,8 @@
     {
       "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src-tauri/src/overlay.rs",
-      "sourceBlob": "9515c4467c51f15c143000aab77f11eba43519a8",
-      "reason": "The overlay pages now follow the app language; the Browser Source setup, options and URLs in the article did not change."
+      "sourceBlob": "3c6855f23e4cef10b58cbbea269b85ddb6039993",
+      "reason": "The overlay pages now default to English and switch to the app language when served; the Browser Source setup, options and URLs in the article did not change."
     },
     {
       "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
@@ -370,8 +370,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src-tauri/src/overlay.rs",
-      "sourceBlob": "9515c4467c51f15c143000aab77f11eba43519a8",
-      "reason": "The overlay pages now follow the app language; the Browser Source setup, options and URLs in the article did not change."
+      "sourceBlob": "3c6855f23e4cef10b58cbbea269b85ddb6039993",
+      "reason": "The overlay pages now default to English and switch to the app language when served; the Browser Source setup, options and URLs in the article did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
