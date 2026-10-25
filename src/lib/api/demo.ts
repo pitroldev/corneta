@@ -18,6 +18,7 @@ import type {
   ChatMessage,
   ChatSideEvent,
   ChatStatus,
+  DeckStatus,
   EngineSnapshot,
   SessionMeta,
   TargetStatus,
@@ -528,6 +529,22 @@ export function mockApi(): CornetaApi {
       );
     }
     emit();
+  };
+
+  const deckStatusNow = (): DeckStatus => {
+    const settings = loadConfig().settings;
+    return {
+      running: settings.deckEnabled,
+      port: settings.deckPort,
+      address: settings.deckEnabled
+        ? `192.168.0.12:${settings.deckPort}`
+        : null,
+      error: null,
+      devices: settings.deckDevices.map((device) => ({
+        ...device,
+        connected: false,
+      })),
+    };
   };
 
   return {
@@ -1204,6 +1221,31 @@ export function mockApi(): CornetaApi {
     },
     async markMoment() {
       return [];
+    },
+    async deckStatus() {
+      return deckStatusNow();
+    },
+    async deckPairStart() {
+      return {
+        url: `http://192.168.0.12:${loadConfig().settings.deckPort}/deck#t=demo`,
+        expiresInMs: 120_000,
+      };
+    },
+    async deckPairAnswer() {},
+    async deckDeviceRemove() {},
+    async deckRequestDone() {},
+    subscribeDeck({ status }) {
+      if (!status) return () => {};
+      // No server events here; follow the saved switch so settings and setup react to it.
+      let last = JSON.stringify(deckStatusNow());
+      const timer = setInterval(() => {
+        const next = deckStatusNow();
+        const key = JSON.stringify(next);
+        if (key === last) return;
+        last = key;
+        status(next);
+      }, 400);
+      return () => clearInterval(timer);
     },
     async exportConfig() {
       return false;

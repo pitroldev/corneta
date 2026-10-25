@@ -5,6 +5,7 @@ mod chat;
 mod commands;
 mod compositor;
 mod config;
+mod deck;
 mod engine;
 mod engine_policy;
 mod frame_pool;
@@ -77,6 +78,7 @@ pub struct AppState {
     pub oauth: Mutex<auth::OauthConfig>,
     pub studio: Mutex<studio::StudioServer>,
     pub overlay: Mutex<overlay::OverlayServer>,
+    pub deck: deck::DeckRuntime,
     pub telemetry: telemetry::TelemetryRuntime,
 }
 
@@ -118,6 +120,7 @@ fn shutdown_engine(app: &tauri::AppHandle) {
         .note_exit_live(engine_live(app));
     studio::stop(&app.state::<AppState>().studio);
     overlay::stop(&app.state::<AppState>().overlay);
+    deck::shutdown(app);
     commands::kill_engine_for_shutdown(app);
     commands::close_auto_broadcasts(app, generation, false);
 }
@@ -241,6 +244,7 @@ pub fn run() {
             oauth: Mutex::new(auth::OauthConfig::default()),
             studio: Mutex::new(studio::StudioServer::default()),
             overlay: Mutex::new(overlay::OverlayServer::default()),
+            deck: deck::DeckRuntime::default(),
             telemetry: telemetry::TelemetryRuntime::default(),
         })
         .invoke_handler(tauri::generate_handler![
@@ -317,6 +321,11 @@ pub fn run() {
             commands::obs_check,
             resources::system_memory_bytes,
             commands::mark_moment,
+            commands::deck_status,
+            commands::deck_pair_start,
+            commands::deck_pair_answer,
+            commands::deck_device_remove,
+            commands::deck_request_done,
             commands::export_config,
             commands::import_config,
             commands::save_text_file,
@@ -393,6 +402,8 @@ pub fn run() {
                     });
                 }
             }
+            // The phone deck opens on the home network only when the streamer turned it on.
+            tauri::async_runtime::spawn(deck::sync(app.handle().clone()));
             // The frontend registers shortcuts so registration errors can be shown to the user.
             if let Some(icon) = app.default_window_icon().cloned() {
                 let show = MenuItem::with_id(app, "show", Msg::TrayOpen.now(), true, None::<&str>)?;

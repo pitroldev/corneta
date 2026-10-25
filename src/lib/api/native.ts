@@ -14,6 +14,10 @@ import type {
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
+  DeckDesktopRequest,
+  DeckPairRequest,
+  DeckPairTicket,
+  DeckStatus,
   PlatformMark,
   RecordDirCheck,
   SessionMeta,
@@ -607,6 +611,52 @@ export function tauriApi(): CornetaApi {
     async markMoment(label) {
       const { invoke } = await core();
       return invoke<PlatformMark[]>("mark_moment", { label: label ?? null });
+    },
+    async deckStatus() {
+      const { invoke } = await core();
+      return invoke<DeckStatus>("deck_status");
+    },
+    async deckPairStart() {
+      const { invoke } = await core();
+      return invoke<DeckPairTicket>("deck_pair_start");
+    },
+    async deckPairAnswer(requestId, allow) {
+      const { invoke } = await core();
+      await invoke("deck_pair_answer", { requestId, allow });
+    },
+    async deckDeviceRemove(id) {
+      const { invoke } = await core();
+      await invoke("deck_device_remove", { id });
+    },
+    async deckRequestDone(id, ok, message) {
+      const { invoke } = await core();
+      await invoke("deck_request_done", { id, ok, message: message ?? null });
+    },
+    subscribeDeck(handlers) {
+      let cancelled = false;
+      const unlisteners: (() => void)[] = [];
+      void event().then(async ({ listen }) => {
+        const subscriptions = await Promise.all([
+          listen<DeckStatus>("deck://status", (e) =>
+            handlers.status?.(e.payload),
+          ),
+          listen<DeckPairRequest>("deck://pair-request", (e) =>
+            handlers.pairRequest?.(e.payload),
+          ),
+          listen<{ requestId: string }>("deck://pair-closed", (e) =>
+            handlers.pairClosed?.(e.payload.requestId),
+          ),
+          listen<DeckDesktopRequest>("deck://request", (e) =>
+            handlers.request?.(e.payload),
+          ),
+        ]);
+        if (cancelled) subscriptions.forEach((u) => u());
+        else unlisteners.push(...subscriptions);
+      });
+      return () => {
+        cancelled = true;
+        unlisteners.splice(0).forEach((u) => u());
+      };
     },
     async exportConfig() {
       const { invoke } = await core();

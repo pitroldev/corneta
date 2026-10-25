@@ -83,6 +83,50 @@ pub fn validate_secret_namespace(value: &str) -> Result<(), String> {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct DeckDevice {
+    pub id: String,
+    pub name: String,
+    /// Unix ms.
+    #[serde(default)]
+    pub paired_at: u64,
+}
+
+/// One step of a phone deck combo; only the fields its action uses are set.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckComboStep {
+    /// mark | brb | mic | scene | say | pause | wait
+    pub action: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub label: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub on: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub muted: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scene: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub platform: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub seconds: Option<u32>,
+}
+
+/// A named list of steps the phone runs in order, shared by every paired phone.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DeckCombo {
+    pub id: String,
+    pub name: String,
+    #[serde(default)]
+    pub steps: Vec<DeckComboStep>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct VideoPreset {
     pub width: u32,
     pub height: u32,
@@ -243,6 +287,20 @@ pub struct Settings {
     pub overlay_position: String,
     #[serde(default = "default_overlay_port")]
     pub overlay_port: u32,
+    /// Opt-in: the phone deck listens on the home network only while this is on.
+    #[serde(default)]
+    pub deck_enabled: bool,
+    #[serde(default = "default_deck_port")]
+    pub deck_port: u32,
+    /// Deck action ids in key order; empty means the built-in layout.
+    #[serde(default)]
+    pub deck_layout: Vec<String>,
+    /// Combos the streamer built on the phone; the layout refers to them as `combo:<id>`.
+    #[serde(default)]
+    pub deck_combos: Vec<DeckCombo>,
+    /// Paired phones. Only native code adds or removes them; each verifier lives in the vault.
+    #[serde(default)]
+    pub deck_devices: Vec<DeckDevice>,
     /// bottom | top
     #[serde(default = "default_overlay_chat_position")]
     pub overlay_chat_position: String,
@@ -303,6 +361,9 @@ fn default_overlay_position() -> String {
 }
 fn default_overlay_port() -> u32 {
     7393
+}
+fn default_deck_port() -> u32 {
+    7394
 }
 fn default_overlay_chat_position() -> String {
     "bottom".to_string()
@@ -424,6 +485,11 @@ impl Default for Settings {
             overlay_sound: true,
             overlay_position: default_overlay_position(),
             overlay_port: default_overlay_port(),
+            deck_enabled: false,
+            deck_port: default_deck_port(),
+            deck_layout: Vec::new(),
+            deck_combos: Vec::new(),
+            deck_devices: Vec::new(),
             overlay_chat_position: default_overlay_chat_position(),
             overlay_duration_secs: default_overlay_duration(),
             overlay_scale: default_overlay_scale(),
@@ -591,6 +657,24 @@ impl AppConfig {
         if !(1..=65_535).contains(&s.overlay_port) {
             return Err(Msg::ConfigInvalidOverlayPort.text(l));
         }
+        // Privileged ports need elevation on some systems, and the overlay port is loopback-only.
+        if !(1024..=65_535).contains(&s.deck_port) || s.deck_port == s.overlay_port {
+            s.deck_port = default_deck_port();
+        }
+        crate::deck::normalize_combos(&mut s.deck_combos);
+        let mut seen = std::collections::HashSet::new();
+        s.deck_layout.retain(|action| {
+            crate::deck::is_layout_key(action, &s.deck_combos) && seen.insert(action.clone())
+        });
+        s.deck_layout.truncate(crate::deck::MAX_KEYS);
+        let mut device_ids = std::collections::HashSet::new();
+        s.deck_devices
+            .retain(|device| valid_id(&device.id) && device_ids.insert(device.id.clone()));
+        for device in &mut s.deck_devices {
+            device.name =
+                crate::deck::device_name(&device.name, &Msg::DeckDefaultDeviceName.text(l));
+        }
+        s.deck_devices.truncate(crate::deck::MAX_DEVICES);
         s.overlay_duration_secs = s.overlay_duration_secs.clamp(1, 60);
         s.overlay_chat_size = s.overlay_chat_size.clamp(8, 72);
         s.overlay_chat_max = s.overlay_chat_max.clamp(1, 100);
@@ -754,6 +838,8 @@ pub(crate) fn config_from_import(
         .retain(|source| valid_id(&source.id) && alert_ids.insert(source.id.clone()));
     s.obs_password = current.settings.obs_password.clone();
     s.youtube_api_key = current.settings.youtube_api_key.clone();
+    // An imported file cannot pair phones; pairing only happens through the PC prompt.
+    s.deck_devices = current.settings.deck_devices.clone();
     if !is_local_absolute_dir(&s.record_video_dir) {
         s.record_video_dir = current.settings.record_video_dir.clone();
     }
@@ -848,7 +934,9 @@ pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
     let raw = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");
     std::fs::write(&tmp, raw).map_err(|e| e.to_string())?;
-    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())
+    std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
+    crate::deck::config_saved(app, config);
+    Ok(())
 }
 
 #[cfg(test)]

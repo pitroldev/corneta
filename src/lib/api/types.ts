@@ -21,6 +21,10 @@ import type {
   ObsCheck,
   ObsVideo,
   ObsVideoCheck,
+  DeckDesktopRequest,
+  DeckPairRequest,
+  DeckPairTicket,
+  DeckStatus,
   PlatformMark,
   RecordDirCheck,
   SessionMeta,
@@ -233,6 +237,18 @@ export interface CornetaApi {
   systemMemoryBytes(): Promise<number>;
   /** The report marker is always written; the result lists the platforms that were asked too. */
   markMoment(label?: string): Promise<PlatformMark[]>;
+  deckStatus(): Promise<DeckStatus>;
+  /** A single-use QR link, valid for a couple of minutes. */
+  deckPairStart(): Promise<DeckPairTicket>;
+  deckPairAnswer(requestId: string, allow: boolean): Promise<void>;
+  deckDeviceRemove(id: string): Promise<void>;
+  deckRequestDone(id: string, ok: boolean, message?: string): Promise<void>;
+  subscribeDeck(handlers: {
+    status?: (status: DeckStatus) => void;
+    pairRequest?: (request: DeckPairRequest) => void;
+    pairClosed?: (requestId: string) => void;
+    request?: (request: DeckDesktopRequest) => void;
+  }): () => void;
   exportConfig(): Promise<boolean>;
   importConfig(): Promise<boolean>;
   saveBrbSlate(b64: string, generation?: string): Promise<void>;

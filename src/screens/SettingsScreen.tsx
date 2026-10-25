@@ -56,6 +56,7 @@ import {
   LoudnessTarget,
 } from "./settings/QualityPreviews";
 import { RecordingSettings } from "./settings/RecordingSettings";
+import { DeckSettings } from "./settings/DeckSettings";
 import {
   Field,
   SecurityFeature,
@@ -512,6 +513,8 @@ export function SettingsScreen() {
               ))}
             </div>
           </Card>
+
+          <DeckSettings />
 
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">

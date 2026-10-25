@@ -10,6 +10,7 @@ import {
   Plus,
   Plug,
   Shield,
+  Smartphone,
   Tv2,
   Wifi,
 } from "lucide-react";
@@ -35,6 +36,7 @@ import { ObsSetupPanel, type ObsSetupStatus } from "../ObsSetup";
 import { QualityModeCards, modeTitleKey } from "../QualityModes";
 import { QuickConnect } from "../platforms/TargetConnect";
 import { Mascot } from "../decor";
+import { useDeckStatus } from "../deck/pairing";
 import { Badge, Button, ExperimentalBadge, PlatformGlyph, Toggle } from "../ui";
 
 export function StepHeader({
@@ -649,6 +651,7 @@ export function DoneStep({
   const obs = useStore((s) => s.obs);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const r = useReadiness();
+  const deck = useDeckStatus();
   const ok = r.ready.length > 0 && obsConfigured(obs);
   const s = config.settings;
   const nets = [
@@ -701,6 +704,20 @@ export function DoneStep({
       value: nets.length ? joinNames(nets, t) : t("golive.tile.safety.noneSub"),
       done: true,
     },
+    // Optional, so it only appears once a phone is paired.
+    ...(deck && deck.devices.length > 0
+      ? [
+          {
+            icon: Smartphone,
+            label: t("components.setup.done.deck"),
+            value: joinNames(
+              deck.devices.map((d) => d.name),
+              t,
+            ),
+            done: true,
+          },
+        ]
+      : []),
   ];
   const hasChat = (s.chatSources ?? []).length > 0;
   return (

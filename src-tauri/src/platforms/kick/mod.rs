@@ -33,6 +33,10 @@ impl ChatProvider for Kick {
         )
     }
 
+    fn mention_login<'a>(&self, source: &'a ChatSource) -> Option<&'a str> {
+        Some(&source.value)
+    }
+
     fn sends_by_default(&self) -> bool {
         true
     }

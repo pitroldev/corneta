@@ -83,6 +83,10 @@ pub trait ChatProvider: Sync {
     fn sends_once(&self) -> bool {
         false
     }
+    /// The login viewers @mention in this source's chat, when the source holds one.
+    fn mention_login<'a>(&self, _source: &'a ChatSource) -> Option<&'a str> {
+        None
+    }
     /// None when this source cannot take the message right now.
     fn send(&self, _out: &Outbox) -> Option<Result<(), String>> {
         None
