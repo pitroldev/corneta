@@ -38,7 +38,7 @@
     "lucide-react": "^1.61.0",
     "next": "16.4.2",
     "next-mdx-remote": "6.0.0",
-    "posthog-js": "^1.438.10",
+    "posthog-js": "^1.438.14",
     "posthog-node": "^5.56.4",
     "react": "19.3.1",
     "react-dom": "19.3.1",

@@ -1,6 +1,6 @@
 import type { QueuedRequestWithOptions } from "posthog-js/dist/module.no-external";
 
-export const SUPPORTED_POSTHOG_TRANSPORT_VERSION = "1.438.10";
+export const SUPPORTED_POSTHOG_TRANSPORT_VERSION = "1.438.14";
 const REQUEST_TIMEOUT_MS = 1_000;
 
 export interface TelemetryTransport {
