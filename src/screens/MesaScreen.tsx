@@ -44,6 +44,7 @@ function VideoTile({
   sub?: string;
   down?: boolean;
 }) {
+  const t = useT();
   const ref = useRef<HTMLVideoElement>(null);
   useEffect(() => {
     const el = ref.current;
@@ -65,7 +66,7 @@ function VideoTile({
         <div className="absolute inset-0 grid place-items-center bg-night text-center">
           <div>
             <div className="-rotate-3 bg-brass px-3 py-1 font-display text-xl font-extrabold text-brass-ink shadow-[4px_4px_0_#0b0805]">
-              JÁ VOLTO
+              {t("golive.security.brb.label")}
             </div>
           </div>
         </div>

@@ -5,5 +5,5 @@ out/
 .vercel/
 *.tsbuildinfo
 
-# Capturas locais de comparação visual, não são fonte.
+# Local visual comparison captures, not source.
 .shots/

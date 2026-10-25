@@ -1,10 +1,10 @@
-# Conteúdo editorial da Corneta
+# Corneta editorial content
 
-Esta pasta é a fonte versionada de **Guias** e **Ajuda**. Os arquivos públicos são
-gerados a partir de MDX validado; conteúdo com `status: draft` nunca entra nas
-listagens públicas, no sitemap, nos alternates ou no lookup das rotas.
+This folder is the versioned source of **Guides** and **Help**. The public files
+are generated from validated MDX; content with `status: draft` never enters the
+public listings, the sitemap, the alternates or the route lookup.
 
-## Estrutura
+## Structure
 
 ```text
 content/
@@ -21,35 +21,35 @@ content/
   people.json
 ```
 
-Todos os segmentos de URL, categorias, slugs, diretórios de asset e filenames
-devem estar em inglês, em lowercase kebab-case. Isso vale mesmo quando título,
-texto, alt e legenda estão em português. Exemplos:
+All URL segments, categories, slugs, asset directories and filenames must be in
+English, in lowercase kebab-case. This holds even when the title, text, alt and
+caption are in Portuguese. Examples:
 
 - `/guides/multistream/obs-multistream`;
 - `/help/getting-started/first-stream`;
 - `/en/help/troubleshooting/obs-not-found`;
 - `corneta-platform-status-connected.webp`.
 
-As categorias permitidas e o registro versionado
-`EDITORIAL_ENGLISH_PATH_APPROVALS` são exportados por
-`lib/editorial/constants.ts`. A regex valida apenas a forma lowercase ASCII
-kebab-case: antes de criar um arquivo, uma pessoa deve confirmar que todo o path
-está em inglês, adicioná-lo ao registro e incrementar sua versão. Não crie uma
-categoria ou path apenas no filesystem: altere o contrato, a navegação e os
-testes juntos.
+The allowed categories and the versioned registry
+`EDITORIAL_ENGLISH_PATH_APPROVALS` are exported by
+`lib/editorial/constants.ts`. The regex only validates the lowercase ASCII
+kebab-case shape: before creating a file, a person must confirm that the whole
+path is in English, add it to the registry and bump its version. Do not create a
+category or path only in the filesystem: change the contract, the navigation and
+the tests together.
 
-## Contrato do frontmatter
+## Frontmatter contract
 
-Use um arquivo de `templates/` como ponto de partida. O exemplo abaixo é um
-rascunho: não atribui autoria nem revisão a ninguém. Drafts podem omitir campos
-ainda não validados; para publicar, preencha também `author`, `reviewedBy` e
-`publishedAt`.
+Use a file from `templates/` as the starting point. The example below is a
+draft: it attributes neither authorship nor review to anyone. Drafts may omit
+fields that are not validated yet; to publish, also fill in `author`,
+`reviewedBy` and `publishedAt`.
 
 ```yaml
 contentId: guide_obs_multistream
 title: Como fazer multistream no OBS Studio
-description: Descrição única e factual para busca e compartilhamento.
-summary: Resposta curta que aparece no começo do artigo.
+description: Unique, factual description for search and sharing.
+summary: Short answer shown at the start of the article.
 locale: pt-BR
 collection: guides
 kind: guide
@@ -77,164 +77,174 @@ sources:
 images: []
 ```
 
-As datas e versões do exemplo são ilustrativas: substitua-as pela revisão e pelos
-testes realmente feitos. Ao publicar, acrescente as identidades e `publishedAt`. O auditor exige uma fonte revisada,
-versão testada e autor e revisor registrados em `people.json`. Artigos não usam
-imagem de capa; screenshots úteis entram no corpo, perto do passo que explicam.
-Datas usam `YYYY-MM-DD`; não atualize `updatedAt` sem uma revisão substancial. Numa segunda revisão do mesmo artigo no mesmo dia, `updatedAt`, `reviewedAt` e `sources[].reviewedAt` aceitam a hora local (`YYYY-MM-DDTHH:MM`); ela só ordena as revisões, e o site mostra o dia.
+The example is the `pt-BR` file, so its `title` and `primaryQuery` are in
+Portuguese. Every article is created for both locales: the `en` file lives under
+`en/`, sets `locale: en`, keeps the same `translationKey`, collection, category
+and slug, and needs its own `contentId` (by convention the same id with `_en`,
+here `guide_obs_multistream_en`).
 
-Uma revisão restrita a uma fonte interna pode avançar `reviewedAt` do artigo e daquela fonte após conferir as alegações dependentes. Descreva o escopo na revisão do PR; preserve `updatedAt` se o corpo não mudou, as datas das fontes externas não revisitadas, `testedWith` e as versões/datas reais das capturas. `productVersion` informa contra qual versão a documentação foi revisada, não declara um novo teste de live. O gate de revisão não substitui essa conferência.
+The dates and versions in the example are illustrative: replace them with the
+review and the tests you actually did. When publishing, add the identities and `publishedAt`. The auditor requires a reviewed source,
+a tested version, and an author and a reviewer registered in `people.json`. Articles do not use
+a cover image; useful screenshots go in the body, next to the step they explain.
+Dates use `YYYY-MM-DD`; do not bump `updatedAt` without a substantial revision. For a second revision of the same article on the same day, `updatedAt`, `reviewedAt` and `sources[].reviewedAt` accept the local time (`YYYY-MM-DDTHH:MM`); it only orders the revisions, and the site shows the day.
 
-O gate compara os corpos depois de normalizar ambos com o Prettier do lockfile, usando as mesmas opções fixas. Alinhar tabelas ou quebrar linhas de JSX não deve criar uma data de atualização editorial. Mudanças de texto, tags, propriedades e metadados substantivos continuam exigindo `updatedAt`; alterações de fontes internas continuam exigindo a revisão correspondente. Esse normalizador é ferramenta de contribuição, não parte do bundle público.
+A review limited to one internal source may advance the `reviewedAt` of the article and of that source after checking the claims that depend on it. Describe the scope in the PR review; keep `updatedAt` if the body did not change, along with the dates of external sources you did not revisit, `testedWith` and the real versions/dates of the captures. `productVersion` states which version the documentation was reviewed against; it does not declare a new live test. The revision gate does not replace this check.
 
-### Identidade e autoria
+The gate compares the bodies after normalizing both with the lockfile's Prettier, using the same fixed options. Aligning tables or rewrapping JSX lines must not create an editorial update date. Changes to text, tags, props and substantive metadata still require `updatedAt`; changes to internal sources still require the matching review. This normalizer is contributor tooling, not part of the public bundle.
 
-O `contentId` é um identificador estável de telemetria, não uma URL. Use
-`help_...` ou `guide_...`, apenas com minúsculas, dígitos e underscores, e nunca
-reaproveite um ID removido para outro assunto.
+### Identity and authorship
 
-`people.json` registra o tipo factual (`person` ou `organization`) e a URL de cada
-assinatura. Conteúdo publicado exige autor e revisor do tipo `person`, com URL;
-não represente uma equipe ou empresa como `Person` nos dados estruturados.
-Preencha `author` com quem escreveu e `reviewedBy` somente depois da revisão
-efetiva e com a concordância da pessoa indicada. Use o nome exato do registro;
-cadastre a pessoa com seu perfil público quando necessário. Não use nomes de
-exemplo nem atribua automaticamente a revisão ao mantenedor. O auditor rejeita
-campos ausentes, placeholders conhecidos e identidades não registradas, mas
-não comprova que a revisão aconteceu: essa confirmação faz parte do PR.
+The `contentId` is a stable telemetry identifier, not a URL. Use `help_...` or
+`guide_...`, with only lowercase letters, digits and underscores, and never
+reuse a removed ID for another subject.
 
-O template da página já renderiza o `title` como H1. Portanto, o corpo MDX começa
-em H2 (`##`). H2 e H3 formam o sumário automaticamente. Markdown GFM é aceito;
-links internos devem usar a URL pública em inglês.
+`people.json` records the factual type (`person` or `organization`) and the URL
+of each byline. Published content requires an author and a reviewer of type
+`person`, with a URL; do not represent a team or a company as `Person` in the
+structured data. Fill in `author` with whoever wrote the article, and
+`reviewedBy` only after the review has actually happened and with the agreement
+of the named person. Use the exact name from the registry; register the person
+with their public profile when needed. Do not use example names or
+automatically attribute the review to the maintainer. The auditor rejects
+missing fields, known placeholders and unregistered identities, but it does not
+prove that the review happened: that confirmation is part of the PR.
 
-Imagens no corpo usam somente um identificador literal já declarado em
+The page template already renders the `title` as the H1. So the MDX body starts
+at H2 (`##`). H2 and H3 build the table of contents automatically. GFM Markdown
+is accepted; internal links must use the public English URL.
+
+Images in the body only use a literal identifier already declared in
 `frontmatter.images`:
 
 ```mdx
 <ContentImage baseName="corneta-platform-status-connected" />
 ```
 
-Não use `![]()`, `<img>` nem `<EditorialImage>` diretamente. O template resolve
-src, alt, legenda, dimensões e proveniência pelo frontmatter. Cada item de
-`images` deve aparecer exatamente uma vez no corpo.
+Do not use `![]()`, `<img>` or `<EditorialImage>` directly. The template
+resolves src, alt, caption, dimensions and provenance from the frontmatter. Each
+item in `images` must appear exactly once in the body.
 
-## Traduções
+## Translations
 
-O site é bilíngue: todo conteúdo publicado precisa das versões completas
-`pt-BR` e `en`, ambas publicadas e ligadas pela mesma `translationKey`, com a
-mesma coleção, categoria e slug. O `content:check` reprova artigo publicado sem
-esse par. Rascunhos podem existir num idioma só enquanto a tradução não fica
-pronta. O loader só expõe alternates quando o par é recíproco.
+The site is bilingual: all published content needs complete `pt-BR` and `en`
+versions, both published and linked by the same `translationKey`, with the same
+collection, category and slug. `content:check` fails a published article without
+that pair. Drafts may exist in a single language while the translation is not
+ready. The loader only exposes alternates when the pair is reciprocal.
 
-Tradução não significa copiar screenshots no idioma errado. Cada imagem declara
-`language: pt-BR`, `language: en` ou `language: none`. Use `none` apenas quando o
-visual não contém texto nem interface localizada.
+Translation does not mean copying screenshots in the wrong language. Each image
+declares `language: pt-BR`, `language: en` or `language: none`. Use `none` only
+when the visual contains no text and no localized interface.
 
-## Protocolo reproduzível de screenshots
+## Reproducible screenshot protocol
 
-Antes da captura:
+Before capturing:
 
-1. use uma conta e um perfil exclusivos de demonstração;
-2. preencha canais, títulos e mensagens com dados fictícios plausíveis;
-3. registre versão da Corneta, versão do software externo, Windows, idioma,
-   tema, escala e dimensão da janela;
-4. desligue notificações e feche janelas fora do tutorial;
-5. reproduza o estado desde o início e confirme o resultado esperado;
-6. capture a imagem original em PNG, sem redimensionar nem anotar;
-7. revise o original em 100% de zoom antes de produzir a derivada.
+1. use a dedicated demo account and profile;
+2. fill channels, titles and messages with plausible fictional data;
+3. record the Corneta version, the external software version, Windows, language,
+   theme, scale and window size;
+4. turn off notifications and close the windows that are not part of the
+   tutorial;
+5. reproduce the state from the start and confirm the expected result;
+6. capture the original image as PNG, without resizing or annotating it;
+7. review the original at 100% zoom before producing the derivative.
 
-Uma imagem é reprovada se mostrar, mesmo parcialmente:
+An image is rejected if it shows, even partially:
 
-- stream key, token, senha, API key, cookie ou URL com credencial;
-- e-mail, conta, chat, avatar ou nome de uma pessoa real;
-- ID real de telemetria, operação, relatório ou erro;
-- caminho local, username do Windows, IP ou notificação pessoal;
-- tela adjacente ou dado que não seja necessário para a tarefa.
+- a stream key, token, password, API key, cookie or URL with credentials;
+- the e-mail, account, chat, avatar or name of a real person;
+- a real telemetry, operation, report or error ID;
+- a local path, Windows username, IP or personal notification;
+- an adjacent screen or any data the task does not need.
 
-Não use blur como única proteção de segredo. Prepare dados fictícios antes da
-captura e prefira cortar a região. OCR e busca por padrões podem complementar,
-mas nunca substituir, a revisão humana no arquivo original.
+Do not use blur as the only protection for a secret. Prepare fictional data
+before capturing and prefer cropping the region. OCR and pattern search can
+complement, but never replace, human review of the original file.
 
-Screenshots de Twitch, YouTube, Kick e OBS só entram quando a localização visual
-evita um erro real. Registre `capturedAt` e `externalUiReviewedAt`; para OBS,
-registre também `sourceVersion` com a versão capturada. `productVersion` continua
-reservado à versão da Corneta. Esses campos ficam só no manifesto. Confira as regras de marca atuais e refaça a captura quando a
-interface mudar. Não copie imagens de centrais de ajuda.
+Screenshots of Twitch, YouTube, Kick and OBS only go in when the visual location
+prevents a real mistake. Record `capturedAt` and `externalUiReviewedAt`; for
+OBS, also record `sourceVersion` with the captured version. `productVersion`
+stays reserved for the Corneta version. These fields live only in the manifest. Check the current brand rules and redo the capture when the
+interface changes. Do not copy images from help centers.
 
-## Pipeline e manifesto de assets
+## Asset pipeline and manifest
 
-O master e a derivada são arquivos diferentes:
+The master and the derivative are different files:
 
 ```text
 content/assets/originals/multistream/obs-multistream-flow.png
 public/images/editorial/multistream/obs-multistream-flow.webp
 ```
 
-1. preserve o master sanitizado em `content/assets/originals/`;
-2. exporte screenshot ou arte raster em WebP ou AVIF com o comando reproduzível;
-   diagramas podem ser SVG;
-3. mantenha cada derivada abaixo de **512 KiB**;
-4. preserve proporção, legibilidade mobile e dimensões declaradas;
-5. adicione master e todas as derivadas a `assets/manifest.json`;
-6. no artigo, cite a imagem em `images` só com `baseName`, `alt` e, se houver,
-   `caption`; arquivo, dimensões, procedência e datas vêm do manifesto, e a
-   primeira derivada é a que o artigo usa;
-7. execute `pnpm content:check` dentro de `web`.
+1. keep the sanitized master in `content/assets/originals/`;
+2. export screenshots or raster art as WebP or AVIF with the reproducible
+   command; diagrams may be SVG;
+3. keep each derivative under **512 KiB**;
+4. preserve the aspect ratio, mobile legibility and declared dimensions;
+5. add the master and every derivative to `assets/manifest.json`;
+6. in the article, list the image in `images` with only `baseName`, `alt` and,
+   if there is one, `caption`; file, dimensions, provenance and dates come from
+   the manifest, and the first derivative is the one the article uses;
+7. run `pnpm content:check` inside `web`.
 
-Exemplo executado a partir de `web/`:
+Example run from `web/`:
 
 ```powershell
 pnpm content:image --input assets/originals/multistream/obs-multistream-flow.png --output images/editorial/multistream/obs-multistream-flow.webp --width 1600 --quality 82
 ```
 
-O comando lê somente dentro de `content/assets/originals`, grava somente dentro
-de `public/images/editorial`, exige o mesmo `baseName`, recusa sobrescrever sem
-`--force` e falha antes de gravar se ultrapassar 512 KiB. Copie `src`, largura,
-altura e bytes exibidos para o manifesto; use `--force` apenas depois de revisar
-a mudança da derivada.
+The command reads only inside `content/assets/originals`, writes only inside
+`public/images/editorial`, requires the same `baseName`, refuses to overwrite
+without `--force` and fails before writing if the output exceeds 512 KiB. Copy
+the `src`, width, height and bytes it prints into the manifest; use `--force`
+only after reviewing the change to the derivative.
 
-O auditor rejeita PNG/JPEG como derivada pública, arquivos ausentes, nomes fora
-da convenção, estouro de bytes, dimensões declaradas divergentes do manifesto,
-dimensões reais divergentes do manifesto, idioma incompatível e asset não
-registrado. Masters e derivadas também precisam ser imagens legíveis cujo formato
-real corresponda à extensão; EXIF, XMP, IPTC, ICC, comentários e metadata de
-Photoshop não podem permanecer nem no arquivo versionado nem no público.
+The auditor rejects PNG/JPEG as a public derivative, missing files, names
+outside the convention, byte overruns, declared dimensions that differ from the
+manifest, real dimensions that differ from the manifest, a mismatched language
+and unregistered assets. Masters and derivatives must also be readable images
+whose real format matches the extension; EXIF, XMP, IPTC, ICC, comments and
+Photoshop metadata must not remain in either the versioned file or the public
+one.
 
-SVG é analisado como XML estrito e limitado a uma allowlist passiva. Não use
-scripts, `foreignObject`, handlers `on*`, CSS, animação, links ou recursos
-externos; todo SVG deve ter exatamente um `<title>` e um `<desc>` diretos e não
-vazios. `next/image` ainda negocia e otimiza o formato entregue ao navegador;
-isso não elimina a obrigação de manter uma derivada pública enxuta, rastreável e
-separada do master.
+SVG is parsed as strict XML and limited to a passive allowlist. Do not use
+scripts, `foreignObject`, `on*` handlers, CSS, animation, links or external
+resources; every SVG must have exactly one direct, non-empty `<title>` and
+`<desc>`. `next/image` still negotiates and optimizes the format delivered to
+the browser; that does not remove the obligation to keep a public derivative
+that is lean, traceable and separate from the master.
 
-`baseName` deve ser idêntico ao nome, sem extensão, do master e da derivada. A
-validação automática de sintaxe garante apenas lowercase ASCII kebab-case. A
-revisão humana confirma que diretórios, filenames e `baseName` estão em inglês,
-adiciona o `src` exato a `EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS` e incrementa
-a versão desse registro antes de usá-lo no manifesto. O `baseName` e o master
-precisam espelhar esse caminho: mesmo nome e mesmos diretórios em
-`assets/originals`. Aprovar apenas o filename não aprova seus diretórios. O frontmatter funciona como uso localizado do asset (alt e
-legenda); o manifesto é a única origem de arquivo, procedência, direitos, datas,
-versão e variantes. Trocar uma captura no manifesto muda o que o leitor vê, então
-o gate de revisão exige `updatedAt` novo nos artigos que a usam.
+`baseName` must be identical to the name, without extension, of the master and
+the derivative. The automatic syntax validation only guarantees lowercase ASCII
+kebab-case. Human review confirms that directories, filenames and `baseName`
+are in English, adds the exact `src` to `EDITORIAL_ENGLISH_ASSET_PATH_APPROVALS`
+and bumps the version of that registry before the path is used in the manifest.
+The `baseName` and the master must mirror that path: same name and same
+directories under `assets/originals`. Approving only the filename does not approve its directories. The frontmatter acts as the localized use of the asset (alt and
+caption); the manifest is the single source of file, provenance, rights, dates,
+version and variants. Swapping a capture in the manifest changes what the reader
+sees, so the revision gate requires a new `updatedAt` on the articles that use
+it.
 
-Imagens geradas por IA são permitidas apenas como apoio abstrato. Nunca podem
-simular a Corneta, OBS, uma plataforma, um erro, uma métrica ou prova de
-funcionalidade. Registre modelo e data no manifesto. Para fluxos e explicações,
-prefira um SVG próprio e mantenha a mesma informação em HTML próximo.
+AI-generated images are allowed only as abstract support. They may never
+simulate Corneta, OBS, a platform, an error, a metric or proof of a feature.
+Record the model and the date in the manifest. For flows and explanations,
+prefer an original SVG and keep the same information in nearby HTML.
 
-## Processo de publicação
+## Publishing process
 
-1. valide intenção, sobreposição e `contentId`;
-2. parta do template correto;
-3. execute a tarefa na versão declarada;
-4. escreva a resposta direta e depois os detalhes;
-5. prepare fontes primárias e pacote visual;
-6. faça revisão técnica e editorial com pessoas registradas;
-7. troque para `status: published` apenas quando o auditor passar;
-8. confirme canonical, imagem social e links no preview;
-9. publique e revise no intervalo declarado.
+1. validate the intent, overlap and `contentId`;
+2. start from the right template;
+3. perform the task on the declared version;
+4. write the direct answer first, then the details;
+5. prepare the primary sources and the visual package;
+6. do a technical and an editorial review with registered people;
+7. switch to `status: published` only when the auditor passes;
+8. confirm the canonical, the social image and the links in the preview;
+9. publish, and review again at the declared interval.
 
-Comparativos exigem teste hands-on recente e metodologia explícita.
-Troubleshooting segue “sintoma → causa provável → como confirmar → correção”.
-Não transforme recurso experimental em promessa estável.
+Comparisons require a recent hands-on test and an explicit methodology.
+Troubleshooting follows “symptom → likely cause → how to confirm → fix”.
+Do not turn an experimental feature into a stable promise.

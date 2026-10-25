@@ -6,73 +6,73 @@
 <h1 align="center">Corneta</h1>
 
 <p align="center">
-  <strong>A sua live, do primeiro sinal ao último replay.</strong><br>
-  Transmita do OBS para várias plataformas, reúna o chat e reviva os melhores momentos.<br>
-  Um app no seu PC, com código aberto.
+  <strong>Your stream, from the first signal to the last replay.</strong><br>
+  Stream from OBS to several platforms, bring the chat together and relive the best moments.<br>
+  An app on your PC, open source.
 </p>
 
 <p align="center">
-  <a href="#conheça-a-corneta">Conheça</a> ·
-  <a href="#testar-sem-rust-obs-ou-contas">Experimente</a> ·
-  <a href="#desenvolva-e-contribua">Contribua</a> ·
-  <a href="#documentação">Documentação</a>
+  <a href="#meet-corneta">Meet it</a> ·
+  <a href="#try-it-without-rust-obs-or-accounts">Try it</a> ·
+  <a href="#develop-and-contribute">Contribute</a> ·
+  <a href="#documentation">Documentation</a>
 </p>
 
-> **Windows x64 · Código aberto.** [Experimente a demo](#testar-sem-rust-obs-ou-contas) ou veja [como usar na sua live](#quero-usar-na-minha-live).
+> **Windows x64 · Open source.** [Try the demo](#try-it-without-rust-obs-or-accounts) or see [how to use it on your stream](#use-it-on-your-stream).
 
-[![Painel Ao vivo da Corneta antes da live: plataformas, OBS, upload e proteções conferidos, com o BORA AO VIVO liberado.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
+[![Corneta's Live panel before the stream: platforms, OBS, upload and safety nets checked, with GO LIVE enabled.](docs/images/readme/live.webp)](docs/images/readme/live.webp)
 
-_Interface real em modo de demonstração, com dados fictícios. Clique nos prints para ampliar._
+_The real interface in demo mode, with made-up data. Click the screenshots to enlarge them._
 
-## Conheça a Corneta
+## Meet Corneta
 
-Você continua criando suas cenas no OBS. A Corneta recebe esse sinal no seu computador e o envia aos destinos escolhidos, enquanto mantém a conversa e a história da transmissão por perto.
+You keep building your scenes in OBS. Corneta receives that signal on your computer and sends it to the destinations you choose, while keeping the conversation and the story of the stream close at hand.
 
-**O vídeo vai do seu PC para as plataformas.** O site da Corneta ajuda na configuração e no login das integrações; não recebe nem retransmite a sua live.
+**Video goes from your PC to the platforms.** The Corneta website helps with setup and with signing in to integrations; it does not receive or relay your stream.
 
-### Antes da live: prepare cada destino
+### Before the stream: prepare each destination
 
-Adicione plataformas por URL e chave de transmissão, conecte as contas com integração disponível e confira o OBS e o upload antes de entrar no ar. Destinos personalizados também têm lugar.
+Add platforms by URL and stream key, connect accounts where an integration is available, and check OBS and your upload before going on air. Custom destinations have a place too.
 
-Escolha como o sinal chega a cada plataforma:
+Choose how the signal reaches each platform:
 
-| Modo           | O que faz                                                            |
-| -------------- | -------------------------------------------------------------------- |
-| **Na lata**    | Repassa o sinal do OBS, sem reencodificar o vídeo.                   |
-| **Esperto**    | Repassa onde o sinal é compatível e adapta os destinos que precisam. |
-| **Caprichado** | Reencodifica conforme a qualidade escolhida para cada destino.       |
+| Mode            | What it does                                                                               |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| **Straight up** | Passes the OBS signal through without re-encoding the video.                               |
+| **Smart**       | Passes the signal through where it is compatible and adapts the destinations that need it. |
+| **All out**     | Re-encodes at the quality chosen for each destination.                                     |
 
-Quando disponível, a aceleração da GPU ajuda no processamento. Cada destino consome upload; adaptar o vídeo também exige recursos do computador. A Corneta mostra estimativas antes da live — a capacidade real depende da sua conexão, máquina e configuração.
+When available, GPU acceleration helps with processing. Each destination uses upload bandwidth; adapting the video also takes computer resources. Corneta shows estimates before the stream — actual capacity depends on your connection, machine and settings.
 
-### Durante a live: a conversa fica por perto
+### During the stream: the conversation stays close
 
-Acompanhe o chat de **Twitch, YouTube e Kick** numa mesma interface, com identificação de plataforma, emotes e opções de moderação conforme a integração. Chat e alertas também podem abrir em janelas separadas.
+Follow **Twitch, YouTube and Kick** chat in a single interface, with platform identification, emotes and moderation options depending on the integration. Chat and alerts can also open in separate windows.
 
-[![Chat integrado da Corneta com mensagens fictícias, identificação de plataforma e controles da conversa.](docs/images/readme/chat.webp)](docs/images/readme/chat.webp)
+[![Corneta's built-in chat with made-up messages, platform identification and conversation controls.](docs/images/readme/chat.webp)](docs/images/readme/chat.webp)
 
-_Conversa simulada, com fontes identificadas por plataforma._
+_A simulated conversation, with sources identified by platform._
 
-O painel da live acompanha o estado dos destinos e as métricas disponíveis do OBS. Reconexão por destino, gravação local opcional e marcação de momentos ajudam você a cuidar da transmissão sem perder o fio da conversa.
+The live panel tracks the state of each destination and the available OBS metrics. Per-destination reconnection, optional local recording and moment markers help you look after the stream without losing the thread of the conversation.
 
-> Transmissão, login e chat são capacidades diferentes. Enviar vídeo para uma plataforma não garante OAuth, chat, envio de mensagens ou moderação nela. Consulte a [matriz de integrações](docs/SUPERFICIE-DE-REDE.md#as-três-funções-são-independentes).
+> Streaming, sign-in and chat are separate capabilities. Sending video to a platform does not guarantee OAuth, chat, sending messages or moderation there. See the [integration matrix](docs/NETWORK-SURFACE.md#the-three-capabilities-are-independent).
 
-### Depois da live: uma história para revisitar
+### After the stream: a story to revisit
 
-O relatório começa pela sua live: duração, audiência disponível, participação do chat e momentos marcados. Gráficos mostram como ela evoluiu; os detalhes técnicos ficam num capítulo próprio, para quando você quiser investigar.
+The report starts with your stream: duration, available audience data, chat participation and marked moments. Charts show how it evolved; technical details get a chapter of their own, for when you want to dig in.
 
-[![Relatório da Corneta com o retrato da live, estatísticas de participação e a história da transmissão.](docs/images/readme/report.webp)](docs/images/readme/report.webp)
+[![Corneta report with the stream at a glance, participation stats and the story of the stream.](docs/images/readme/report.webp)](docs/images/readme/report.webp)
 
-_Relatório de demonstração de 48 minutos, com dados fictícios e sem gravação de vídeo._
+_A 48-minute demo report, with made-up data and no video recording._
 
-**Gravou?** Reveja o vídeo local junto do chat registrado e navegue pelos momentos. **Não gravou?** O relatório continua com os dados que foram salvos, sem depender de um vídeo. Você também pode exportá-lo para consultar depois.
+**Recorded it?** Rewatch the local video alongside the saved chat and jump between moments. **Didn't record?** The report still works with the data that was saved, without depending on a video. You can also export it to look at later.
 
-Vídeo e histórico do chat são opcionais e vêm desligados. Ative o que quiser guardar antes da transmissão; o replay depende desses arquivos continuarem disponíveis no disco.
+Video and chat history are optional and off by default. Turn on what you want to keep before the stream; the replay depends on those files still being available on disk.
 
-## Testar sem Rust, OBS ou contas
+## Try it without Rust, OBS or accounts
 
-O caminho mais curto para conhecer a interface e começar a contribuir é a **demonstração no navegador**. Ela usa dados fictícios e não exige conectar nenhuma conta.
+The shortest way to get to know the interface and start contributing is the **browser demo**. It uses made-up data and does not require connecting any account.
 
-Com **Node.js 24.18.1** e **pnpm 11.18.0** instalados:
+With **Node.js 24.18.1** and **pnpm 11.18.0** installed:
 
 ```sh
 git clone https://github.com/pitroldev/corneta.git
@@ -81,109 +81,109 @@ pnpm install --frozen-lockfile
 pnpm contrib:demo
 ```
 
-Abra **http://127.0.0.1:1420**. Explore a preparação da live, o chat e os relatórios de exemplo pelo menu lateral.
+Open **http://127.0.0.1:1420**. Explore stream setup, chat and the sample reports from the side menu.
 
-O perfil de contribuição não carrega seu `.env` pessoal e desativa a telemetria. Não copie credenciais nem configurações reais para experimentar. A demo simula a transmissão: ela não valida OBS, encoder, cofre ou login real.
+The contributor profile does not load your personal `.env` and turns telemetry off. Do not copy real credentials or settings to try it out. The demo simulates streaming: it does not validate OBS, the encoder, the vault or real sign-in.
 
-## Quero usar na minha live
+## Use it on your stream
 
-Consulte as [releases do projeto](https://github.com/pitroldev/corneta/releases) para instaladores e notas de versão. **Windows x64 é a plataforma atual**; macOS, Linux e Windows ARM ainda não têm distribuição validada. Builds de contribuição são destinados ao desenvolvimento e não substituem os instaladores de release.
+See the [project releases](https://github.com/pitroldev/corneta/releases) for installers and release notes. **Windows x64 is the current platform**; macOS, Linux and Windows ARM do not have a validated distribution yet. Contributor builds are meant for development and do not replace the release installers.
 
-Para testar o aplicativo nativo a partir do código, siga o caminho de [desktop para desenvolvimento](#desktop-nativo--windows-x64) abaixo. Faça os testes fora de uma live real.
+To test the native app from source, follow the [desktop development](#native-desktop--windows-x64) path below. Run your tests outside a real stream.
 
-## Desenvolva e contribua
+## Develop and contribute
 
-A interface desktop usa **React, TypeScript e Tailwind CSS**; o aplicativo nativo, **Tauri 2 e Rust**. O site e a API de configuração ficam no workspace **Next.js** em `web/`.
+The desktop interface uses **React, TypeScript and Tailwind CSS**; the native app, **Tauri 2 and Rust**. The website and the setup API live in the **Next.js** workspace in `web/`.
 
-Você não precisa configurar o projeto inteiro para ajudar. Comece pela área que quer melhorar e pelo [guia de contribuição](CONTRIBUTING.md). Documentação, relatos reproduzíveis e ajustes de interface também contam.
+You don't need to set up the whole project to help. Start with the area you want to improve and the [contribution guide](CONTRIBUTING.md). Documentation, reproducible reports and interface tweaks count too.
 
-### Validar uma contribuição
+### Validate a contribution
 
-Em um clone limpo, sem `.env`, contas ou arquivos pessoais:
+In a clean clone, without `.env`, accounts or personal files:
 
 ```sh
 pnpm contrib:check
 ```
 
-Esse comando valida app e site sem os segredos da operação oficial. Os requisitos e testes nativos adicionais estão no [guia de desenvolvimento](docs/DESENVOLVIMENTO.md).
+This command validates the app and the website without the official operation's secrets. Additional requirements and native tests are in the [development guide](docs/DEVELOPMENT.md).
 
-### Site e API local — Next.js
+### Website and local API — Next.js
 
 ```sh
 pnpm contrib:web
 ```
 
-Abra **http://localhost:7390**. É possível trabalhar no site sem configurar OAuth; autenticar contas de verdade exige a configuração dos provedores.
+Open **http://localhost:7390**. You can work on the website without configuring OAuth; signing in to real accounts requires configuring the providers.
 
-O perfil recusa arquivos reais `web/.env*`. Se já tiver uma operação configurada, use um clone limpo — não mova nem apague suas credenciais. Para hospedagem própria e OAuth, consulte [configuração](docs/CONFIGURACAO.md) e [contratos de rede](docs/SUPERFICIE-DE-REDE.md).
+The profile refuses real `web/.env*` files. If you already have a configured operation, use a clean clone — do not move or delete your credentials. For self-hosting and OAuth, see [configuration](docs/CONFIGURATION.md) and [network contracts](docs/NETWORK-SURFACE.md).
 
-### Desktop nativo — Windows x64
+### Native desktop — Windows x64
 
 <details>
-<summary><strong>Requisitos e comandos para rodar o app nativo</strong></summary>
+<summary><strong>Requirements and commands to run the native app</strong></summary>
 
-Além de Node/pnpm, instale **Rust 1.97.1**, **Visual Studio Build Tools com C++/MSVC e Windows SDK**, **PowerShell 7** (`pwsh`) e **WebView2 Runtime**. OBS com obs-websocket v5 é necessário para testar a integração com ele.
+Besides Node/pnpm, install **Rust 1.97.1**, **Visual Studio Build Tools with C++/MSVC and the Windows SDK**, **PowerShell 7** (`pwsh`) and the **WebView2 Runtime**. OBS with obs-websocket v5 is required to test the OBS integration.
 
 ```powershell
 pwsh -NoProfile -File scripts/fetch-binaries.ps1
 pnpm contrib:app:dev
 ```
 
-O script baixa e verifica as versões fixadas de FFmpeg e MediaMTX. O primeiro build compila as dependências Rust e é mais pesado que a demo; tempo, memória e espaço necessários variam conforme máquina e cache.
+The script downloads and verifies the pinned versions of FFmpeg and MediaMTX. The first build compiles the Rust dependencies and is heavier than the demo; the time, memory and disk space it needs vary with the machine and cache.
 
-Para compilar somente o executável local, sem criar nem instalar um pacote de distribuição:
+To compile only the local executable, without creating or installing a distribution package:
 
 ```sh
 pnpm contrib:app:build
 ```
 
-O perfil usa identidade e cofre de contribuição separados, com updater e telemetria desativados. **OBS e portas de rede continuam compartilhados:** não teste durante uma live real. Não é necessário ter a chave privada oficial do updater.
+The profile uses a separate contributor identity and vault, with the updater and telemetry turned off. **OBS and network ports are still shared:** do not test during a real stream. You do not need the official updater private key.
 
-Consulte [desenvolvimento](docs/DESENVOLVIMENTO.md) para os limites do perfil. Empacotamento e distribuição seguem os [gates de release](docs/GATES-DE-RELEASE.md) e a [assinatura](docs/ASSINATURA.md), não o fluxo de contribuição.
+See [development](docs/DEVELOPMENT.md) for the profile's limits. Packaging and distribution follow the [release gates](docs/RELEASE-GATES.md) and [signing](docs/SIGNING.md), not the contribution flow.
 
 </details>
 
-### Onde cada coisa vive
+### Where things live
 
-| Diretório                    | Responsabilidade                                                       |
-| ---------------------------- | ---------------------------------------------------------------------- |
-| [`src/`](src/)               | Interface desktop, design system, chat, relatórios e motor simulado.   |
-| [`src-tauri/`](src-tauri/)   | Motor nativo, OBS, processamento de mídia, cofre e persistência local. |
-| [`web/`](web/)               | Site, conteúdo e API de configuração/OAuth. Não retransmite vídeo.     |
-| [`scripts/`](scripts/)       | Ferramentas de desenvolvimento, validação e preparação de releases.    |
-| [`docs/`](docs/README.md)    | Guias e contratos mantidos do projeto.                                 |
-| [`compliance/`](compliance/) | Inventários e evidências de conformidade da distribuição.              |
+| Directory                    | Responsibility                                                        |
+| ---------------------------- | --------------------------------------------------------------------- |
+| [`src/`](src/)               | Desktop interface, design system, chat, reports and simulated engine. |
+| [`src-tauri/`](src-tauri/)   | Native engine, OBS, media processing, vault and local persistence.    |
+| [`web/`](web/)               | Website, content and setup/OAuth API. It does not relay video.        |
+| [`scripts/`](scripts/)       | Development, validation and release preparation tools.                |
+| [`docs/`](docs/README.md)    | The project's maintained guides and contracts.                        |
+| [`compliance/`](compliance/) | Compliance inventories and evidence for the distribution.             |
 
-O fluxo de mídia usa **MediaMTX local → processamento Rust/FFmpeg → destinos**, com supervisão por destino. Cópia, reencodificação e compartilhamento de processamento dependem do modo e da compatibilidade. Veja a [arquitetura](docs/ARQUITETURA.md) para os detalhes.
+The media flow is **local MediaMTX → Rust/FFmpeg processing → destinations**, with per-destination supervision. Copying, re-encoding and shared processing depend on the mode and on compatibility. See the [architecture](docs/ARCHITECTURE.md) for details.
 
-**Código e comentários são em inglês.** Issues e documentação podem ser em português ou inglês. Antes de mudanças maiores, abra uma conversa numa issue; para bugs, inclua passos de reprodução com dados fictícios. Siga o [código de conduta](CODE_OF_CONDUCT.md).
+**Code, comments and documentation are in English.** Issues can be opened in English or Portuguese. Before larger changes, start a conversation in an issue; for bugs, include reproduction steps with made-up data. Follow the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Documentação
+## Documentation
 
-| Quero…                                       | Por onde começar                                                                                                                 |
-| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| Entender o que funciona e o que mudou        | [Compatibilidade](docs/COMPATIBILIDADE.md) · [Notas de versão](https://github.com/pitroldev/corneta/releases)                    |
-| Preparar o ambiente e encontrar tarefas      | [Desenvolvimento](docs/DESENVOLVIMENTO.md) · [Contribuição](CONTRIBUTING.md)                                                     |
-| Entender o código e testar cenários          | [Arquitetura](docs/ARQUITETURA.md) · [Performance](docs/PERFORMANCE.md) · [Fixtures de relatórios](docs/RELATORIOS-FICTICIOS.md) |
-| Configurar integrações ou uma distribuição   | [Configuração](docs/CONFIGURACAO.md) · [Gates de release](docs/GATES-DE-RELEASE.md)                                              |
-| Pedir ajuda ou comunicar uma vulnerabilidade | [Suporte](SUPPORT.md) · [Canal de segurança](SECURITY.md)                                                                        |
+| I want to…                               | Where to start                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Understand what works and what changed   | [Compatibility](docs/COMPATIBILITY.md) · [Release notes](https://github.com/pitroldev/corneta/releases)                  |
+| Set up the environment and find tasks    | [Development](docs/DEVELOPMENT.md) · [Contributing](CONTRIBUTING.md)                                                     |
+| Understand the code and test scenarios   | [Architecture](docs/ARCHITECTURE.md) · [Performance](docs/PERFORMANCE.md) · [Report fixtures](docs/SYNTHETIC-REPORTS.md) |
+| Configure integrations or a distribution | [Configuration](docs/CONFIGURATION.md) · [Release gates](docs/RELEASE-GATES.md)                                          |
+| Get help or report a vulnerability       | [Support](SUPPORT.md) · [Security channel](SECURITY.md)                                                                  |
 
-O [índice completo](docs/README.md) reúne os demais guias, incluindo design, conteúdo, privacidade e operação.
+The [full index](docs/README.md) lists the other guides, including design, content, privacy and operations.
 
-## Privacidade e segurança
+## Privacy and security
 
-Credenciais usam o cofre nativo; gravações e relatórios ficam no computador. Os prints deste README foram feitos em perfil descartável, apenas com dados fictícios — [procedência e revisão das imagens](docs/MATERIAIS-PUBLICOS.md#capturas-do-readme).
+Credentials use the native vault; recordings and reports stay on the computer. The screenshots in this README were taken in a disposable profile, with made-up data only — [provenance and review of the images](docs/PUBLIC-ASSETS.md#readme-screenshots).
 
-Na distribuição oficial com telemetria configurada, **dados de uso só são enviados após ativação explícita; relatos de falhas ficam ativos quando não há escolha anterior e podem ser desligados**. Os controles são independentes e as escolhas anteriores são preservadas. Ativar uso não envia eventos anteriores à ativação. Builds de contribuição desativam o envio. Veja a [política de privacidade](https://www.corneta.live/legal/privacy) para o que é coletado e a [configuração](docs/CONFIGURACAO.md) para variáveis e kill switches.
+In the official distribution with telemetry configured, **usage data is only sent after you explicitly turn it on; error reports are on when no earlier choice exists and can be turned off**. The controls are independent and earlier choices are preserved. Turning on usage data does not send events from before it was turned on. Contributor builds disable sending. See the [privacy policy](https://www.corneta.live/legal/privacy) for what is collected and the [configuration](docs/CONFIGURATION.md) for variables and kill switches.
 
-Nunca publique stream keys, tokens, `.env`, relatórios pessoais ou logs brutos em issues. Suspeitas de vulnerabilidade devem seguir o [canal privado de segurança](SECURITY.md).
+Never post stream keys, tokens, `.env`, personal reports or raw logs in issues. Suspected vulnerabilities must go through the [private security channel](SECURITY.md).
 
-## Licença
+## License
 
-O código próprio da Corneta é [MIT](LICENSE). Dependências, fontes, ícones, modelos e sidecars mantêm suas licenças e avisos: consulte [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). A distribuição do FFmpeg também exige cumprir as obrigações do binário utilizado.
+Corneta's own code is [MIT](LICENSE). Dependencies, fonts, icons, models and sidecars keep their own licenses and notices: see [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). Distributing FFmpeg also requires meeting the obligations of the binary used.
 
-Forks são bem-vindos, mas não devem se apresentar como a distribuição oficial nem reutilizar suas chaves e serviços sem configuração própria.
+Forks are welcome, but must not present themselves as the official distribution or reuse its keys and services without their own configuration.
 
 ---
 
-[Experimentar a Corneta](#testar-sem-rust-obs-ou-contas) · [Contribuir com o projeto](CONTRIBUTING.md) · [Voltar ao início](#corneta)
+[Try Corneta](#try-it-without-rust-obs-or-accounts) · [Contribute to the project](CONTRIBUTING.md) · [Back to top](#corneta)

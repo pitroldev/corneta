@@ -1,4 +1,4 @@
-// Desktop pt-BR dictionary and Dict type source. Follow docs/TOM-DE-VOZ.md before changing copy.
+// Desktop pt-BR dictionary and Dict type source. Follow docs/VOICE-AND-TONE.md before changing copy.
 
 export const pt = {
   "analysis.advice.app.cpu":
@@ -232,6 +232,7 @@ export const pt = {
   "chat.alertsrc.section": "Fontes de alerta",
   "chat.alertsrc.status.dropped": "caiu",
   "chat.alertsrc.status.error": "erro",
+  "chat.alertsrc.status.invalidToken": "token inválido",
   "chat.alertsrc.status.live": "no ar",
   "chat.alertsrc.tokenSaved": "token salvo",
   "chat.alertsrc.tokenStored.chip": "Token no cofre",

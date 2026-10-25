@@ -28,7 +28,7 @@ describe("release source compliance gate", () => {
         "THIRD_PARTY_NOTICES.md",
         "compliance/ffmpeg-sources.json",
         "compliance/ffmpeg-provenance.json",
-        "docs/CONFORMIDADE-FFMPEG.md",
+        "docs/FFMPEG-COMPLIANCE.md",
       ]),
     );
     expect(

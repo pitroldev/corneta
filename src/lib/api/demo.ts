@@ -1,4 +1,5 @@
 import { defaultConfig } from "../factory";
+import { resolveLocale } from "../i18n/locale";
 import type { I18n, MessageKey } from "../i18n";
 import { PLATFORMS } from "../platforms";
 import {
@@ -1027,13 +1028,16 @@ export function mockApi(): CornetaApi {
       return [];
     },
     async chatSend(text) {
-      // Keep the self-echo label aligned with the moderation guard in ChatScreen.
+      // The native app localizes its own author name and marks the message as its own.
+      const you =
+        resolveLocale(loadConfig().settings.language) === "en" ? "you" : "você";
       chatMsgListeners.forEach((l) =>
         l({
           id: `me-${Date.now()}`,
           platform: "twitch",
-          source: "você",
-          author: "você",
+          source: you,
+          author: you,
+          own: true,
           color: "#ffb323",
           text,
           fragments: [{ kind: "text", text }],

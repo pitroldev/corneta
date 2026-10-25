@@ -96,4 +96,5 @@ export const ALERT_STATUS: Record<string, MessageKey> = {
   connected: "chat.alertsrc.status.live",
   error: "chat.alertsrc.status.error",
   disconnected: "chat.alertsrc.status.dropped",
+  "invalid-token": "chat.alertsrc.status.invalidToken",
 };

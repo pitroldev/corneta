@@ -1,15 +1,15 @@
-## Problema e mudança
+## Problem and change
 
-<!-- Descreva objetivo, solução e limites. Relacione uma issue, se houver. -->
+<!-- Describe the goal, the solution and its limits. Link an issue, if there is one. -->
 
-## Validação
+## Validation
 
-<!-- Comandos realmente executados e resultados; cite também testes não feitos. -->
+<!-- Commands actually run and their results; also mention tests you did not run. -->
 
-- [ ] Adicionei regressão quando pertinente.
-- [ ] Considerei CPU/GPU, memória e resposta da interface durante a live.
-- [ ] Revisei privacidade, cancelamento e compatibilidade de dados/IPC.
-- [ ] Textos públicos foram revisados em PT/EN e os componentes usam o design system, quando aplicável.
-- [ ] Não incluí credenciais, logs privados ou assets sem procedência.
+- [ ] I added a regression test where relevant.
+- [ ] I considered CPU/GPU, memory and interface responsiveness during a stream.
+- [ ] I reviewed privacy, cancellation and data/IPC compatibility.
+- [ ] Public text was reviewed in PT/EN and the components use the design system, where applicable.
+- [ ] I did not include credentials, private logs or assets without provenance.
 
-<!-- Capturas somente se a mudança for visual, sempre com dados fictícios. Leia CONTRIBUTING.md. -->
+<!-- Screenshots only if the change is visual, always with made-up data. Read CONTRIBUTING.md. -->

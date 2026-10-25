@@ -51,11 +51,17 @@ struct Ctx {
     shutdown: watch::Receiver<bool>,
 }
 
-async fn overlay_page() -> Html<&'static str> {
-    Html(OVERLAY_HTML)
+const PAGE_LANG: &str = "<html lang=\"pt-BR\">";
+
+/// OBS shows these pages to viewers, so they follow the app's language; a Browser Source reload picks up a change.
+fn with_lang(page: &str, locale: crate::i18n::Locale) -> String {
+    page.replacen(PAGE_LANG, &format!("<html lang=\"{}\">", locale.tag()), 1)
 }
-async fn chat_page() -> Html<&'static str> {
-    Html(CHAT_OVERLAY_HTML)
+async fn overlay_page() -> Html<String> {
+    Html(with_lang(OVERLAY_HTML, crate::i18n::locale()))
+}
+async fn chat_page() -> Html<String> {
+    Html(with_lang(CHAT_OVERLAY_HTML, crate::i18n::locale()))
 }
 
 async fn ws_alerts(ws: WebSocketUpgrade, State(ctx): State<Ctx>) -> impl IntoResponse {
@@ -284,6 +290,15 @@ pub fn info(server: &Mutex<OverlayServer>) -> Option<OverlayInfo> {
 mod tests {
     use super::*;
     use crate::i18n::Locale;
+
+    #[test]
+    fn overlay_pages_take_the_app_language() {
+        for page in [OVERLAY_HTML, CHAT_OVERLAY_HTML] {
+            assert_eq!(page.matches(PAGE_LANG).count(), 1);
+            assert!(with_lang(page, Locale::En).contains("<html lang=\"en\">"));
+            assert!(with_lang(page, Locale::PtBr).contains(PAGE_LANG));
+        }
+    }
 
     #[test]
     fn startup_diagnostics_never_format_localized_or_private_error_text() {

@@ -1,10 +1,10 @@
-# Assets editoriais
+# Editorial assets
 
-- `originals/` guarda masters sanitizados, sem compressão destrutiva adicional.
-- `manifest.json` registra procedência e cada derivada pública.
-- As derivadas ficam em `web/public/images/editorial/`, fora desta pasta.
-- Master e derivada usam o mesmo `baseName`, em inglês e kebab-case.
-- Não coloque segredos nos masters: eles são versionados no repositório.
+- `originals/` holds sanitized masters, with no additional lossy compression.
+- `manifest.json` records the provenance and every public derivative.
+- Derivatives live in `web/public/images/editorial/`, outside this folder.
+- Master and derivative use the same `baseName`, in English and kebab-case.
+- Do not put secrets in the masters: they are versioned in the repository.
 
-O protocolo completo, inclusive privacidade, formatos, idioma e orçamento de
-512 KiB, está em `../README.md`.
+The full protocol, including privacy, formats, language and the 512 KiB
+budget, is in `../README.md`.

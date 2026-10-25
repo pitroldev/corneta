@@ -1,5 +1,5 @@
-# Masters sanitizados
+# Sanitized masters
 
-Preserve aqui apenas imagens que já passaram pela revisão de privacidade. Separe
-por assunto usando diretórios em inglês e kebab-case. Arquivos brutos com dados
-reais não devem entrar no repositório, nem temporariamente.
+Keep here only images that have already passed the privacy review. Group them
+by subject using English kebab-case directories. Raw files with real data must
+not enter the repository, not even temporarily.

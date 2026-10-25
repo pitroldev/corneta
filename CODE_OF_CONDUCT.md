@@ -1,15 +1,15 @@
-# Código de conduta
+# Code of conduct
 
-Queremos um espaço onde pessoas consigam colaborar sem intimidação. Estas regras valem para issues, PRs, revisões e outros espaços administrados pelo projeto, incluindo quando alguém representa a Corneta.
+We want a space where people can collaborate without intimidation. These rules apply to issues, PRs, reviews and other spaces run by the project, including when someone represents Corneta.
 
-Trate pessoas com respeito. Discuta código e decisões com argumentos verificáveis; aceite correções, diferenças de experiência e críticas técnicas. Não são aceitos assédio, discriminação, ameaças, divulgação de dados privados, conteúdo sexual dirigido a participantes ou ataques pessoais. Não publique uma denúncia para mobilizar ataques contra alguém.
+Treat people with respect. Discuss code and decisions with verifiable arguments; accept corrections, differences in experience and technical criticism. Harassment, discrimination, threats, disclosure of private data, sexual content directed at participants and personal attacks are not accepted. Do not publish a complaint to rally attacks against someone.
 
-## Relatar e tratar um incidente
+## Reporting and handling an incident
 
-O responsável atual pelos espaços do projeto é o mantenedor [@pitroldev](https://github.com/pitroldev). O contato privado informado pelo projeto é **corneta@pitrol.dev**. Use o assunto “Conduta — Corneta”, descreva fatos, links relevantes e o resultado desejado; envie apenas dados necessários. A confirmação operacional dessa caixa ainda está pendente no [registro de segurança](docs/SEGURANCA-REPOSITORIO.md); não presumimos um teste de entrega nem prazo de resposta.
+The person currently responsible for the project's spaces is the maintainer [@pitroldev](https://github.com/pitroldev). The private contact provided by the project is **corneta@pitrol.dev**. Use the subject “Conduct — Corneta”, describe the facts, relevant links and the outcome you want; send only the data that is needed. Operational confirmation of this mailbox is still pending in the [security record](docs/REPOSITORY-SECURITY.md); we do not assume a delivery test or a response time.
 
-O mantenedor deve confirmar que recebeu quando puder, examinar o contexto, ouvir as pessoas envolvidas quando apropriado e comunicar uma decisão. Pode orientar, pedir correção, remover conteúdo ofensivo, advertir ou restringir temporária/permanentemente a participação, conforme gravidade e repetição. Relatos são tratados com discrição, mas não há promessa de sigilo absoluto diante de risco ou obrigação aplicável.
+The maintainer should acknowledge receipt when possible, examine the context, hear the people involved when appropriate and communicate a decision. They may give guidance, ask for a correction, remove offensive content, issue a warning or restrict participation temporarily or permanently, depending on severity and repetition. Reports are handled with discretion, but absolute confidentiality is not promised when there is a risk or an applicable obligation.
 
-É possível pedir reconsideração pelo mesmo canal, trazendo informação nova. Se o relato envolver o próprio mantenedor, não existe comitê independente no projeto: violações das regras da plataforma também podem ser reportadas ao GitHub pelos seus canais.
+You can ask for reconsideration through the same channel, bringing new information. If the report involves the maintainer, the project has no independent committee: violations of the platform's rules can also be reported to GitHub through its channels.
 
-Suspeitas técnicas de vulnerabilidade seguem [SECURITY.md](SECURITY.md). Este documento não substitui ajuda emergencial nem atendimento profissional.
+Suspected technical vulnerabilities follow [SECURITY.md](SECURITY.md). This document does not replace emergency help or professional assistance.

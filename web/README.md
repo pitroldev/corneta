@@ -1,133 +1,134 @@
-# Web da Corneta
+# Corneta web
 
-A parte da Corneta que roda fora do PC do streamer, em Next.js 16, React Server Components e
-Tailwind CSS 4. São duas coisas no mesmo app:
+The part of Corneta that runs outside the streamer's PC, built with Next.js 16, React Server
+Components and Tailwind CSS 4. The same app holds two things:
 
-- **Site público** — a página de apresentação e as páginas legais. O HTML é renderizado no
-  servidor; um cliente pequeno cuida da troca de idioma, da preferência de telemetria e das
-  métricas manuais descritas abaixo.
-- **Setup API** (`/api/v1/*`) — entrega os Client IDs públicos no bootstrap e faz o
-  exchange/refresh do OAuth da Kick, a única plataforma que exige Client Secret. O app desktop
-  depende dela para o login oficial da Kick.
+- **Public site** — the landing page and the legal pages. HTML is rendered on the server; a
+  small client handles the language switch, the telemetry preference and the manual metrics
+  described below.
+- **Setup API** (`/api/v1/*`) — serves the public Client IDs at bootstrap and performs the OAuth
+  exchange/refresh for Kick, the only platform that requires a Client Secret. The desktop app
+  depends on it for the official Kick login.
 
-## Contribuir sem credenciais oficiais
+## Contributing without official credentials
 
-Use as versões de Node/pnpm e a instalação descritas no [README principal](../README.md). Da raiz do repositório, sem criar `.env`:
+Use the Node/pnpm versions and the installation described in the [main README](../README.md). From the repository root, without creating a `.env`:
 
 ```bash
-pnpm contrib:web        # site + API em http://localhost:7390
-pnpm contrib:web:check  # integridade, lint, tipos e build do site
-pnpm test               # inclui os testes puros do workspace web
+pnpm contrib:web        # site + API at http://localhost:7390
+pnpm contrib:web:check  # site integrity, lint, types and build
+pnpm test               # includes the pure tests of the web workspace
 ```
 
-Execute o servidor e o build em momentos diferentes ou em cópias separadas. O perfil de contribuição fornece a origem canônica de build e desliga telemetria; não usa credenciais OAuth oficiais nem valida login real. Se houver arquivos reais `web/.env*`, ele recusa continuar: use outro clone limpo, sem apagar suas credenciais. Veja [desenvolvimento](../docs/DESENVOLVIMENTO.md).
+Run the server and the build at different times or in separate copies. The contributor profile provides the canonical build origin and turns telemetry off; it does not use official OAuth credentials or validate a real login. If real `web/.env*` files exist, it refuses to continue: use another clean clone instead of deleting your credentials. See [development](../docs/DEVELOPMENT.md).
 
-## Operação configurada e variáveis
+## Configured operation and variables
 
-Para testar integrações próprias, o exemplo pertinente é [web/.env.example](.env.example), e o arquivo local é `web/.env.local` — ambos relativos à raiz do repositório. Não sobrescreva um arquivo existente. Os comandos `pnpm web:dev` e `pnpm web:check`, também na raiz, usam essa configuração e não têm o isolamento do perfil de contribuição.
+To test your own integrations, the relevant example is [web/.env.example](.env.example) and the local file is `web/.env.local`, both relative to the repository root. Do not overwrite an existing file. The `pnpm web:dev` and `pnpm web:check` commands, also run from the root, use this configuration and do not have the isolation of the contributor profile.
 
-O build de produção exige `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; isso não habilita hospedagem arbitrária de forks. No host de produção, forneça as variáveis pelo ambiente/cofre do host. Consulte a [matriz de configuração](../docs/CONFIGURACAO.md) para OAuth, limites locais, proxy, precedência e distinção entre segredos e valores públicos. Os [gates de release](../docs/GATES-DE-RELEASE.md) reúnem os critérios adicionais exigidos para distribuir o produto, incluindo proteção WAF/edge no host.
+The production build requires `NEXT_PUBLIC_SITE_URL=https://www.corneta.live`; this does not enable arbitrary hosting of forks. On the production host, supply the variables through the host's environment/secret store. See the [configuration matrix](../docs/CONFIGURATION.md) for OAuth, local limits, proxy, precedence and the distinction between secrets and public values. The [release gates](../docs/RELEASE-GATES.md) collect the additional criteria required to distribute the product, including WAF/edge protection on the host.
 
-O download usa o endereço estável `/download`, sem variável de ambiente ou segredo.
-A rota consulta o `latest.json` público da release oficial no GitHub e redireciona
-para o instalador Windows `.exe` versionado indicado no manifesto, após validar
-repositório, plataforma e versão. A resposta válida pode ficar em cache no CDN por
-cinco minutos. Se o manifesto estiver inválido ou indisponível, a rota encaminha
-para a página `releases/latest` do repositório oficial, sem cache, em vez de inventar
-um nome de arquivo. Isso não modifica o [atualizador do desktop](../docs/ATUALIZACAO-AUTOMATICA.md),
-que continua usando seu próprio endpoint de manifesto e verificando a assinatura.
+The download uses the stable `/download` address, with no environment variable or secret.
+The route reads the public `latest.json` of the official GitHub release and redirects
+to the versioned Windows `.exe` installer named in the manifest, after validating the
+repository, platform and version. A valid response may stay in the CDN cache for
+five minutes. If the manifest is invalid or unavailable, the route forwards
+to the `releases/latest` page of the official repository, uncached, instead of inventing
+a file name. This does not change the [desktop updater](../docs/AUTO-UPDATE.md),
+which still uses its own manifest endpoint and verifies the signature.
 
-Resumo das variáveis do site:
+Summary of the site variables:
 
-- `NEXT_PUBLIC_SITE_URL`: URL canônica usada em metadata, sitemap e robots;
-- `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION`: tokens públicos fornecidos pelo
-  Search Console e Bing Webmaster Tools. A metadata omite as tags quando eles estão vazios;
-- `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` e `NEXT_PUBLIC_POSTHOG_HOST`: Project API Key de
-  ingestão (`phc_*`) e host HTTPS usados no navegador;
-- `POSTHOG_PROJECT_TOKEN` e `POSTHOG_HOST`: equivalentes server-only para a Setup API. Se
-  ausentes, usam as variáveis públicas como fallback;
-- `NEXT_PUBLIC_TELEMETRY_DISABLED=1` e `TELEMETRY_DISABLED=1`: kill switches independentes de
-  cliente e servidor;
-- `NEXT_PUBLIC_DEPLOYMENT_ENV`, `POSTHOG_ENVIRONMENT`, `NEXT_PUBLIC_BUILD_SHA` e `BUILD_SHA`:
-  contexto de deploy. Na Vercel, `VERCEL_ENV` e `VERCEL_GIT_COMMIT_SHA` são os fallbacks do
-  servidor.
+- `NEXT_PUBLIC_SITE_URL`: canonical URL used in metadata, sitemap and robots;
+- `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION`: public tokens issued by Search
+  Console and Bing Webmaster Tools. The metadata omits the tags when they are empty;
+- `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN` and `NEXT_PUBLIC_POSTHOG_HOST`: ingestion Project API Key
+  (`phc_*`) and HTTPS host used in the browser;
+- `POSTHOG_PROJECT_TOKEN` and `POSTHOG_HOST`: server-only equivalents for the Setup API. When
+  absent, the public variables are used as fallback;
+- `NEXT_PUBLIC_TELEMETRY_DISABLED=1` and `TELEMETRY_DISABLED=1`: independent client and server
+  kill switches;
+- `NEXT_PUBLIC_DEPLOYMENT_ENV`, `POSTHOG_ENVIRONMENT`, `NEXT_PUBLIC_BUILD_SHA` and `BUILD_SHA`:
+  deploy context. On Vercel, `VERCEL_ENV` and `VERCEL_GIT_COMMIT_SHA` are the server
+  fallbacks.
 
-Use apenas a **Project API Key de ingestão** nessas variáveis. Uma PostHog Personal API Key
-nunca deve entrar no site, na API ou no repositório. Em produção, cliente e servidor usam o
-mesmo project token, `https://us.i.posthog.com` e o SHA completo do mesmo commit; o gate
-`pnpm telemetry:release:check` valida esse contrato junto com o desktop.
+Use only the **ingestion Project API Key** in these variables. A PostHog Personal API Key must
+never go into the site, the API or the repository. In production, client and server use the
+same project token, `https://us.i.posthog.com` and the full SHA of the same commit; the
+`pnpm telemetry:release:check` gate validates this contract together with the desktop.
 
-A proteção das rotas Kick usa memória local limitada a 10.000 entradas por instância,
-sem serviço de armazenamento ou segredo adicional: 20 exchanges e 60 refreshes por
-origem em janelas fixas de 60 segundos. Reiniciar/escalar cria contadores novos; isso
-não é um limite global. Proteção compartilhada antes das instâncias depende de
-WAF/edge configurado e testado no host, com resposta `429` sem desafio interativo.
-O build não configura nem comprova essa proteção. Confira escopo, cobertura e
-ensaios antes de distribuir.
+The Kick routes are protected by local memory capped at 10,000 entries per instance,
+with no storage service or additional secret: 20 exchanges and 60 refreshes per
+origin in fixed 60-second windows. Restarting/scaling creates fresh counters; this
+is not a global limit. Shared protection in front of the instances depends on a
+WAF/edge configured and tested on the host, answering `429` without an interactive challenge.
+The build neither configures nor proves this protection. Check scope, coverage and
+test runs before distributing.
 
-## Telemetria e diagnóstico
+## Telemetry and diagnostics
 
-Sem configuração válida ou com o kill switch pertinente, o envio fica desativado. No desktop, uso é opt-in (`unset` desativado) e falhas são opt-out (`unset` ativo); escolhas explícitas anteriores são preservadas e a ativação não recupera eventos de uso anteriores. O site mantém seu controle único de opt-out, DNT/GPC e kill switch; não compartilha as preferências do desktop. A API preserva a correlação conforme cada finalidade ativa no app. O que é coletado está na [política de privacidade](https://www.corneta.live/legal/privacy); esta descrição não substitui revisão jurídica.
+Without a valid configuration, or with the relevant kill switch set, sending is disabled. On the desktop, usage is opt-in (`unset` means off) and failures are opt-out (`unset` means on); earlier explicit choices are preserved, and turning sending on does not recover earlier usage events. The site keeps its own single opt-out control, DNT/GPC and kill switch; it does not share the desktop preferences. The API keeps correlation according to each purpose enabled in the app. What is collected is in the [privacy policy](https://www.corneta.live/legal/privacy); this description is not a substitute for legal review.
 
-Quando o envio aplicável está habilitado:
+When the applicable sending is enabled:
 
-- o site usa PostHog sem cookie: cada carregamento de página recebe um id aleatório que fica só
-  em memória. Não há persistência de identidade, perfil de pessoa, autocapture, replay, heatmap,
-  texto da página, performance, surveys, feature flags ou configuração remota. O `cookieless_mode`
-  do PostHog não serve aqui: ele descarta no servidor o evento sem `$raw_user_agent` e `$host`, e o
-  filtro do site remove os dois;
-- o site envia somente `site_page_viewed`, `site_cta_clicked` e exceções redigidas. Rotas são
-  enums; query strings e fragments nunca entram no evento;
-- a preferência `corneta:site-telemetry:v1` guarda apenas um opt-out persistente no navegador.
-  DNT e Global Privacy Control também desligam a captura. O controle fica na Política de
-  privacidade;
-- o site nunca identifica a pessoa e não liga uma visita ao UUID opcional da instalação do
-  aplicativo;
-- a Setup API envia somente falhas: erros operacionais conhecidos viram evento com rota,
-  código, classe HTTP e duração em bucket; falhas inesperadas viram exceção redigida. Corpo,
-  resposta de provedor, query, tokens e cabeçalhos de autenticação não são passados ao facade;
-- cada resposta da API inclui `X-Request-Id`. O desktop envia a correlação de UUID, `operation_id` opcional e finalidades fechadas em `X-Corneta-Telemetry-Purposes` somente quando alguma finalidade está efetivamente habilitada. A API reutiliza essa correlação em eventos operacionais apenas com uso habilitado e em exceções apenas com falhas habilitadas. Sem correlação autorizada para aquela finalidade, usa uma identidade efêmera do pedido; isso não contorna o kill switch ou a configuração de envio da API;
-- o envio server-side roda no `after()` do Next.js e falha silenciosamente: PostHog nunca muda
-  status, corpo ou latência necessária da resposta.
+- the site uses PostHog without cookies: each page load gets a random id that lives only in
+  memory. There is no identity persistence, person profile, autocapture, replay, heatmap, page
+  text, performance, surveys, feature flags or remote config. PostHog's `cookieless_mode` does
+  not work here: the server drops events without `$raw_user_agent` and `$host`, and the site's
+  filter removes both;
+- the site sends only `site_page_viewed`, `site_cta_clicked` and redacted exceptions. Routes are
+  enums; query strings and fragments never enter the event;
+- the `corneta:site-telemetry:v1` preference stores only a persistent opt-out in the browser.
+  DNT and Global Privacy Control also turn capture off. The control is on the Privacy policy
+  page;
+- the site never identifies the person and does not link a visit to the optional installation
+  UUID of the app;
+- the Setup API sends only failures: known operational errors become an event with route, code,
+  HTTP class and bucketed duration; unexpected failures become a redacted exception. Body,
+  provider response, query, tokens and authentication headers are not passed to the facade;
+- every API response includes `X-Request-Id`. The desktop sends the UUID correlation, an optional `operation_id` and a closed set of purposes in `X-Corneta-Telemetry-Purposes` only when some purpose is actually enabled. The API reuses this correlation in operational events only when usage is enabled, and in exceptions only when failures are enabled. Without an authorized correlation for that purpose, it uses an ephemeral per-request identity; this does not bypass the kill switch or the API's sending configuration;
+- server-side sending runs in the Next.js `after()` and fails silently: PostHog never changes the
+  status, body or required latency of the response.
 
-O health check `/api/v1/health` publica somente SHA, kill switches, hosts públicos e SHA-256 do
-project token público efetivamente implantados no site/API. O workflow de release compara essa
-metadata com o desktop antes de criar o draft; nenhuma Personal API Key ou token bruto aparece na
-resposta.
+The `/api/v1/health` health check publishes only the SHA, kill switches, public hosts and the
+SHA-256 of the public project token actually deployed on the site/API. The release workflow
+compares this metadata with the desktop before creating the draft; no Personal API Key or raw
+token appears in the response.
 
-No projeto PostHog de produção, configure retenção de 90 dias, **Discard client IP data**,
-Cloud US (Virginia), DPA, MFA e acesso por função.
+In the production PostHog project, configure 90-day retention, **Discard client IP data**,
+Cloud US (Virginia), DPA, MFA and role-based access.
 
-### Páginas legais
+### Legal pages
 
-`/legal/privacy` e `/legal/terms-of-use` são estáticas e descrevem o comportamento real do
-produto: o que o app guarda no computador, o que a API de login (`/api/v1/*`) processa e o que
-nenhum dos dois faz. Ao mudar fluxo de dados no app ou nas rotas de API, atualize os dois
-documentos e a data em `lib/legal.ts`.
+`/legal/privacy` and `/legal/terms-of-use` are static and describe the product's actual
+behavior: what the app stores on the computer, what the login API (`/api/v1/*`) processes and
+what neither of them does. When you change a data flow in the app or in the API routes, update
+both documents and the date in `lib/legal.ts`.
 
-A identificação vive em **`lib/legal.ts`** — configuração fixa, sem variável de ambiente: tudo
-ali é impresso na página pública. O arquivo separa duas figuras de propósito: a **pessoa
-jurídica** que opera o site, a API e oferece os termos (controladora dos dados na LGPD) e o
-**autor** titular dos direitos autorais do código no `LICENSE`. Trocar a titularidade do código
-para a empresa exigiria uma cessão de direitos — não é edição de texto.
+Identification lives in **`lib/legal.ts`** — fixed configuration, no environment variable:
+everything there is printed on the public page. The file deliberately separates two roles: the
+**legal entity** that operates the site and the API and offers the terms (data controller under
+the LGPD) and the **author** who holds the copyright to the code in `LICENSE`. Transferring
+ownership of the code to the company would require an assignment of rights — it is not a text
+edit.
 
-Uma mudança material de telemetria exige atualizar as versões PT/EN da política, a data de
-revisão e `LEGAL_ACCEPT_VERSION`, espelhado no workspace desktop.
+A material telemetry change requires updating the PT/EN versions of the policy, the revision
+date and `LEGAL_ACCEPT_VERSION`, which is mirrored in the desktop workspace.
 
-## Conteúdo editorial e buscadores
+## Editorial content and search engines
 
-Os hubs públicos usam caminhos sempre em inglês: `/help`, `/guides`, `/en/help` e
-`/en/guides`. O texto continua localizado. Artigos vivem em `content/`, passam pelo gate
-`pnpm --dir web content:check` (executado da raiz) e só entram em sitemap, hreflang e llms.txt quando estão publicados. Consulte o [guia editorial](content/README.md).
+The public hubs always use English paths: `/help`, `/guides`, `/en/help` and
+`/en/guides`. The text stays localized. Articles live in `content/`, go through the
+`pnpm --dir web content:check` gate (run from the root) and only enter the sitemap, hreflang and llms.txt once they are published. See the [editorial guide](content/README.md).
 
-Para concluir a verificação externa depois do deploy:
+To complete the external verification after the deploy:
 
-1. defina `GOOGLE_SITE_VERIFICATION` e `BING_SITE_VERIFICATION` no ambiente de produção;
-2. implante o mesmo host de `NEXT_PUBLIC_SITE_URL`;
-3. confirme as tags no HTML renderizado;
-4. valide a propriedade de domínio nos dois consoles;
-5. envie `https://www.corneta.live/sitemap.xml`.
+1. set `GOOGLE_SITE_VERIFICATION` and `BING_SITE_VERIFICATION` in the production environment;
+2. deploy the same host as `NEXT_PUBLIC_SITE_URL`;
+3. confirm the tags in the rendered HTML;
+4. verify domain ownership in both consoles;
+5. submit `https://www.corneta.live/sitemap.xml`.
 
-As quatro primeiras etapas dependem das contas externas e não podem ser concluídas apenas pelo
-repositório. Não use upload de arquivo de verificação: as tags geradas por metadata permanecem
-válidas em todas as páginas públicas.
+The first four steps depend on the external accounts and cannot be completed from the
+repository alone. Do not use the verification file upload: the tags generated through metadata
+remain valid on every public page.

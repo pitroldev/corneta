@@ -1,6 +1,6 @@
 ---
 name: Corneta
-description: "Transmita para todas as plataformas ao mesmo tempo, sem dor de cabeça."
+description: "Stream to every platform at once, without the headache."
 colors:
   bg: "#100b07"
   surface: "#1a130c"
@@ -164,202 +164,202 @@ components:
 
 ## Overview
 
-Textos de interface seguem o [guia de tom de voz](docs/TOM-DE-VOZ.md), compartilhado com o site e o conteúdo editorial. Este documento define a linguagem visual, sem duplicar as regras de escrita.
+Interface copy follows the [voice and tone guide](docs/VOICE-AND-TONE.md), shared with the site and the editorial content. This document defines the visual language without duplicating the writing rules.
 
-**Creative North Star: "Pôster de Corneta em Operação"**
+**Creative North Star: "A Corneta Poster at Work"**
 
-A Corneta é uma ferramenta desktop em modo **Operate** com voz autoral de pôster e quadrinho: tinta escura, papel quente, latão, tomate, blocos sólidos, tipografia robusta e sombras secas. A expressão visual serve à leitura rápida de uma operação de live; a marca aparece em detalhes precisos, sem competir com estado, conteúdo ou próxima ação.
+Corneta is a desktop tool in **Operate** mode with the authorial voice of a poster and a comic: dark ink, warm paper, brass, tomato, solid blocks, sturdy type and dry shadows. The visual expression serves fast reading of a live-stream operation; the brand shows up in precise details, without competing with state, content or the next action.
 
-Nos relatórios, a narrativa é live-first e editorial. Cada viewport deve ter uma protagonista clara e a ordem de leitura preserva o retrato da live antes do replay, depois evolução, audiência e momentos, comunidade e, por fim, dados técnicos sob progressive disclosure. Saúde e incidentes são notas secundárias dentro do capítulo técnico, nunca a manchete da transmissão. Estados vazios, ausentes, carregando, indisponíveis e de erro devem dizer honestamente o que aconteceu e qual ação ainda é possível.
+In reports, the narrative is live-first and editorial. Each viewport must have one clear protagonist, and the reading order keeps the portrait of the stream before the replay, then evolution, audience and moments, community and, finally, technical data under progressive disclosure. Health and incidents are secondary notes inside the technical chapter, never the headline of the stream. Empty, missing, loading, unavailable and error states must say honestly what happened and which action is still possible.
 
-O tema escuro é a referência normativa dos tokens acima. O tema claro mantém os mesmos papéis semânticos, substituindo tinta por superfícies de papel/quadrinho quentes e preservando latão, tomate e sombras escuras; os overrides reais vivem em `src/index.css` e não devem criar uma segunda nomenclatura de componentes.
+The dark theme is the normative reference for the tokens above. The light theme keeps the same semantic roles, swapping ink for warm paper/comic surfaces while keeping brass, tomato and dark shadows; the actual overrides live in `src/index.css` and must not create a second component naming scheme.
 
 **Key Characteristics:**
 
-- Pôster/quadrinho operacional, não dashboard corporativo genérico.
-- Latão para seleção, orientação e ação principal; tomate para chamada e estado ao vivo.
-- Superfícies sólidas e hierarquia tonal antes de bordas.
-- Sombras duras com deslocamento e sem desfoque.
-- Uma protagonista por viewport e complexidade técnica revelada sob demanda.
-- Foco visível, contraste AA, movimento reduzível e estados honestos.
+- Operational poster/comic, not a generic corporate dashboard.
+- Brass for selection, orientation and the main action; tomato for call-outs and the live state.
+- Solid surfaces and tonal hierarchy before borders.
+- Hard, offset shadows with no blur.
+- One protagonist per viewport, with technical complexity revealed on demand.
+- Visible focus, AA contrast, reducible motion and honest states.
 
 ## Colors
 
-A paleta combina tinta marrom-negra, papéis quentes, marfim e dois acentos de impressão de alta energia.
+The palette combines brown-black ink, warm papers, ivory and two high-energy print accents.
 
 ### Primary
 
-- **Latão de Ação** (`colors.brass`): seleciona navegação, botões primários, ícones editoriais, progresso e marca-texto.
-- **Latão Aceso** (`colors.brass-strong`): resposta de hover sobre ações de latão.
-- **Tinta sobre Latão** (`colors.brass-ink`): garante leitura e foco em superfícies de latão.
+- **Action Brass** (`colors.brass`): marks selected navigation, primary buttons, editorial icons, progress and highlighting.
+- **Lit Brass** (`colors.brass-strong`): hover response on brass actions.
+- **Ink on Brass** (`colors.brass-ink`): keeps text and focus readable on brass surfaces.
 
 ### Secondary
 
-- **Tomate de Chamada** (`colors.tomato`): ação enfática, estado ao vivo e selos que precisam interromper a varredura.
-- **Tomate Aceso** (`colors.tomato-strong`): resposta de hover da chamada tomate.
+- **Call-out Tomato** (`colors.tomato`): emphatic action, live state and badges that need to interrupt scanning.
+- **Lit Tomato** (`colors.tomato-strong`): hover response of the tomato call-out.
 
 ### Tertiary
 
-- **Vermelho Ao Vivo** (`colors.live`): presença e pulso de transmissão.
-- **Verde Firme**, **Amarelo Atenção**, **Vermelho Falha** e **Azul Informação** (`colors.ok`, `colors.warn`, `colors.bad`, `colors.info`): estados semânticos; nunca trocar esses papéis por decoração.
+- **Live Red** (`colors.live`): on-air presence and pulse.
+- **Steady Green**, **Attention Yellow**, **Failure Red** and **Information Blue** (`colors.ok`, `colors.warn`, `colors.bad`, `colors.info`): semantic states; never trade these roles for decoration.
 
 ### Neutral
 
-- **Tinta de Fundo** e **Painel de Navegação** (`colors.bg`, `colors.panel`): casca do aplicativo e sidebar.
-- **Papéis Escuros** (`colors.surface`, `colors.surface-2`, `colors.surface-3`): camadas por preenchimento, do conteúdo principal ao apoio.
-- **Traços** (`colors.border`, `colors.border-soft`): divisões necessárias, não contorno automático de todo bloco.
-- **Marfins de Leitura** (`colors.ink`, `colors.ink-muted`, `colors.ink-faint`): conteúdo principal, apoio e metadado.
-- **Noite de Sombra** (`colors.night`): sombra seca e palco do replay.
+- **Background Ink** and **Navigation Panel** (`colors.bg`, `colors.panel`): app shell and sidebar.
+- **Dark Papers** (`colors.surface`, `colors.surface-2`, `colors.surface-3`): layers by fill, from main content to supporting content.
+- **Strokes** (`colors.border`, `colors.border-soft`): necessary divisions, not an automatic outline around every block.
+- **Reading Ivories** (`colors.ink`, `colors.ink-muted`, `colors.ink-faint`): main content, supporting text and metadata.
+- **Shadow Night** (`colors.night`): dry shadow and the replay stage.
 
 ### Named Rules
 
-**The Solid Ink Rule.** Use manchas sólidas de latão, tomate ou superfície; não introduza glow, vidro, gradiente genérico ou halo decorativo.
+**The Solid Ink Rule.** Use solid patches of brass, tomato or surface; do not introduce glow, glass, generic gradients or decorative halos.
 
-**The Semantic Signal Rule.** Verde, amarelo, vermelho de falha e azul informativo comunicam estado. Latão e tomate carregam marca e prioridade, não substituem o significado do estado.
+**The Semantic Signal Rule.** Green, yellow, failure red and information blue communicate state. Brass and tomato carry brand and priority; they do not replace the meaning of a state.
 
 ## Typography
 
-**Display Font:** Baloo 2 (com Segoe UI e system-ui como fallback)
+**Display Font:** Baloo 2 (with Segoe UI and system-ui as fallback)
 
-**Body Font:** Inter Variable / Inter (com Segoe UI e system-ui como fallback)
+**Body Font:** Inter Variable / Inter (with Segoe UI and system-ui as fallback)
 
-**Character:** Baloo 2 traz o volume arredondado de letreiro e quadrinho; Inter mantém explicações, controles e dados densos nítidos. O contraste entre as famílias é parte da identidade e também separa história de instrumentação.
+**Character:** Baloo 2 brings the rounded heft of signage and comics; Inter keeps explanations, controls and dense data crisp. The contrast between the two families is part of the identity and also separates story from instrumentation.
 
 ### Hierarchy
 
-- **Display** (800, 2.25rem; 3rem a partir de 640px, line-height 1): título protagonista do relatório e da sessão em destaque.
-- **Headline** (800, 1.875rem, line-height 1.05): título de tela, retrato da live e seção editorial.
-- **Title** (800, 1.25rem, line-height 1.05): títulos de painel, modal e disclosure técnico.
-- **Navigation** (700, 1rem, line-height 1.25): jornada principal da sidebar.
-- **Action** (700, 0.875rem, line-height 1): botões de marca e CTAs compactos.
-- **Body** (400, 0.875rem, line-height 1.5): explicações e conteúdo operacional; descrições editoriais ficam em até cerca de 42rem.
-- **Label** (700, 0.6875rem, tracking 0.025em, uppercase): kicker, estatística, selo e metadado curto.
+- **Display** (800, 2.25rem; 3rem from 640px up, line-height 1): protagonist title of the report and of the featured session.
+- **Headline** (800, 1.875rem, line-height 1.05): screen title, stream portrait and editorial section.
+- **Title** (800, 1.25rem, line-height 1.05): panel, modal and technical disclosure titles.
+- **Navigation** (700, 1rem, line-height 1.25): main sidebar navigation.
+- **Action** (700, 0.875rem, line-height 1): brand buttons and compact CTAs.
+- **Body** (400, 0.875rem, line-height 1.5): explanations and operational content; editorial descriptions stay within about 42rem.
+- **Label** (700, 0.6875rem, tracking 0.025em, uppercase): kicker, stat, badge and short metadata.
 
 ### Named Rules
 
-**The Two Voices Rule.** Use Baloo 2 para títulos, navegação, números protagonistas e ações de marca; use Inter para leitura, descrição, formulário e instrumentação.
+**The Two Voices Rule.** Use Baloo 2 for titles, navigation, protagonist numbers and brand actions; use Inter for reading, descriptions, forms and instrumentation.
 
-**The Poster, Then Footnote Rule.** A hierarquia começa com uma frase curta e volumosa; contexto e precisão entram abaixo em Inter menor, nunca espremidos dentro do mesmo título.
+**The Poster, Then Footnote Rule.** The hierarchy starts with a short, heavy phrase; context and precision come below in smaller Inter, never squeezed into the same title.
 
 ## Layout
 
-O shell desktop usa sidebar fixa de 16rem e uma área principal rolável com padding de 2rem. Meça responsividade pela largura restante depois da sidebar, não pela janela inteira. A lista de relatórios se limita a 64rem; o detalhe editorial se abre até 72rem.
+The desktop shell uses a fixed 16rem sidebar and a scrollable main area with 2rem padding. Measure responsiveness by the width left after the sidebar, not by the whole window. The report list is capped at 64rem; the editorial detail opens up to 72rem.
 
-O ritmo-base usa passos de 4px e recorre principalmente a 8, 12, 16, 20, 24 e 32px. Seções narrativas do relatório se separam por 48px. Dentro de uma seção, títulos, cartões e controles ficam mais próximos para que cada bloco seja lido como uma unidade.
+The base rhythm uses 4px steps and relies mostly on 8, 12, 16, 20, 24 and 32px. Narrative sections of the report are 48px apart. Within a section, titles, cards and controls sit closer together so each block reads as one unit.
 
-Em base, conteúdos e controles empilham em uma coluna. Em 640px, títulos e paddings podem crescer. Em 1280px, somente relações que ganham comparação real viram duas colunas: retrato da live com estatísticas, replay com chat, evolução com momentos e grades técnicas. A coluna narrativa principal sempre recebe mais largura que o apoio.
+At the base size, content and controls stack in one column. At 640px, titles and paddings can grow. At 1280px, only pairings that gain a real comparison become two columns: stream portrait with stats, replay with chat, evolution with moments, and technical grids. The main narrative column always gets more width than the supporting one.
 
-Nos relatórios, preserve esta progressão: resumo editorial → replay → evolução/audiência/momentos → comunidade → técnica. A seção técnica começa recolhida; detalhes de ajuste do replay também ficam escondidos até haver necessidade ou evidência de problema.
+In reports, keep this progression: editorial summary → replay → evolution/audience/moments → community → technical. The technical section starts collapsed; replay adjustment details also stay hidden until there is a need or evidence of a problem.
 
 ### Named Rules
 
-**The One Protagonist Rule.** Cada viewport tem um bloco dominante; grades auxiliares não podem disputar tamanho, cor e sombra com ele.
+**The One Protagonist Rule.** Each viewport has one dominant block; auxiliary grids must not compete with it in size, color or shadow.
 
-**The Sidebar-Aware Rule.** O breakpoint amplo só vale quando o conteúdo restante, após as 16rem da sidebar, sustenta as duas colunas sem esmagar texto ou controles.
+**The Sidebar-Aware Rule.** The wide breakpoint only applies when the content left after the sidebar's 16rem can hold both columns without crushing text or controls.
 
 ## Elevation & Depth
 
-O sistema é tonal por padrão e usa sombras apenas como impressão deslocada: a profundidade vem de blocos sólidos em níveis de superfície, barras de acento e sombras duras. Não há sombra ambiente, blur nem glow.
+The system is tonal by default and uses shadows only as an offset print: depth comes from solid blocks at different surface levels, accent bars and hard shadows. There is no ambient shadow, blur or glow.
 
 ### Shadow Vocabulary
 
-- **Pop** (`box-shadow: 4px 4px 0 0 var(--color-night)`): protagonista, estado vazio, modal e bloco que deve parecer um adesivo impresso.
-- **Pop Small** (`box-shadow: 3px 3px 0 0 var(--color-night)`): ícone editorial, glyph de plataforma e selo compacto.
-- **Pop Brass** (`box-shadow: 4px 4px 0 0 var(--color-brass-ink)`): botão ou navegação sobre latão.
+- **Pop** (`box-shadow: 4px 4px 0 0 var(--color-night)`): protagonist, empty state, modal and any block that should look like a printed sticker.
+- **Pop Small** (`box-shadow: 3px 3px 0 0 var(--color-night)`): editorial icon, platform glyph and compact badge.
+- **Pop Brass** (`box-shadow: 4px 4px 0 0 var(--color-brass-ink)`): button or navigation on brass.
 
 ### Named Rules
 
-**The Dry Shadow Rule.** Sombras têm offset visível e blur zero; se a profundidade pede névoa, a solução está fora do mundo da Corneta.
+**The Dry Shadow Rule.** Shadows have a visible offset and zero blur; if the depth calls for haze, the solution lies outside Corneta's world.
 
-**The Flat-by-Default Rule.** Um painel comum se diferencia pelo preenchimento. Borda ou sombra só entra quando comunica agrupamento, interação ou protagonismo.
+**The Flat-by-Default Rule.** A regular panel stands apart by its fill. A border or shadow only comes in when it communicates grouping, interaction or protagonism.
 
 ## Shapes
 
-Os cantos são secos, apenas suavizados o suficiente para manter controles amigáveis: 4px em selos e controles pequenos, 7px em botões e navegação, 10px em painéis e 14px em blocos editoriais protagonistas. Barras, handles e indicadores de estado podem ser circulares quando a função pede leitura contínua.
+Corners are dry, softened just enough to keep controls friendly: 4px on badges and small controls, 7px on buttons and navigation, 10px on panels and 14px on protagonist editorial blocks. Bars, handles and state indicators can be circular when their function calls for continuous reading.
 
-Bordas são firmes, normalmente de 2px em campos, opções e estados vazios; divisores estruturais usam 1px. Inclinações discretas, entre cerca de -3° e 2°, pertencem a selos, mascote e estados ao vivo, não a conteúdo longo.
+Borders are firm, usually 2px on fields, options and empty states; structural dividers use 1px. Subtle tilts, between about -3° and 2°, belong to badges, the mascot and live states, not to long-form content.
 
 ### Named Rules
 
-**The Dry Corner Rule.** Não transforme todo componente em cápsula. O formato pill fica reservado a régua, ponto, progresso ou outro elemento naturalmente contínuo.
+**The Dry Corner Rule.** Do not turn every component into a capsule. The pill shape is reserved for a timeline, a dot, progress or another naturally continuous element.
 
 ## Components
 
 ### Buttons
 
-- **Shape:** cantos secos médios (7px); alturas de 32, 40 e 56px para `sm`, `md` e `lg`.
-- **Primary:** bloco de latão, tinta escura, Baloo 2 bold e sombra seca de latão; o hover acende o latão.
-- **Tomate:** chamada enfática em tomate, texto branco e sombra seca noturna.
-- **Ghost / Outline / Subtle:** ghost usa texto e preenchimento apenas no hover; outline usa traço de 2px; subtle repousa em `surface-2`.
-- **Danger:** falha em camada translúcida e borda semântica; confirmação muda o rótulo, não depende só da cor.
-- **Active / Disabled:** ações com sombra deslocam 4px e perdem a sombra ao pressionar; desabilitados ficam a 40% e sem interação ou sombra.
-- **Focus:** traço seco de latão com 3px e offset de 2px; sobre latão, o traço muda para tinta escura.
+- **Shape:** medium dry corners (7px); heights of 32, 40 and 56px for `sm`, `md` and `lg`.
+- **Primary:** brass block, dark ink, Baloo 2 bold and a dry brass shadow; hover lights up the brass.
+- **Tomato:** emphatic call-out in tomato, white text and a dry night shadow.
+- **Ghost / Outline / Subtle:** ghost is text only, with a fill on hover; outline uses a 2px stroke; subtle rests on `surface-2`.
+- **Danger:** failure color on a translucent layer with a semantic border; confirmation changes the label instead of relying on color alone.
+- **Active / Disabled:** actions with a shadow shift 4px and lose the shadow when pressed; disabled ones sit at 40% with no interaction or shadow.
+- **Focus:** dry 3px brass outline with a 2px offset; on brass, the outline turns dark ink.
 
 ### Chips
 
-- **Style:** adesivo compacto com raio de 4px, padding de 2px × 8px, label em uppercase e tracking amplo.
-- **State:** os tons semânticos sempre usam texto de contraste correspondente; glyphs de plataforma preservam a cor oficial e recebem sombra curta.
+- **Style:** compact sticker with a 4px radius, 2px × 8px padding, uppercase label and wide tracking.
+- **State:** semantic tones always use the matching contrast text; platform glyphs keep their official color and get a short shadow.
 
 ### Cards / Containers
 
-- **Corner Style:** painel comum em 10px; bloco editorial protagonista em 14px.
-- **Background:** `surface` para conteúdo principal e `surface-2` para conteúdo interno ou de apoio.
-- **Shadow Strategy:** sem sombra por padrão; `pop` somente em protagonistas, estados vazios e modais.
-- **Border:** ausente por padrão; use barra de latão, divisor suave ou borda semântica quando houver significado.
-- **Internal Padding:** 20px no painel comum; 24–32px em protagonistas responsivos.
+- **Corner Style:** regular panel at 10px; protagonist editorial block at 14px.
+- **Background:** `surface` for main content and `surface-2` for nested or supporting content.
+- **Shadow Strategy:** no shadow by default; `pop` only on protagonists, empty states and modals.
+- **Border:** none by default; use a brass bar, a soft divider or a semantic border when it carries meaning.
+- **Internal Padding:** 20px on a regular panel; 24–32px on responsive protagonists.
 
 ### Inputs / Fields
 
-- **Style:** altura de 40px, fundo `surface-2`, borda sólida de 2px, raio de 7px e padding horizontal de 12px.
-- **Focus:** a borda vira latão e o foco global permanece visível.
-- **Error / Disabled:** erro troca borda e foco para `bad`; desabilitado mantém o valor legível com 50% de opacidade e cursor de indisponível.
+- **Style:** 40px tall, `surface-2` background, solid 2px border, 7px radius and 12px horizontal padding.
+- **Focus:** the border turns brass and the global focus ring stays visible.
+- **Error / Disabled:** an error switches border and focus to `bad`; a disabled field keeps its value readable at 50% opacity with a not-allowed cursor.
 
 ### Navigation
 
-A sidebar separa o que se usa durante a live (**Na live**: Ao vivo, Chat, Relatórios) do que se prepara antes (**Preparar**: Plataformas, Qualidade), sem números de ordem — as telas não formam uma sequência obrigatória. O estado da live (fora do ar, conectando, no ar com o tempo, erro) fica no topo da sidebar, visível em qualquer tela. O item ativo é um bloco de latão com ícone, Baloo 2 bold, dica curta em Inter e sombra seca; os inativos usam tinta apagada e ganham superfície somente em hover. Um ponto de atenção marca Plataformas quando alguma ligada ainda não está pronta. A sidebar permanece com 16rem no shell desktop.
+The sidebar separates what you use during the stream (**Streaming**: Live, Chat, Reports) from what you prepare beforehand (**Set up**: Platforms, Quality), with no step numbers — the screens are not a mandatory sequence. The stream state (off air, connecting, on air with the elapsed time, error) sits at the top of the sidebar, visible on every screen. The active item is a brass block with an icon, Baloo 2 bold, a short hint in Inter and a dry shadow; inactive items use faded ink and only get a surface on hover. An attention dot marks Platforms when an enabled platform is not ready yet. The sidebar stays at 16rem in the desktop shell.
 
 ### Live Screen
 
-A tela Ao vivo tem uma protagonista por estado. Fora do ar, quatro indicadores (Plataformas, OBS, Internet, Proteções) dizem o que está pronto; cada um abre o detalhe numa gaveta lateral, sem sair da tela. O BORA AO VIVO vive numa barra fixa embaixo com uma única linha de status — a mesma pendência nunca aparece em vários blocos. No ar, a tela vira cockpit: números por plataforma, carga da máquina e o chat unificado ao lado a partir de 1280px.
+The Live screen has one protagonist per state. Off air, four indicators (Platforms, OBS, Internet, Safety nets) say what is ready; each one opens its detail in a side drawer without leaving the screen. GO LIVE sits in a fixed bottom bar with a single status line — the same pending item never appears in more than one block. On air, the screen becomes a cockpit: per-platform numbers, machine load and, from 1280px up, the unified chat alongside.
 
 ### Drawer
 
-Detalhe sob demanda entra numa gaveta lateral de 26rem, com cabeçalho de ícone em latão, conteúdo rolável e, quando houver, um rodapé com o caminho para a tela completa. A gaveta usa borda de 2px e sombra seca deslocada para a esquerda; o fundo escurece com tinta, sem blur.
+On-demand detail opens in a 26rem side drawer, with a brass icon header, scrollable content and, when there is one, a footer with the path to the full screen. The drawer uses a 2px border and a dry shadow offset to the left; the backdrop darkens with ink, without blur.
 
 ### First-run Setup
 
-A configuração inicial ocupa a janela abaixo da barra de título: trilha de passos em latão à esquerda e um passo por vez à direita. Cada passo termina algo real (plataforma conectada, OBS apontado, upload medido) em vez de só explicar, e qualquer passo pode ficar para depois — o painel mostra o que faltou.
+First-time setup fills the window below the title bar: a brass step track on the left and one step at a time on the right. Each step finishes something real (platform connected, OBS pointed at Corneta, upload measured) instead of only explaining, and any step can be left for later — the dashboard shows what is still missing.
 
 ### Report Story
 
-O relatório abre com título e contexto, seguido por um retrato protagonista da live que combina alcance, duração, conversa e até quatro estatísticas. Cabeçalhos de história usam um ícone de latão com sombra curta, título Baloo e descrição Inter. O replay ocupa o palco noturno; evolução, momentos e comunidade entram em blocos sólidos; saúde, incidentes e instrumentação técnica vivem juntos dentro de `details` e começam recolhidos.
+The report opens with a title and context, followed by a protagonist portrait of the stream that combines reach, duration, conversation and up to four stats. Story headers use a brass icon with a short shadow, a Baloo title and an Inter description. The replay takes the night stage; evolution, moments and community come in solid blocks; health, incidents and technical instrumentation live together inside `details` and start collapsed.
 
 ### Replay
 
-O player sincronizado mantém vídeo, régua e controles como protagonista. Chat passa para coluna lateral somente em 1280px; antes disso, empilha. Régua e volume aceitam teclado, controles expõem nomes acessíveis, ausência de gravação ganha estado próprio e ajustes de sincronia aparecem apenas quando necessários.
+The synced player keeps video, timeline and controls as the protagonist. Chat moves to a side column only at 1280px; below that, it stacks. Timeline and volume accept the keyboard, controls expose accessible names, a missing recording gets its own state, and sync adjustments only appear when needed.
 
 ### Motion
 
-Transições de botão usam 75ms; entrada de tela usa 110ms com `easeOut`; a sessão em destaque reage em 150ms. Pulso ao vivo (1.4s), mascote (2.4s) e marquee (14s) só aparecem onde o estado ou a marca justificam. `prefers-reduced-motion` reduz transições e remove animações infinitas.
+Button transitions take 75ms; screen entry takes 110ms with `easeOut`; the featured session reacts in 150ms. The live pulse (1.4s), the mascot (2.4s) and the marquee (14s) only appear where state or brand justify them. `prefers-reduced-motion` shortens transitions and removes infinite animations.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** preserve latão para orientação e ação principal, tomate para chamada e as cores semânticas para estado.
-- **Do** construir hierarquia com tamanho, preenchimento sólido, espaço e uma sombra seca seletiva.
-- **Do** manter uma protagonista por viewport e a ordem editorial dos relatórios.
-- **Do** tratar problemas como insight técnico secundário, depois da história da live.
-- **Do** calcular layouts largos no espaço que sobra depois da sidebar fixa de 16rem.
-- **Do** oferecer foco visível, contraste AA, teclado, redução de movimento e texto que nomeia o estado.
-- **Do** mostrar loading, vazio, erro, replay ausente e controle indisponível como estados diferentes e honestos.
+- **Do** reserve brass for orientation and the main action, tomato for call-outs and the semantic colors for state.
+- **Do** build hierarchy with size, solid fill, space and one selective dry shadow.
+- **Do** keep one protagonist per viewport and the editorial order of reports.
+- **Do** treat problems as a secondary technical insight, after the story of the stream.
+- **Do** compute wide layouts in the space left after the fixed 16rem sidebar.
+- **Do** provide visible focus, AA contrast, keyboard support, reduced motion and text that names the state.
+- **Do** show loading, empty, error, missing replay and unavailable control as distinct, honest states.
 
 ### Don't:
 
-- **Don't** introduzir glow, vidro, blur, gradiente genérico ou sombra ambiente.
-- **Don't** contornar todos os painéis; superfícies tonais são o agrupamento padrão.
-- **Don't** transformar todo bloco em card flutuante, toda forma em pill ou toda seção em grade de métricas.
-- **Don't** abrir a instrumentação técnica antes da história da live ou deixar ajustes raros permanentemente expostos.
-- **Don't** usar falhas, quedas ou comparação negativa como manchete do relatório ou resumo do arquivo.
-- **Don't** usar Baloo 2 para parágrafos densos nem Inter para substituir a voz dos títulos protagonistas.
-- **Don't** depender apenas de cor, hover ou animação para comunicar significado ou operação.
+- **Don't** introduce glow, glass, blur, generic gradients or ambient shadow.
+- **Don't** outline every panel; tonal surfaces are the default grouping.
+- **Don't** turn every block into a floating card, every shape into a pill or every section into a metrics grid.
+- **Don't** open the technical instrumentation before the story of the stream or leave rare adjustments permanently exposed.
+- **Don't** use failures, drops or negative comparisons as the report headline or the archive summary.
+- **Don't** use Baloo 2 for dense paragraphs or Inter in place of the voice of protagonist titles.
+- **Don't** rely only on color, hover or animation to convey meaning or operation.

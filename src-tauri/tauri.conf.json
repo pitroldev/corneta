@@ -39,9 +39,9 @@
     "category": "Video",
     "homepage": "https://www.corneta.live",
     "license": "MIT",
-    "licenseFile": "LICENSE-INSTALADOR.txt",
-    "shortDescription": "Transmita para todas as plataformas ao mesmo tempo.",
-    "longDescription": "Corneta recebe um único stream do seu OBS e distribui para Twitch, YouTube, Facebook, Kick e outras ao mesmo tempo — com qualidade por plataforma, cofre de chaves e reconexão automática.",
+    "licenseFile": "LICENSE-INSTALLER.txt",
+    "shortDescription": "Stream to every platform at once.",
+    "longDescription": "Corneta takes a single stream from your OBS and sends it to Twitch, YouTube, Facebook, Kick and more at the same time, with per-platform quality, a key vault and automatic reconnection.",
     "targets": ["nsis"],
     "icon": [
       "icons/32x32.png",

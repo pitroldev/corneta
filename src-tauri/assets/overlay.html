@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Corneta · Overlay de alertas</title>
+    <title>Corneta · Alerts overlay</title>
     <style>
       :root {
         --brass: #ffb323;
@@ -178,11 +178,59 @@
           tomato: "#ff5a3c",
           cyan: "#3ad1c8",
         };
+        // The local server sets <html lang> from the app's language when it serves this page.
+        const EN = document.documentElement.lang === "en";
+        const TEXT = EN
+          ? {
+              someone: "someone",
+              follow: (U) => `${U} followed the channel!`,
+              sub: (U) => `${U} subscribed!`,
+              resub: (U) => `${U} subscribed again!`,
+              months: (n) => `${n} months in a row`,
+              subgift: (U, n, many) =>
+                `${U} gifted ${n} ${many ? "subs" : "sub"}!`,
+              bits: (U, n) => `${U} sent ${n} bits!`,
+              tip: (U, m) => `${U} tipped ${m}!`,
+              raid: (U, n) => `${U} raided with ${n || "the whole crew"}!`,
+              member: (U) => `${U} became a member!`,
+              superchat: (U, m) => `${U} — super chat ${m}`,
+              upgrade: (U) => `${U} kept their gifted sub going!`,
+              payforward: (U) => `${U} paid the gift forward!`,
+              streak: (U, n) =>
+                `${U} has been here ${n || "several"} streams in a row!`,
+              charity: (U, m) => `${U} donated ${m} to charity!`,
+              gift: (U, what) => `${U} sent ${what || "a gift"}!`,
+              kicks: (U, n) => `${U} sent ${n} KICKs!`,
+              reward: (U, what) => `${U} redeemed ${what || "a reward"}!`,
+              milestone: (U) => `${U} hit a milestone!`,
+            }
+          : {
+              someone: "alguém",
+              follow: (U) => `${U} seguiu o canal!`,
+              sub: (U) => `${U} assinou!`,
+              resub: (U) => `${U} assinou de novo!`,
+              months: (n) => `${n} meses seguidos`,
+              subgift: (U, n, many) =>
+                `${U} presenteou ${n} ${many ? "subs" : "sub"}!`,
+              bits: (U, n) => `${U} mandou ${n} bits!`,
+              tip: (U, m) => `${U} doou ${m}!`,
+              raid: (U, n) => `${U} chegou com ${n || "a galera"} na raid!`,
+              member: (U) => `${U} virou membro!`,
+              superchat: (U, m) => `${U} — super chat ${m}`,
+              upgrade: (U) => `${U} continuou a assinatura de presente!`,
+              payforward: (U) => `${U} passou o presente adiante!`,
+              streak: (U, n) =>
+                `${U} tá há ${n || "várias"} lives seguidas aqui!`,
+              charity: (U, m) => `${U} doou ${m} pra caridade!`,
+              gift: (U, what) => `${U} mandou ${what || "um presente"}!`,
+              kicks: (U, n) => `${U} mandou ${n} KICKs!`,
+              reward: (U, what) => `${U} resgatou ${what || "uma recompensa"}!`,
+              milestone: (U) => `${U} chegou a um marco!`,
+            };
         function fmtAmount(n) {
           if (n == null || isNaN(n)) return "";
-          return Number.isInteger(n)
-            ? String(n)
-            : n.toFixed(2).replace(".", ",");
+          if (Number.isInteger(n)) return String(n);
+          return EN ? n.toFixed(2) : n.toFixed(2).replace(".", ",");
         }
         function money(a) {
           const cur = (raw.currency || "").toString().trim();
@@ -193,113 +241,98 @@
         let raw = {};
         function present(a) {
           raw = a || {};
-          const user = (a.user || "alguém").toString();
+          const user = (a.user || TEXT.someone).toString();
           const amt =
             typeof a.amount === "number" ? a.amount : Number(a.amount);
           const U = `<b>${esc(user)}</b>`;
+          const title = a.title ? esc(a.title) : "";
           switch (a.kind) {
             case "follow":
-              return {
-                emoji: "🎉",
-                head: `${U} seguiu o canal!`,
-                accent: "green",
-              };
+              return { emoji: "🎉", head: TEXT.follow(U), accent: "green" };
             case "sub":
-              return { emoji: "⭐", head: `${U} assinou!`, accent: "brass" };
+              return { emoji: "⭐", head: TEXT.sub(U), accent: "brass" };
             case "resub":
               return {
                 emoji: "⭐",
-                head: `${U} assinou de novo!`,
-                note: amt > 1 ? `${fmtAmount(amt)} meses seguidos` : "",
+                head: TEXT.resub(U),
+                note: amt > 1 ? TEXT.months(fmtAmount(amt)) : "",
                 accent: "brass",
               };
             case "subgift":
               return {
                 emoji: "🎁",
-                head: `${U} presenteou ${fmtAmount(amt) || "1"} ${amt > 1 ? "subs" : "sub"}!`,
+                head: TEXT.subgift(U, fmtAmount(amt) || "1", amt > 1),
                 accent: "brass",
               };
             case "bits":
               return {
                 emoji: "💎",
-                head: `${U} mandou ${fmtAmount(amt)} bits!`,
+                head: TEXT.bits(U, fmtAmount(amt)),
                 accent: "cyan",
               };
             case "tip":
               return {
                 emoji: "💰",
-                head: `${U} doou ${money(amt)}!`,
+                head: TEXT.tip(U, money(amt)),
                 accent: "green",
               };
             case "raid":
               return {
                 emoji: "🚀",
-                head: `${U} chegou com ${fmtAmount(amt) || "a galera"} na raid!`,
+                head: TEXT.raid(U, fmtAmount(amt)),
                 accent: "tomato",
               };
             case "member":
-              return {
-                emoji: "🌟",
-                head: `${U} virou membro!`,
-                accent: "brass",
-              };
+              return { emoji: "🌟", head: TEXT.member(U), accent: "brass" };
             case "superchat":
               return {
                 emoji: "💬",
-                head: `${U} — super chat ${money(amt)}`,
-                note: a.image && a.title ? esc(a.title) : "",
+                head: TEXT.superchat(U, money(amt)),
+                note: a.image && a.title ? title : "",
                 accent: "blue",
               };
             case "upgrade":
-              return {
-                emoji: "⏫",
-                head: `${U} continuou a assinatura de presente!`,
-                accent: "brass",
-              };
+              return { emoji: "⏫", head: TEXT.upgrade(U), accent: "brass" };
             case "payforward":
               return {
                 emoji: "🤝",
-                head: `${U} passou o presente adiante!`,
+                head: TEXT.payforward(U),
                 accent: "tomato",
               };
             case "streak":
               return {
                 emoji: "🔥",
-                head: `${U} tá há ${fmtAmount(amt) || "várias"} lives seguidas aqui!`,
+                head: TEXT.streak(U, fmtAmount(amt)),
                 accent: "tomato",
               };
             case "charity":
               return {
                 emoji: "💚",
-                head: `${U} doou ${money(amt)} pra caridade!`,
-                note: a.title ? esc(a.title) : "",
+                head: TEXT.charity(U, money(amt)),
+                note: title,
                 accent: "green",
               };
             case "gift":
               return {
                 emoji: "🎀",
-                head: `${U} mandou ${a.title ? esc(a.title) : "um presente"}!`,
+                head: TEXT.gift(U, title),
                 accent: "brass",
               };
             case "kicks":
               return {
                 emoji: "🟩",
-                head: `${U} mandou ${fmtAmount(amt)} KICKs!`,
-                note: a.title ? esc(a.title) : "",
+                head: TEXT.kicks(U, fmtAmount(amt)),
+                note: title,
                 accent: "green",
               };
             case "reward":
               return {
                 emoji: "🎟️",
-                head: `${U} resgatou ${a.title ? esc(a.title) : "uma recompensa"}!`,
+                head: TEXT.reward(U, title),
                 accent: "cyan",
               };
             case "milestone":
-              return {
-                emoji: "🏆",
-                head: `${U} chegou a um marco!`,
-                accent: "brass",
-              };
+              return { emoji: "🏆", head: TEXT.milestone(U), accent: "brass" };
             default:
               return {
                 emoji: "📣",
@@ -452,7 +485,7 @@
               user: "maria",
               amount: 15,
               currency: "BRL",
-              message: "arrasou hoje!",
+              message: EN ? "great stream today!" : "arrasou hoje!",
             },
             {
               kind: "raid",
@@ -472,7 +505,7 @@
               user: "ana",
               amount: 20,
               currency: "BRL",
-              message: "primeira vez aqui 🎉",
+              message: EN ? "first time here 🎉" : "primeira vez aqui 🎉",
             },
             { kind: "follow", platform: "kick", user: "novato99" },
           ];

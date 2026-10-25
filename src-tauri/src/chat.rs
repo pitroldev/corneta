@@ -102,6 +102,9 @@ pub struct ChatMessage {
     /// A platform notice with no author line, such as a watch streak or a mode change.
     #[serde(skip_serializing_if = "is_false")]
     pub system: bool,
+    /// Sent from this app. The author shown is localized, so the UI must not match on the name.
+    #[serde(skip_serializing_if = "is_false")]
+    pub own: bool,
     /// The same message reaching more than one source (Twitch shared chat) is shown once.
     #[serde(skip)]
     pub dedup_key: Option<String>,

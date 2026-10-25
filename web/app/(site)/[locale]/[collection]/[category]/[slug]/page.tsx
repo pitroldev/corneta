@@ -223,6 +223,7 @@ export default async function EditorialArticlePage({
     { name: frontmatter.title, path: document.href },
   ];
   const mdxComponents = createEditorialMdxComponents({
+    locale,
     images: frontmatter.images,
     imagePresentation: (contentImage) => ({
       source: `${copy.common.sourceLabel}: ${imageSourceLabel(locale, contentImage.source)}`,

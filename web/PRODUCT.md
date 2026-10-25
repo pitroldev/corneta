@@ -8,74 +8,74 @@ web
 
 ## Users
 
-Streamers brasileiros que usam OBS ou outro programa de transmissão compatível com RTMP e querem transmitir para mais de uma plataforma sem manter servidores ou depender de uma assinatura de relay. O público inclui iniciantes que precisam de um fluxo guiado e streamers experientes que valorizam controle por destino, resiliência e privacidade.
+Brazilian streamers who use OBS or another RTMP-compatible streaming app and want to stream to more than one platform without running servers or depending on a relay subscription. The audience includes beginners who need a guided flow and experienced streamers who value per-destination control, resilience and privacy.
 
 ## Product Purpose
 
-O site público apresenta e distribui a Corneta, um app desktop que recebe um único sinal RTMP local e o envia para múltiplos destinos. O OBS é o programa recomendado por ter integração de configuração, controle e estatísticas. O sucesso da superfície pública é fazer o visitante entender o benefício em poucos segundos e baixar o app para Windows.
+The public site presents and distributes Corneta, a desktop app that receives a single local RTMP signal and sends it to multiple destinations. OBS is the recommended app because it has setup, control and stats integration. The public surface succeeds when a visitor understands the benefit within a few seconds and downloads the app for Windows.
 
-A Corneta está pronta para uso em Windows x64. O app não deve ser apresentado como experimental ou em preparação para beta. Os rótulos experimentais se aplicam somente aos recursos e integrações específicos listados neste documento, não ao produto como um todo. A disponibilidade de instaladores acompanha as releases publicadas.
+Corneta is ready to use on Windows x64. The app must not be presented as experimental or as getting ready for a beta. Experimental labels apply only to the specific features and integrations listed in this document, not to the product as a whole. Installer availability follows the published releases.
 
 ## Positioning
 
-A Corneta faz o multistream rodar localmente e mantém cada destino independente. Isso permite acompanhar, reconectar, pausar e ajustar saídas separadamente, sem mensalidade de relay e mantendo chaves, configurações e relatórios no computador do streamer.
+Corneta runs multistreaming locally and keeps each destination independent. That lets the streamer monitor, reconnect, pause and adjust outputs separately, with no monthly relay fee and with keys, settings and reports kept on the streamer's computer.
 
 ## Operating Context
 
-O streamer prepara cenas, câmera e áudio no OBS ou em outro programa compatível com RTMP. A Corneta entra depois dele: recebe o sinal local, mede o upload disponível, distribui a transmissão, acompanha os destinos e reúne informações úteis durante e depois da live. A configuração automática, o controle de início/parada e as estatísticas integradas são específicos do OBS; outras fontes exigem apontar manualmente o servidor e a chave locais.
+The streamer prepares scenes, camera and audio in OBS or another RTMP-compatible app. Corneta comes after it: it receives the local signal, measures the available upload, distributes the stream, monitors the destinations and gathers useful information during and after the stream. Automatic setup, start/stop control and the built-in stats are specific to OBS; other sources require pointing them manually at the local server and key.
 
 ## Capabilities and Constraints
 
-- App atual Windows-first; não há builds públicos confirmados para macOS ou Linux.
-- Requer uma fonte de vídeo/áudio compatível com RTMP. O OBS é recomendado, mas não obrigatório; aceitar o sinal de outro programa não implica oferecer a mesma integração de configuração, controle e estatísticas.
-- Multistream, configuração do OBS, teste de upload, destinos independentes, chat, alertas, audiência agregada e relatórios existem no produto.
-- Chaves de transmissão ficam no cofre nativo do sistema.
-- Três modos de qualidade existem e têm estes nomes na interface: “Na lata” (copia o sinal do OBS para todos), “Esperto” (copia o que já serve e recodifica só o que precisa) e “Caprichado” (recodifica cada destino com o preset da plataforma). O app estima upload somado, número de recodificações e carga antes da live.
-- Recodificação usa encoder de hardware quando disponível (NVENC, QSV, AMF) e cai para software; o app estima quantas sessões simultâneas a placa aguenta.
-- Recorte vertical 9:16 com panorâmica e zoom existe (editor de enquadramento + filtro no motor) para destinos que só aceitam vídeo em pé.
-- Chat unificado lê Twitch, Kick e YouTube com emotes (BTTV/FFZ/7TV e nativos), selos e horário; envia mensagens e permite apagar e dar timeout. Existe janela flutuante com chat, alertas ou os dois.
-- Alertas nativos (seguidor, sub, resub, subgift, bits, raid, membro, superchat) e fontes externas (Streamlabs, StreamElements) existem; tokens ficam no cofre.
-- Overlay para OBS existe: servidor local em loopback serve alertas e chat como Browser Source, com posição, tamanho, duração, som e limites configuráveis, além de alerta de teste.
-- Auto-bitrate existe e age nos destinos que estão recodificando. Normalizador de áudio (loudnorm) existe e é opt-in.
-- YouTube automático existe: com a conta conectada, o app cria a transmissão e injeta a chave no início da live.
-- Atalho global, bandeja, iniciar com o Windows, tema claro/escuro, perfis de destino e backup da configuração existem.
-- Métricas por destino durante a live existem: bitrate, fps, quadros perdidos, tempo no ar, além de CPU, GPU e estatísticas do OBS.
-- Co-stream com convidados (“Mesa”) existe no código, mas está desligado por feature flag e não deve ser divulgado.
-- A implementação de Twitch não é uma certificação de operação real. Esta fonte não apresenta um ensaio verificável de live por plataforma; a matriz externa deve ser registrada e aprovada antes da distribuição.
-- TikTok, Instagram e X são experimentais.
-- Proteção por tela “JÁ VOLTO” em queda do OBS existe.
-- Modo deck existe: o celular, pelo navegador e sem instalar app, vira o painel da live na rede local. Ele marca momentos, liga o JÁ VOLTO, troca cena e microfone, muda título, manda recado no chat, pausa um destino e roda combos. Também mostra avisos com a ação que resolve, o chat e a saúde da live. Vem desligado e pareia por QR, com código de 4 dígitos e permissão no PC. Só funciona com o PC e o celular na mesma rede, e a conexão não é criptografada, então a página tem que dizer para evitar Wi-Fi público.
-- Detecção de tela preta ou congelada não deve ser apresentada como concluída.
-- Cada destino consome upload; transcode também pode consumir CPU ou GPU.
-- O núcleo local é gratuito e o projeto usa licença MIT.
+- The current app is Windows-first; there are no confirmed public builds for macOS or Linux.
+- Requires an RTMP-compatible video/audio source. OBS is recommended but not required; accepting the signal from another app does not mean offering the same setup, control and stats integration.
+- Multistreaming, OBS setup, upload test, independent destinations, chat, alerts, aggregated audience and reports exist in the product.
+- Stream keys are kept in the operating system's native vault.
+- Three quality modes exist, with these names in the interface: “Straight up” (copies the OBS signal to every destination), “Smart” (copies what already fits and re-encodes only what needs it) and “All out” (re-encodes each destination with the platform's preset). The app estimates combined upload, number of re-encodes and load before the stream.
+- Re-encoding uses a hardware encoder when available (NVENC, QSV, AMF) and falls back to software; the app estimates how many simultaneous sessions the graphics card can handle.
+- A vertical 9:16 crop with pan and zoom exists (framing editor + engine filter) for destinations that only accept portrait video.
+- Unified chat reads Twitch, Kick and YouTube with emotes (BTTV/FFZ/7TV and native), badges and timestamps; it sends messages and can delete messages and time users out. A floating window shows chat, alerts or both.
+- Native alerts (follower, sub, resub, subgift, bits, raid, member, superchat) and external sources (Streamlabs, StreamElements) exist; tokens are kept in the vault.
+- An OBS overlay exists: a local loopback server serves alerts and chat as a Browser Source, with configurable position, size, duration, sound and limits, plus a test alert.
+- Auto-bitrate exists and acts on destinations that are re-encoding. The Audio normalizer (loudnorm) exists and is opt-in.
+- Automatic YouTube exists: with the account connected, the app creates the broadcast and injects the key when the stream starts.
+- Global shortcut, tray, start with Windows, light/dark theme, destination profiles and settings backup exist.
+- Per-destination metrics during the stream exist: bitrate, fps, dropped frames, time on air, plus CPU, GPU and OBS stats.
+- Co-streaming with guests (“Table”) exists in the code, but it is turned off by a feature flag and must not be promoted.
+- The Twitch implementation is not a certification of real-world operation. This source does not present a verifiable per-platform stream rehearsal; the external matrix must be recorded and approved before distribution.
+- TikTok, Instagram and X are experimental.
+- Protection through the “BE RIGHT BACK” screen when OBS drops exists.
+- Deck mode exists: the phone, through the browser and without installing an app, becomes the stream's control panel on the local network. It marks moments, turns on BE RIGHT BACK, switches scene and microphone, changes the title, sends a message to chat, pauses a destination and runs combos. It also shows warnings with the action that fixes them, the chat and the stream's health. It is off by default and pairs by QR code, with a 4-digit code and permission on the PC. It only works with the PC and the phone on the same network, and the connection is not encrypted, so the page has to tell people to avoid public Wi-Fi.
+- Black or frozen screen detection must not be presented as finished.
+- Each destination uses upload; transcoding can also use CPU or GPU.
+- The local core is free and the project uses the MIT license.
 
 ## Brand Commitments
 
-- O nome do produto é Corneta.
-- A marca existente e o símbolo de corneta são ativos reconhecíveis do produto.
-- A voz deve ser casual, direta, brasileira e atraente para streamers.
-- Evitar linguagem excessivamente técnica, formal ou editorial.
-- A comunicação deve ser divertida sem parecer infantil e confiante sem esconder limitações.
+- The product name is Corneta.
+- The existing brand and the bugle symbol are recognizable product assets.
+- The voice must be casual, direct, Brazilian and appealing to streamers.
+- Avoid overly technical, formal or editorial language.
+- Communication must be fun without seeming childish and confident without hiding limitations.
 
 ## Evidence on Hand
 
-- Interface funcional do app em `../src/`.
-- Vídeo de apresentação da LP (`public/video/`) e recortes das telas reais do app (`public/images/lp/`), feitos a partir do modo demo de contribuidor; pessoas, nomes e números neles são ilustrativos.
-- A conta de banda e carga da LP é o recorte da tela Qualidade do app, que calcula com `../src/lib/estimates.ts` e os presets de cada destino em `../src/platforms/<id>/destination.json`; se um dia virar HTML, tem que espelhar esses arquivos.
-- Copy dos recursos e das ressalvas espelha os rótulos do app (`../src/screens/SettingsScreen.tsx`, `EncodingScreen.tsx`, `ChatScreen.tsx`).
-- [Critérios de validação real](../docs/GATES-DE-RELEASE.md). São requisitos, não evidência de que um ensaio ocorreu. Ao documentar um ensaio, registrar plataforma, versão/commit, data, cenário, ambiente e resultado verificável antes de anunciar validação.
-- Arquitetura e funcionalidades documentadas em `../README.md` e `../docs/`.
-- Licença MIT em `../LICENSE`.
-- Não há depoimentos, números públicos de usuários, benchmarks comerciais ou logos de clientes; não devem ser fabricados.
+- Working app interface in `../src/`.
+- Landing page presentation video (`public/video/`) and crops of the app's real screens (`public/images/lp/`), made from the contributor demo mode; the people, names and numbers in them are illustrative.
+- The landing page's bandwidth and load calculation is the crop of the app's Quality screen, which computes it with `../src/lib/estimates.ts` and each destination's presets in `../src/platforms/<id>/destination.json`; if it ever becomes HTML, it has to mirror those files.
+- Copy for features and caveats mirrors the app's labels (`../src/screens/SettingsScreen.tsx`, `EncodingScreen.tsx`, `ChatScreen.tsx`).
+- [Real-world validation criteria](../docs/RELEASE-GATES.md). They are requirements, not evidence that a rehearsal took place. When documenting a rehearsal, record the platform, version/commit, date, scenario, environment and verifiable result before announcing validation.
+- Architecture and features documented in `../README.md` and `../docs/`.
+- MIT license in `../LICENSE`.
+- There are no testimonials, public user numbers, commercial benchmarks or customer logos; they must not be fabricated.
 
 ## Product Principles
 
-1. Explicar o resultado antes da tecnologia.
-2. Mostrar o app trabalhando em vez de acumular alegações.
-3. Ser transparente sobre plataforma, upload e recursos experimentais.
-4. Manter uma única ação principal: baixar a versão para Windows.
-5. Fazer iniciantes se sentirem capazes sem afastar streamers experientes.
+1. Explain the result before the technology.
+2. Show the app working instead of piling up claims.
+3. Be transparent about platform, upload and experimental features.
+4. Keep a single main action: download the Windows version.
+5. Make beginners feel capable without pushing away experienced streamers.
 
 ## Accessibility & Inclusion
 
-O site deve funcionar por teclado, respeitar redução de movimento, manter contraste WCAG AA, usar estrutura semântica clara e permanecer utilizável em mobile e com zoom de 200%.
+The site must work with a keyboard, respect reduced motion, keep WCAG AA contrast, use a clear semantic structure and stay usable on mobile and at 200% zoom.

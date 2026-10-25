@@ -2,6 +2,7 @@ import { EditorialCallout } from "./article";
 import { EditorialImage } from "./editorial-image";
 import { UploadCalculator } from "./upload-calculator";
 import type { EditorialImage as EditorialImageData } from "@/lib/editorial/types";
+import type { Locale } from "@/lib/i18n";
 
 export interface EditorialMdxImagePresentation {
   source: string;
@@ -15,9 +16,11 @@ export interface EditorialMdxImagePresentation {
 
 // Images must come from validated frontmatter, not arbitrary MDX sources or dimensions.
 export function createEditorialMdxComponents({
+  locale,
   images,
   imagePresentation,
 }: {
+  locale: Locale;
   images: readonly EditorialImageData[];
   imagePresentation: (
     image: EditorialImageData,
@@ -57,6 +60,6 @@ export function createEditorialMdxComponents({
   return {
     Callout: EditorialCallout,
     ContentImage,
-    UploadCalculator,
+    UploadCalculator: () => <UploadCalculator locale={locale} />,
   };
 }

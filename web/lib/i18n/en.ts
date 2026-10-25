@@ -1,4 +1,4 @@
-// Use natural English with the register defined in docs/TOM-DE-VOZ.md, not literal Portuguese phrasing.
+// Use natural English with the register defined in docs/VOICE-AND-TONE.md, not literal Portuguese phrasing.
 import type { Dict } from "./pt";
 
 export const en: Dict = {

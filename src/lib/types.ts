@@ -317,6 +317,8 @@ export interface ChatMessage {
   shared?: boolean;
   /** A platform notice with no author line, such as a watch streak or a mode change. */
   system?: boolean;
+  /** Sent from this app; the author name is localized, so never match on it. */
+  own?: boolean;
 }
 
 export interface ChatDelete {

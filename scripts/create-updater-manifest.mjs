@@ -108,7 +108,7 @@ const assetUrl = `https://github.com/${encodeURIComponent(owner)}/${encodeURICom
 const manifest = {
   version,
   notes:
-    "Baixe a atualização da Corneta. Consulte as notas completas no release do GitHub.",
+    "Download the Corneta update. The full notes are in the GitHub release.",
   pub_date: new Date().toISOString(),
   platforms: {
     "windows-x86_64": {

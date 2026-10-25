@@ -1,4 +1,4 @@
-// Desktop English dictionary. Follow docs/TOM-DE-VOZ.md; preserve placeholders, rich markup, units, and provider labels.
+// Desktop English dictionary. Follow docs/VOICE-AND-TONE.md; preserve placeholders, rich markup, units, and provider labels.
 import type { Dict } from "./pt";
 
 export const en: Dict = {
@@ -236,6 +236,7 @@ export const en: Dict = {
   "chat.alertsrc.section": "Alert sources",
   "chat.alertsrc.status.dropped": "dropped",
   "chat.alertsrc.status.error": "error",
+  "chat.alertsrc.status.invalidToken": "invalid token",
   "chat.alertsrc.status.live": "live",
   "chat.alertsrc.tokenSaved": "token saved",
   "chat.alertsrc.tokenStored.chip": "Token in Windows Credential Manager",

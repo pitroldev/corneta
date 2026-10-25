@@ -1,6 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import type { Locale } from "@/lib/i18n";
+
+const COPY = {
+  "pt-BR": {
+    kicker: "Faça a conta",
+    title: "Quanto a sua live vai pedir?",
+    hint: "Use o bitrate de vídeo + áudio de cada saída local.",
+    input: (platform: string) =>
+      `Bitrate da ${platform} em megabits por segundo`,
+    total: "Bitrate somado",
+    upload: "Upload estável recomendado",
+    range: (low: string, high: string) => `${low} a ${high} Mb/s`,
+    note: "Essa faixa usa a margem de 1,5× a 2× indicada pelo YouTube para multistream. Teste com áudio, câmera e movimento reais antes da live.",
+  },
+  en: {
+    kicker: "Do the math",
+    title: "How much will your stream need?",
+    hint: "Use the video + audio bitrate of each local output.",
+    input: (platform: string) => `${platform} bitrate in megabits per second`,
+    total: "Combined bitrate",
+    upload: "Recommended stable upload",
+    range: (low: string, high: string) => `${low} to ${high} Mb/s`,
+    note: "This range uses the 1.5× to 2× margin YouTube recommends for multistreaming. Test with real audio, camera and motion before going live.",
+  },
+} as const;
 
 const DESTINATIONS = [
   { id: "twitch", label: "Twitch", initial: 6 },
@@ -13,13 +38,14 @@ function safeBitrate(value: string) {
   return Number.isFinite(parsed) ? Math.min(100, Math.max(0, parsed)) : 0;
 }
 
-function formatMbps(value: number) {
-  return new Intl.NumberFormat("pt-BR", {
+function formatMbps(locale: Locale, value: number) {
+  return new Intl.NumberFormat(locale, {
     maximumFractionDigits: 1,
   }).format(value);
 }
 
-export function UploadCalculator() {
+export function UploadCalculator({ locale }: { locale: Locale }) {
+  const copy = COPY[locale];
   const [bitrates, setBitrates] = useState<Record<string, number>>(() =>
     Object.fromEntries(
       DESTINATIONS.map((destination) => [destination.id, destination.initial]),
@@ -36,9 +62,9 @@ export function UploadCalculator() {
       aria-labelledby="upload-calculator-title"
     >
       <div className="editorial-upload-calculator__heading">
-        <p>Faça a conta</p>
-        <h2 id="upload-calculator-title">Quanto a sua live vai pedir?</h2>
-        <span>Use o bitrate de vídeo + áudio de cada saída local.</span>
+        <p>{copy.kicker}</p>
+        <h2 id="upload-calculator-title">{copy.title}</h2>
+        <span>{copy.hint}</span>
       </div>
 
       <div className="editorial-upload-calculator__fields">
@@ -59,7 +85,7 @@ export function UploadCalculator() {
                     [destination.id]: safeBitrate(event.target.value),
                   }))
                 }
-                aria-label={`Bitrate da ${destination.label} em megabits por segundo`}
+                aria-label={copy.input(destination.label)}
               />
               <b>Mb/s</b>
             </span>
@@ -69,21 +95,21 @@ export function UploadCalculator() {
 
       <div className="editorial-upload-calculator__result" aria-live="polite">
         <div>
-          <span>Bitrate somado</span>
-          <strong>{formatMbps(total)} Mb/s</strong>
+          <span>{copy.total}</span>
+          <strong>{formatMbps(locale, total)} Mb/s</strong>
         </div>
         <div>
-          <span>Upload estável recomendado</span>
+          <span>{copy.upload}</span>
           <strong>
-            {formatMbps(total * 1.5)} a {formatMbps(total * 2)} Mb/s
+            {copy.range(
+              formatMbps(locale, total * 1.5),
+              formatMbps(locale, total * 2),
+            )}
           </strong>
         </div>
       </div>
 
-      <p className="editorial-upload-calculator__note">
-        Essa faixa usa a margem de 1,5× a 2× indicada pelo YouTube para
-        multistream. Teste com áudio, câmera e movimento reais antes da live.
-      </p>
+      <p className="editorial-upload-calculator__note">{copy.note}</p>
     </section>
   );
 }

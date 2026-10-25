@@ -1,54 +1,54 @@
 name: Bug
-description: Relate um problema reproduzível com dados sanitizados.
+description: Report a reproducible problem with sanitized data.
 title: "[Bug]: "
 body:
   - type: markdown
     attributes:
-      value: "Não publique tokens, stream keys, chat completo, cofre ou logs brutos. Vulnerabilidades devem seguir [SECURITY.md](https://github.com/pitroldev/corneta/blob/main/SECURITY.md). Português e inglês são aceitos."
+      value: "Do not post tokens, stream keys, full chat, the vault or raw logs. Vulnerabilities must follow [SECURITY.md](https://github.com/pitroldev/corneta/blob/main/SECURITY.md). Portuguese and English are accepted."
   - type: input
     id: version
     attributes:
-      label: Versão ou commit da Corneta
-      placeholder: "0.7.0 / commit; oficial, Contributor ou demo"
+      label: Corneta version or commit
+      placeholder: "0.7.0 / commit; official, Contributor or demo"
     validations:
       required: true
   - type: textarea
     id: environment
     attributes:
-      label: Ambiente
-      description: Windows/build, OBS, GPU/driver se relevante. Não inclua nome do computador ou caminhos pessoais.
+      label: Environment
+      description: Windows/build, OBS, GPU/driver if relevant. Do not include your computer name or personal paths.
     validations:
       required: true
   - type: dropdown
     id: mode
     attributes:
-      label: Modo afetado
+      label: Affected mode
       options:
-        - Demo / sem transmissão
-        - Cópia (passthrough)
-        - Por plataforma (encode)
-        - Híbrido
-        - Não sei / não se aplica
+        - Demo / no streaming
+        - Straight up (copy)
+        - Smart (hybrid)
+        - All out (encode per platform)
+        - Not sure / not applicable
   - type: input
     id: destination
     attributes:
-      label: Plataformas e integração
-      description: "Ex.: Twitch/OAuth, personalizado/URL e chave (não cole URL ou chave), apenas relatórios."
+      label: Platforms and integration
+      description: "E.g.: Twitch/OAuth, custom/URL and key (do not paste the URL or key), reports only."
   - type: textarea
     id: reproduction
     attributes:
-      label: Passos mínimos para reproduzir
-      description: Informe o identificador do cenário fictício, se utilizou um.
+      label: Minimal steps to reproduce
+      description: Give the identifier of the made-up scenario, if you used one.
     validations:
       required: true
   - type: textarea
     id: expected
     attributes:
-      label: Resultado esperado e observado
+      label: Expected and observed result
     validations:
       required: true
   - type: textarea
     id: evidence
     attributes:
-      label: Evidências opcionais e sanitizadas
-      description: Trecho mínimo ou captura sem credenciais, nomes de usuários ou conteúdo privado. Não anexe a live inteira.
+      label: Optional, sanitized evidence
+      description: A minimal excerpt or screenshot without credentials, usernames or private content. Do not attach the whole stream.

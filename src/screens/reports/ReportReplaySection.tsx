@@ -112,7 +112,7 @@ function ReplayUnavailable({ state }: { state: Exclude<ReplayView, "ready"> }) {
   const requestNavigate = useStore((s) => s.requestNavigate);
   const copy = UNAVAILABLE_COPY[state];
   const openRecordingSettings = () => {
-    setSettingsTab("geral");
+    setSettingsTab("general");
     requestNavigate("settings");
   };
   return (

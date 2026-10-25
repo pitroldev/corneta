@@ -1,36 +1,36 @@
-# Documentação da Corneta
+# Corneta documentation
 
-Comece pelo [README do projeto](../README.md) para conhecer o app, os requisitos e a demonstração. Este índice reúne os guias e contratos mantidos junto do código.
+Start with the [project README](../README.md) to learn about the app, its requirements and the demo. This index gathers the guides and contracts maintained alongside the code.
 
-## Usar e testar
+## Use and test
 
-- [Ajuda e guias](../web/content/): conteúdo de uso publicado pelo site; [suporte](../SUPPORT.md) explica como relatar um problema com segurança.
-- [Desenvolvimento](DESENVOLVIMENTO.md): executar a demo, o site e o desktop em um perfil de contribuição isolado.
-- [Compatibilidade](COMPATIBILIDADE.md): plataformas, versões e formatos de dados suportados.
-- [Relatórios fictícios](RELATORIOS-FICTICIOS.md): gerar, testar e restaurar cenários sem usar relatórios pessoais.
+- [Help and guides](../web/content/): usage content published by the website; [support](../SUPPORT.md) explains how to report a problem safely.
+- [Development](DEVELOPMENT.md): run the demo, the website and the desktop app in an isolated contributor profile.
+- [Compatibility](COMPATIBILITY.md): supported platforms, versions and data formats.
+- [Synthetic reports](SYNTHETIC-REPORTS.md): generate, test and restore scenarios without using personal reports.
 
-## Contribuir
+## Contribute
 
-- [Contribuição](../CONTRIBUTING.md): preparação, testes e critérios para um PR.
-- [Arquitetura](ARQUITETURA.md): responsabilidades, módulos e contratos de ciclo de vida.
-- [Configuração](CONFIGURACAO.md): variáveis, precedência e separação entre distribuição oficial, Contributor e forks.
-- [Superfície de rede](SUPERFICIE-DE-REDE.md): processos, portas, OAuth e integrações.
-- [Performance](PERFORMANCE.md): limites, benchmarks e medições que exigem hardware real.
-- [Tom de voz](TOM-DE-VOZ.md): linguagem do app, tradução e mensagens de erro.
-- [Conteúdo editorial](../web/content/README.md) e [manutenção editorial](RUNBOOK-MANUTENCAO-EDITORIAL.md): escrever, revisar e publicar ajuda e guias.
-- [Segurança do repositório](SEGURANCA-REPOSITORIO.md): verificar segredos e revisar exceções de fixtures. Vulnerabilidades seguem o [canal privado](../SECURITY.md).
-- [Conduta](../CODE_OF_CONDUCT.md): expectativas para colaboração.
+- [Contributing](../CONTRIBUTING.md): setup, tests and criteria for a PR.
+- [Architecture](ARCHITECTURE.md): responsibilities, modules and lifecycle contracts.
+- [Configuration](CONFIGURATION.md): variables, precedence and the separation between the official distribution, Contributor and forks.
+- [Network surface](NETWORK-SURFACE.md): processes, ports, OAuth and integrations.
+- [Performance](PERFORMANCE.md): limits, benchmarks and measurements that need real hardware.
+- [Voice and tone](VOICE-AND-TONE.md): app language, translation and error messages.
+- [Editorial content](../web/content/README.md) and [editorial maintenance](EDITORIAL-MAINTENANCE.md): write, review and publish help and guides.
+- [Repository security](REPOSITORY-SECURITY.md): check for secrets and review fixture exceptions. Vulnerabilities go through the [private channel](../SECURITY.md).
+- [Conduct](../CODE_OF_CONDUCT.md): expectations for collaboration.
 
-## Operar e distribuir
+## Operate and distribute
 
-- [Gates de release](GATES-DE-RELEASE.md): critérios de aprovação; executar um subconjunto não aprova a release.
-- [Assinaturas](ASSINATURA.md) e [atualização automática](ATUALIZACAO-AUTOMATICA.md): integridade do instalador, updater e recuperação.
-- [Conformidade do FFmpeg](CONFORMIDADE-FFMPEG.md) e [avisos de terceiros](../THIRD_PARTY_NOTICES.md): licenças e fontes correspondentes da distribuição.
-- [Materiais públicos](MATERIAIS-PUBLICOS.md): procedência, inventário e revisão de assets.
-- [Política de privacidade](https://www.corneta.live/legal/privacy): o que a telemetria coleta e como desligar; variáveis e kill switches ficam na [configuração](CONFIGURACAO.md).
+- [Release gates](RELEASE-GATES.md): approval criteria; running a subset does not approve the release.
+- [Signing](SIGNING.md) and [auto-update](AUTO-UPDATE.md): installer integrity, updater and recovery.
+- [FFmpeg compliance](FFMPEG-COMPLIANCE.md) and [third-party notices](../THIRD_PARTY_NOTICES.md): licenses and corresponding sources for the distribution.
+- [Public assets](PUBLIC-ASSETS.md): provenance, inventory and review of assets.
+- [Privacy policy](https://www.corneta.live/legal/privacy): what telemetry collects and how to turn it off; variables and kill switches are in the [configuration](CONFIGURATION.md).
 
-## Manter a documentação
+## Maintain the documentation
 
-Atualize o guia responsável pelo contrato alterado. Mudanças entregues aparecem nas [notas de cada release](https://github.com/pitroldev/corneta/releases); preparação e operação da distribuição oficial ficam com os mantenedores, fora do repositório. Planos, prioridades futuras, registros de execução e relatórios de revisão não devem virar páginas permanentes de documentação.
+Update the guide that owns the contract you changed. Shipped changes appear in the [notes for each release](https://github.com/pitroldev/corneta/releases); preparing and operating the official distribution is up to the maintainers, outside the repository. Plans, future priorities, execution logs and review reports must not become permanent documentation pages.
 
-`pnpm docs:check` verifica destinos locais em arquivos Markdown rastreados e novos, incluindo imagens e referências, ignorando exemplos em código e comentários. O comando não consulta URLs externas nem valida âncoras; confira esses casos ao revisar links.
+`pnpm docs:check` checks local destinations in tracked and new Markdown files, including images and references, ignoring examples in code and comments. The command does not query external URLs or validate anchors; check those cases when reviewing links.

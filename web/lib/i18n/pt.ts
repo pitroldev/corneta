@@ -1,4 +1,4 @@
-// Message keys define Dict; keep copy changes aligned with docs/TOM-DE-VOZ.md.
+// Message keys define Dict; keep copy changes aligned with docs/VOICE-AND-TONE.md.
 
 export const pt = {
   "seo.howto.name":

@@ -64,11 +64,11 @@ import {
 import { ShortcutCapture } from "./settings/ShortcutCapture";
 
 // Tab IDs are stable deep-link values; only labels are localized.
-type SettingsTab = "obs" | "seguranca" | "geral";
+type SettingsTab = "obs" | "safety" | "general";
 
 const TABS: { id: SettingsTab; labelKey: MessageKey; icon: typeof Plug }[] = [
-  { id: "geral", labelKey: "settings.tab.general", icon: MonitorCog },
-  { id: "seguranca", labelKey: "settings.tab.safety", icon: Shield },
+  { id: "general", labelKey: "settings.tab.general", icon: MonitorCog },
+  { id: "safety", labelKey: "settings.tab.safety", icon: Shield },
   { id: "obs", labelKey: "settings.tab.obs", icon: Plug },
 ];
 
@@ -102,7 +102,7 @@ export function SettingsScreen() {
 
   const importStep = useConfirm();
   const [tab, setTab] = useState<SettingsTab>(
-    () => (requestedTab as SettingsTab) || "geral",
+    () => (requestedTab as SettingsTab) || "general",
   );
   const [portDraft, setPortDraft] = useState<string | null>(null);
   const [shortcutBusy, setShortcutBusy] = useState(false);
@@ -366,7 +366,7 @@ export function SettingsScreen() {
           </Card>
         </RTabs.Content>
 
-        <RTabs.Content value="seguranca">
+        <RTabs.Content value="safety">
           <Card accent>
             <h3 className="mb-1 flex items-center gap-2 text-lg">
               <Shield className="size-5 text-brass" />{" "}
@@ -449,7 +449,7 @@ export function SettingsScreen() {
           </Card>
         </RTabs.Content>
 
-        <RTabs.Content value="geral">
+        <RTabs.Content value="general">
           <RecordingSettings />
           <Card className="mb-4">
             <h3 className="mb-1 flex items-center gap-2 text-lg">

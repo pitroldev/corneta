@@ -6,7 +6,7 @@ export const compliancePackageFiles = [
   "src-tauri/Cargo.lock",
   "compliance/ffmpeg-sources.json",
   "compliance/ffmpeg-provenance.json",
-  "docs/CONFORMIDADE-FFMPEG.md",
+  "docs/FFMPEG-COMPLIANCE.md",
 ];
 
 export function complianceErrors(manifest, sidecars) {

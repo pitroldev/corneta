@@ -1,6 +1,6 @@
 ---
 name: Corneta
-description: Uma live. Várias comunidades. Tudo no seu controle.
+description: One stream. Many communities. All under your control.
 colors:
   charcoal: "#100b07"
   surface: "#1a130c"
@@ -165,334 +165,341 @@ components:
 
 # Design System: Corneta
 
-## Política dos arquivos de design
+## Design file policy
 
-Este documento orienta o trabalho visual do site; os estilos/componentes em `app/` implementam a interface. [PRODUCT.md](PRODUCT.md) delimita o que o produto pode afirmar. Para implementar mudanças, confira primeiro este documento e o código. A ferramenta de design não é requisito para contribuir, testar ou compilar, e o estado dela não é versionado.
+This document guides the site's visual work; the styles and components in `app/` implement the interface. [PRODUCT.md](PRODUCT.md) defines what the product may claim. To implement changes, check this document and the code first. The design tool is not required to contribute, test or build, and its state is not versioned.
 
 ## Overview
 
-**Creative North Star: "O pôster do megafone"**
+**Creative North Star: "The megaphone poster"**
 
-A Corneta é um app de desktop desenhado como pôster de gibi impresso, e a LP é a mesma
-gráfica: blocos sólidos de cor, sombras **duras** (deslocadas, sem desfoque), cantos secos e
-tipografia gorda que fala alto. O mundo não é inventado para a página — ele é herdado de
-`src/index.css` do app. Quem baixa reconhece a tela; quem chega pela LP já viu o produto.
+Corneta is a desktop app drawn like a printed comic-book poster, and the landing page comes off
+the same press: solid blocks of color, **hard** shadows (offset, no blur), dry corners and fat
+type that speaks loudly. The world is not invented for the page — it is inherited from the
+app's `src/index.css`. Whoever downloads recognizes the screen; whoever arrives through the
+landing page has already seen the product.
 
-A LP abre na **mesa**: papel (`#f3ead7`, o tema claro do app) com a grade de pontos, o mesmo
-cenário dos vídeos da Corneta, e o vídeo de apresentação preso nela com fita, no centro. Depois
-ela alterna a mesa com o palco, o breu quente do app (`#100b07`) com meio-tom impresso. O latão
-manda: é o traço de marca-texto do título, o play do vídeo, o item ativo, o adesivo torto e a
-régua sobre os números. O tomate é o pedido de ação — baixar. Menta reporta saúde, âmbar
-reporta reconexão. Nada de azul, nada de glow, nada de sombra difusa decorativa: esses efeitos
-não pertencem à linguagem visual do site.
+The landing page opens on the **desk**: paper (`#f3ead7`, the app's light theme) with the dot
+grid, the same setting as Corneta's videos, with the intro video taped to it in the center.
+After that it alternates the desk with the stage, the app's Warm Pitch (`#100b07`) with printed
+halftone. Brass leads: it is the title's highlighter stroke, the video's play button, the active
+item, the tilted sticker and the bar above the numbers. Tomato is the call to action —
+download. Mint reports health, amber reports reconnection. No blue, no glow, no decorative
+diffuse shadow: these effects do not belong to the site's visual language.
 
-A voz é brasileira e direta, sem virar infantil. Baloo 2 fala; Inter explica e opera. As telas
-do app na página são recortes reais com dados de exemplo, rotulados assim, e a foto do vídeo
-traz o selo "imagem ilustrativa" no próprio quadro — a honestidade é parte do tom da marca. Os textos seguem o
-[guia de tom de voz](../docs/TOM-DE-VOZ.md).
+The voice is Brazilian and direct, without turning childish. Baloo 2 speaks; Inter explains and
+operates. The app screens on the page are real crops with sample data, labeled as such, and the
+photo in the video carries the "imagem ilustrativa" (illustrative image) seal in the frame itself — honesty is part of the brand's tone. Copy follows the
+[voice and tone guide](../docs/VOICE-AND-TONE.md).
 
 **Key Characteristics:**
 
-- A mesa de papel com grade de pontos no herói; palco escuro com meio-tom nas faixas de produto.
-- Sombras duras de 3–10px sem desfoque; a peça parece adesivo colado, não elemento flutuante.
-- Blocos sólidos de latão com tinta escura — inclusive o play do vídeo.
-- Cantos secos (4–14px). Pílula só para pontos de estado e ondas sonoras.
-- Logos oficiais das plataformas em chips de marca, iguais aos do app.
-- O vídeo da Corneta no centro e recortes das telas reais do app como prova, não mockup genérico.
+- The paper desk with a dot grid in the hero; a dark stage with halftone in the product bands.
+- Hard 3–10px shadows with no blur; each piece looks like a stuck-on sticker, not a floating element.
+- Solid brass blocks with dark ink — including the video's play button.
+- Dry corners (4–14px). Pills only for status dots and sound waves.
+- Official platform logos in brand chips, the same as in the app.
+- Corneta's video in the center and crops of the real app screens as proof, not a generic mockup.
 
 ## Colors
 
-Paleta de duas temperaturas: o breu do estúdio e o papel da gráfica, com latão e tomate
-carregando marca e ação.
+A two-temperature palette: the studio's pitch black and the print shop's paper, with brass and
+tomato carrying brand and action.
 
 ### Primary
 
-- **Breu Quente** (`#100b07`): fundo do palco — régua dos quatro passos, plataformas, CTA
-  final, rodapé e as superfícies mais escuras do app. Sempre com o meio-tom de latão a 5%.
-- **Latão** (`#ffb323`): a cor da marca. Traço de marca-texto do título, play do vídeo,
-  item ativo, adesivos, réguas sobre números, painel da "conta honesta" e
-  ícone da corneta.
+- **Warm Pitch** (`#100b07`): stage background — the four-step strip, platforms, closing CTA,
+  footer and the app's darkest surfaces. Always with the brass halftone at 5%.
+- **Brass** (`#ffb323`): the brand color. The title's highlighter stroke, the video's play
+  button, the active item, stickers, bars above numbers, the "honest math" panel and the
+  horn icon.
 
 ### Secondary
 
-- **Tomate** (`#ff5a36`): reservado à ação — baixar para Windows — e ao adesivo do que é
-  experimental. Nunca decora um bloco que não pede clique; o play do vídeo é latão.
-- **Tinta de Latão** (`#2a1c00`): a tinta escura que sempre acompanha o latão (texto sobre
-  latão, sombra dura sobre painel escuro).
+- **Tomato** (`#ff5a36`): reserved for action — download for Windows — and for the sticker on
+  what is experimental. It never decorates a block that does not ask for a click; the video's
+  play button is brass.
+- **Brass Ink** (`#2a1c00`): the dark ink that always goes with brass (text on brass, hard
+  shadow on a dark panel).
 
 ### Tertiary
 
-- **Menta** (`#56e39b`): destino no ar, folga de upload, itens confirmados. Não compete com a ação.
-- **Âmbar de Aviso** (`#ffc23d`): reconectando, "pode falhar". A cor da ressalva honesta.
-- **Vermelho AO VIVO** (`#ff4733`): só o ponto pulsante de transmissão no ar.
+- **Mint** (`#56e39b`): destination live, upload headroom, confirmed items. It does not compete with the action.
+- **Warning Amber** (`#ffc23d`): reconnecting, "may fail". The color of the honest caveat.
+- **LIVE Red** (`#ff4733`): only the pulsing on-air dot.
 
 ### Neutral
 
-- **Superfície** (`#1a130c`): painel padrão sobre o palco e ladrilho das plataformas.
-- **Superfície Elevada** (`#221a10`): linhas e controles dentro de painéis escuros.
-- **Superfície Alta** (`#2e2314`): estado apagado (interruptor desligado, destino caído).
-- **Painel Fundo** (`#0b0805`): titlebar, sidebar, coluna de chat, header e rodapé. É também a
-  cor de toda sombra dura sobre fundo escuro.
-- **Creme** (`#fcf3e3`) / **Creme Fosco** (`#c6b69b`) / **Creme Apagado** (`#8c7a60`): texto
-  sobre o escuro, em três níveis. Sobre superfície elevada (`#1a130c`/`#221a10`) o apagado sobe
-  para **Creme Apagado Elevado** (`#a08d70`), senão o contraste cai abaixo de AA.
-- **Papel** (`#f3ead7`) e **Papel Claro** (`#fffaf0`): faixas de leitura; alternam entre si
-  quando duas seções claras se encostam.
-- **Tinta** (`#2a1c0a`) / **Tinta Fosca** (`#5f4e36`) / **Tinta Apagada** (`#6f5d3f`): texto
-  sobre papel. **Fio de Papel** (`#cbb88f`) separa linhas claras.
-- **Tomate Tinta** (`#b83218`): kicker sobre papel, onde o tomate puro não teria contraste.
+- **Surface** (`#1a130c`): default panel on the stage and the platform tile.
+- **Raised Surface** (`#221a10`): rows and controls inside dark panels.
+- **High Surface** (`#2e2314`): off state (switch turned off, destination down).
+- **Deep Panel** (`#0b0805`): titlebar, sidebar, chat column, header and footer. It is also the
+  color of every hard shadow on a dark background.
+- **Cream** (`#fcf3e3`) / **Muted Cream** (`#c6b69b`) / **Faint Cream** (`#8c7a60`): text on
+  dark, in three levels. On a raised surface (`#1a130c`/`#221a10`) the faint level moves up to
+  **Raised Faint Cream** (`#a08d70`); otherwise contrast drops below AA.
+- **Paper** (`#f3ead7`) and **Light Paper** (`#fffaf0`): reading bands; they alternate when two
+  light sections touch.
+- **Ink** (`#2a1c0a`) / **Muted Ink** (`#5f4e36`) / **Faint Ink** (`#6f5d3f`): text on paper.
+  **Paper Line** (`#cbb88f`) separates light rows.
+- **Tomato Ink** (`#b83218`): kicker on paper, where plain tomato would not have enough contrast.
 
 ### Named Rules
 
-**A Regra dos Dois Trabalhos.** Latão é marca e destaque; tomate é ação. Se um bloco de tomate
-não abre um download nem entra no ar, ele está errado. Menta reporta saúde, âmbar reporta
-ressalva — nunca o contrário.
+**The Two Jobs Rule.** Brass is brand and emphasis; tomato is action. If a tomato block neither
+starts a download nor goes live, it is wrong. Mint reports health, amber reports caveats —
+never the other way around.
 
-**A Regra do Sem Azul.** O sistema não tem azul. Roteamento, links e estados usam latão, menta
-ou âmbar.
+**The No Blue Rule.** The system has no blue. Routing, links and states use brass, mint or
+amber.
 
-**A Regra da Tinta sobre Cor.** Todo bloco saturado (latão, tomate, menta, âmbar) recebe texto
-em tinta escura (`#2a1c00` ou `#0b0805`), não branco. Os recortes das telas do app ficam como
-o app é, e por isso não seguem esta regra.
+**The Ink on Color Rule.** Every saturated block (brass, tomato, mint, amber) gets text in dark
+ink (`#2a1c00` or `#0b0805`), not white. The app screen crops stay as the app is, so they do
+not follow this rule.
 
 ## Typography
 
-**Display Font:** Baloo 2 (com `Segoe UI`, system-ui, sans-serif)
-**Body Font:** Inter (com `Segoe UI`, system-ui, sans-serif)
+**Display Font:** Baloo 2 (with `Segoe UI`, system-ui, sans-serif)
+**Body Font:** Inter (with `Segoe UI`, system-ui, sans-serif)
 
-**Character:** Baloo 2 é gorda, redonda e falada — é a corneta gritando. Inter é a voz que
-explica a conta de upload sem drama. As duas são exatamente as fontes do app, então a LP e o
-produto soam iguais.
+**Character:** Baloo 2 is fat, round and spoken — it is the horn shouting. Inter is the voice
+that explains the upload math without drama. Both are exactly the app's fonts, so the landing
+page and the product sound the same.
 
 ### Hierarchy
 
-- **Display** (800, `clamp(3rem, 6.4vw, 5.7rem)`, 0.92, -0.035em): só a promessa do herói, em
-  duas linhas centralizadas, a segunda sublinhada por um traço de marca-texto em latão.
-- **Headline** (800, `clamp(2.35rem, 4.2vw, 3.9rem)`, 0.98): viradas de seção e CTA final. Em
-  coluna estreita (layout de duas colunas) desce para `clamp(2.1rem, 3.2vw, 3.05rem)`.
-- **Title** (800, `clamp(1.3rem, 2.1vw, 1.8rem)`, 1.08): título de passo e de recurso.
-- **Body** (500, `1rem`, 1.68): explicações e ressalvas; medida entre 46ch e 68ch.
-- **Label** (800, `0.72rem`, `0.1em`, caixa alta): kicker, rótulo de painel, adesivo e estado.
-- **Action** (Baloo 800, `1.24rem`): botão de download. O botão fala com a fonte da marca, não
-  com a do corpo.
-- **UI** (Baloo 700, `0.9rem`) e **Micro** (Inter 550, `0.62rem`): a escala interna do app.
-  Ela só aparece em superfície de produto desenhada no site; a LP mostra o produto por recortes
-  das telas reais, então o texto da página nunca desce para lá.
+- **Display** (800, `clamp(3rem, 6.4vw, 5.7rem)`, 0.92, -0.035em): only the hero promise, on
+  two centered lines, the second underlined by a brass highlighter stroke.
+- **Headline** (800, `clamp(2.35rem, 4.2vw, 3.9rem)`, 0.98): section turns and the closing CTA.
+  In a narrow column (two-column layout) it drops to `clamp(2.1rem, 3.2vw, 3.05rem)`.
+- **Title** (800, `clamp(1.3rem, 2.1vw, 1.8rem)`, 1.08): step and feature titles.
+- **Body** (500, `1rem`, 1.68): explanations and caveats; measure between 46ch and 68ch.
+- **Label** (800, `0.72rem`, `0.1em`, uppercase): kicker, panel label, sticker and state.
+- **Action** (Baloo 800, `1.24rem`): download button. The button speaks in the brand font, not
+  the body font.
+- **UI** (Baloo 700, `0.9rem`) and **Micro** (Inter 550, `0.62rem`): the app's internal scale.
+  It only appears on product surfaces drawn on the site; the landing page shows the product
+  through crops of the real screens, so page text never goes down to that scale.
 
-- **Mono** (`ui-monospace`, `0.7rem`): só valor copiável. Monoespaçado aqui é dado, não
-  fantasia de "técnico".
+- **Mono** (`ui-monospace`, `0.7rem`): copyable values only. Monospace here is data, not a
+  "techy" costume.
 
 ### Named Rules
 
-**A Regra de Quem Fala.** Baloo 2 para promessas, nomes e botões; Inter para tudo que o
-streamer precisa entender ou operar. Um parágrafo em Baloo é erro.
+**The Who Speaks Rule.** Baloo 2 for promises, names and buttons; Inter for everything the
+streamer needs to understand or operate. A paragraph in Baloo is a mistake.
 
 ## Layout
 
-Casca central de no máximo 1220px com 3rem de goteira, apertando para 2.5rem abaixo de 980px e
-2rem abaixo de 760px. Seções respiram `clamp(78px, 8vw, 122px)`; painéis e superfícies de
-produto trabalham com 8–26px internos.
+A central shell of at most 1220px with a 3rem gutter, tightening to 2.5rem below 980px and 2rem
+below 760px. Sections breathe `clamp(78px, 8vw, 122px)`; panels and product surfaces work with
+8–26px of internal spacing.
 
-O primeiro viewport é a mesa: adesivo, título de duas linhas centralizado, pitch curto e o
-vídeo grande no centro (até 1140px), preso com fita, e o botão de download logo abaixo dele.
-Nada de texto de apoio entre o vídeo e o botão além da linha "Windows 10/11 · sem cadastro". No
-celular o vídeo ocupa a largura e as fitas somem.
+The first viewport is the desk: sticker, centered two-line title, short pitch and the large
+video in the center (up to 1140px), taped down, with the download button right below it. No
+supporting text between the video and the button other than the "Windows 10/11 · no sign-up"
+line. On mobile the video takes the full width and the tape disappears.
 
-Depois do herói, nesta ordem: a régua escura dos quatro passos (número de latão, título, uma
-frase e o atalho pro trecho do vídeo); o mosaico de recursos no papel, com recortes reais e uma
-linha de chips "E mais"; o paredão de plataformas no escuro; na mesa, o que roda no seu PC
-(título, uma frase e três chips de confiança), o painel de latão da conta honesta com o recorte
-da tela Qualidade do app (no celular, só o modo recomendado) e uma linha sobre as contas com o
-link da política de privacidade, onde mora o detalhe de cada permissão; as dúvidas — oito perguntas
-numeradas, todas fechadas, com a coluna do título fixa ao rolar e os cartões de guias e ajuda
-nela (no celular eles vêm depois das perguntas); e o CTA final. Abaixo de 980px as colunas duplas e o mosaico
-colapsam em uma coluna; no celular, cada passo vira uma linha com o número ao lado.
+After the hero, in this order: the dark four-step strip (brass number, title, one sentence and
+the shortcut to that part of the video); the feature mosaic on paper, with real crops and a row
+of "Plus" chips; the platform wall on the dark stage; on the desk, what runs on your PC (title,
+one sentence and three trust chips), the brass "honest math" panel with the crop of the app's
+Quality screen (on mobile, only the recommended mode) and a line about the accounts with the
+privacy policy link, where each permission is detailed; the FAQ — eight numbered questions, all
+collapsed, with the title column sticky while scrolling and the guide and help cards in it (on
+mobile they come after the questions); and the closing CTA. Below 980px the two-column layouts
+and the mosaic collapse into one column; on mobile, each step becomes a row with the number
+beside it.
 
-**A Regra da Frase Única.** Passo e cartão de recurso têm título e uma frase; o recorte da tela
-faz o resto. Ressalva cabe numa linha; o que de fato precisa de mais
-palavras — as permissões das contas — fica na política de privacidade, com uma linha e o link na
-página, nunca num parágrafo de venda. O FAQ não repete o que a página já mostra (plataformas, overlay, vídeo em pé). Se a página repete
-a mesma promessa em duas seções, uma delas sai.
+**The One Sentence Rule.** Steps and feature cards get a title and one sentence; the screen
+crop does the rest. A caveat fits in one line; what really needs more words — the account
+permissions — goes in the privacy policy, with one line and the link on the page, never in a
+sales paragraph. The FAQ does not repeat what the page already shows (platforms, overlay,
+vertical video). If the page repeats the same promise in two sections, one of them goes.
 
-**A Regra do Palco antes da Grade.** Comece por uma cena de produto funcionando — o vídeo — ou
-por uma sequência ordenada. Nunca por uma grade de cards de ícone + título + texto.
+**The Stage Before Grid Rule.** Start with a working product scene — the video — or with an
+ordered sequence. Never with a grid of icon + title + text cards.
 
-**A Regra do Ritmo Alternado.** Duas seções claras encostadas trocam de tom (`#f3ead7` ↔
-`#fffaf0`); duas escuras encostadas ganham uma faixa de latão ou tomate entre elas.
+**The Alternating Rhythm Rule.** Two adjacent light sections switch tone (`#f3ead7` ↔
+`#fffaf0`); two adjacent dark ones get a brass or tomato band between them.
 
 ## Elevation & Depth
 
-Profundidade é impressão, não luz: todo relevo é uma sombra **dura** deslocada, sem desfoque,
-como tinta fora de registro — inclusive a moldura do vídeo. Superfícies de leitura são planas e
-se separam por fio ou troca de tom.
+Depth is print, not light: all relief is a **hard** offset shadow with no blur, like
+out-of-register ink — including the video frame. Reading surfaces are flat and are separated by
+a hairline or a change of tone.
 
 ### Shadow Vocabulary
 
-- **Pop** (`box-shadow: 4px 4px 0 0 #0b0805`): peça padrão sobre superfície escura — adesivos,
-  faixa AO VIVO, blocos de estatística, botão BORA.
-- **Pop Pequeno** (`box-shadow: 3px 3px 0 0 #0b0805`): chips de confiança e glifos de plataforma.
-- **Pop de Latão** (`box-shadow: 4px 4px 0 0 #2a1c00`): peças de latão sobre painel escuro
-  (marca, item ativo, adesivo, botão compacto do header).
-- **Pop de Tinta** (`box-shadow: 4px 4px 0 0 #2a1c0a` / `7px 7px` na versão grande): painéis
-  escuros e blocos pousados sobre papel.
-- **Pop Creme** (`box-shadow: 4px 4px 0 0 #fcf3e3`): só o botão de download sobre o palco
-  escuro, onde uma sombra escura desapareceria.
-- **Desregistro de Título** (`box-shadow: 7px 7px 0 0 #ff5a36`): exclusivo da laje de latão
-  (`Slab`, na página 404) — o tomate atrás do latão imita a impressão fora de registro.
-- **Moldura do Vídeo** (`box-shadow: 10px 10px 0 0 #2a1c0a`): a maior sombra do sistema, só
-  para o vídeo sobre a mesa; cai para 6px no celular.
+- **Pop** (`box-shadow: 4px 4px 0 0 #0b0805`): default piece on a dark surface — stickers, the
+  LIVE banner, stat blocks, the GO LIVE button.
+- **Pop Small** (`box-shadow: 3px 3px 0 0 #0b0805`): trust chips and platform glyphs.
+- **Pop Brass** (`box-shadow: 4px 4px 0 0 #2a1c00`): brass pieces on a dark panel (brand mark,
+  active item, sticker, compact header button).
+- **Pop Ink** (`box-shadow: 4px 4px 0 0 #2a1c0a` / `7px 7px` in the large version): dark panels
+  and blocks resting on paper.
+- **Pop Cream** (`box-shadow: 4px 4px 0 0 #fcf3e3`): only the download button on the dark
+  stage, where a dark shadow would disappear.
+- **Title Misregistration** (`box-shadow: 7px 7px 0 0 #ff5a36`): exclusive to the brass slab
+  (`Slab`, on the 404 page) — the tomato behind the brass imitates out-of-register printing.
+- **Video Frame** (`box-shadow: 10px 10px 0 0 #2a1c0a`): the largest shadow in the system, only
+  for the video on the desk; drops to 6px on mobile.
 
 ### Named Rules
 
-**A Regra da Sombra Seca.** Sombra tem offset e não tem blur. Se apareceu `blur`, virou glow — e
-glow é o mundo antigo. A fita que prende o vídeo é papel chapado, sem sombra.
+**The Dry Shadow Rule.** A shadow has an offset and no blur. If `blur` shows up, it has become
+glow — and glow is the old world. The tape holding the video is flat paper, with no shadow.
 
-**A Regra do Offset que Aparece.** A cor da sombra depende do fundo: `#0b0805` sobre o escuro,
-`#2a1c0a` sobre papel, `#fcf3e3` para o botão de ação no palco. Sombra invisível é sombra errada.
+**The Visible Offset Rule.** The shadow color depends on the background: `#0b0805` on dark,
+`#2a1c0a` on paper, `#fcf3e3` for the action button on the stage. An invisible shadow is a wrong
+shadow.
 
 ## Shapes
 
-Geometria seca: 4px em indicadores e adesivos, 7px em controles, linhas e botões, 10px em
-painéis, 14px em janelas e campos de destaque. Nada acima de 14px. Pílula (`999px`) só em ponto
-de estado, polegar de interruptor e ondas sonoras. Bordas existem para separar zonas de app
-(1px `#3d301c` / `#281f12`), para as réguas editoriais no papel (2–3px de tinta cheia) e
-como moldura de tinta de 3px de peça pousada na mesa (vídeo, cartão de recurso), sempre junto
-do Pop de Tinta. Borda colorida não contorna nada.
+Dry geometry: 4px on indicators and stickers, 7px on controls, rows and buttons, 10px on
+panels, 14px on windows and highlighted fields. Nothing above 14px. Pill (`999px`) only on
+status dots, switch thumbs and sound waves. Borders exist to separate app zones (1px `#3d301c`
+/ `#281f12`), for the editorial rules on paper (2–3px of solid ink) and as the 3px ink frame of
+a piece resting on the desk (video, feature card), always together with Pop Ink. A colored
+border never outlines anything.
 
-A inclinação é material do sistema: adesivos giram entre -3° e +2°. A marca usa um quadrado
-de latão inclinado a -6°, contorno e sombra sólida em tinta de latão, sem desfoque. A corneta
-acompanha a inclinação; o nome permanece reto. Em ícones exportados, a margem transparente
-preserva os cantos e a sombra. Sempre em peça pequena e sólida — texto corrido nunca gira.
+Tilt is part of the system's material: stickers rotate between -3° and +2°. The brand mark uses
+a brass square tilted -6°, with an outline and a solid shadow in brass ink, no blur. The horn
+follows the tilt; the name stays straight. In exported icons, the transparent margin preserves
+the corners and the shadow. Always on a small, solid piece — running text never rotates.
 
-**A Regra do Canto Seco.** Se o raio passou de 14px, o desenho saiu do mundo. Pílula é estado,
-não silhueta.
+**The Dry Corner Rule.** If the radius goes past 14px, the drawing has left the world. A pill is
+a state, not a silhouette.
 
 ## Components
 
 ### Buttons
 
-- **Shape:** retângulo de canto seco (7px), 70px de altura no dock do herói, 64px no CTA final,
-  44px e 4px de canto na versão compacta do header.
-- **Primary (download):** tomate `#ff5a36` com tinta `#2a1c00`, fonte Baloo, sombra Pop Creme
-  sobre o palco (Pop de Latão na versão compacta do header).
-- **Hover / Active:** hover clareia para `#ff7a55`; o clique **afunda** — `translate(4px, 4px)`
-  e a sombra vai a zero, em 90ms. É o mesmo gesto do botão do app.
-- **Play do vídeo:** quadrado de latão de canto 14px, borda de tinta de 3px, girado -6° como a
-  marca, sombra dura de tinta; endireita no hover e afunda no clique.
-- **Focus:** traço de latão de 3px com offset de 3px; sobre latão o traço vira tinta escura. Na
-  mesa, onde o latão some contra o papel, o traço é tomate.
+- **Shape:** dry-cornered rectangle (7px), 70px tall in the hero dock, 64px in the closing CTA,
+  44px with a 4px corner in the compact header version.
+- **Primary (download):** tomato `#ff5a36` with `#2a1c00` ink, Baloo font, Pop Cream shadow on
+  the stage (Pop Brass in the compact header version).
+- **Hover / Active:** hover lightens to `#ff7a55`; the click **sinks** — `translate(4px, 4px)`
+  and the shadow goes to zero, in 90ms. It is the same gesture as the app's button.
+- **Video play button:** brass square with a 14px corner, 3px ink border, rotated -6° like the
+  brand mark, hard ink shadow; it straightens on hover and sinks on click.
+- **Focus:** 3px brass outline with a 3px offset; on brass the outline turns dark ink. On the
+  desk, where brass disappears against the paper, the outline is tomato.
 
 ### Chips
 
-- **Adesivo (`.sticker`):** bloco de latão com tinta escura, caixa alta 0.72rem, sombra Pop de
-  Latão e rotação de -2.2°. A variante tomate gira +1.8° e mantém a tinta escura.
-- **Chip de estado (`.chip`):** bloco sólido pequeno; menta = testado/no ar, âmbar = pode
-  falhar, superfície alta = neutro. Texto sempre em tinta escura.
-- **Ladrilho de destino:** superfície com o glifo oficial da plataforma na cor da marca (44px,
-  canto 4px, sombra Pop Pequeno) e o nome em Baloo. TikTok, Instagram e X levam o mesmo adesivo
-  "experimental" que o app mostra neles, e a ressalva vem numa linha só, embaixo do paredão. A
-  página **não** classifica destinos por status interno de validação: nenhum selo de “testado”,
-  “pendente” ou “pode falhar” aparece sobre eles.
+- **Sticker (`.sticker`):** brass block with dark ink, 0.72rem uppercase, Pop Brass shadow and
+  a -2.2° rotation. The tomato variant rotates +1.8° and keeps the dark ink.
+- **State chip (`.chip`):** small solid block; mint = tested/live, amber = may fail, high
+  surface = neutral. Text always in dark ink.
+- **Destination tile:** surface with the platform's official glyph in the brand color (44px,
+  4px corner, Pop Small shadow) and the name in Baloo. TikTok, Instagram and X carry the same
+  "experimental" sticker the app shows on them, and the caveat comes in a single line below the
+  wall. The page does **not** classify destinations by internal validation status: no “tested”,
+  “pending” or “may fail” badge appears on them.
 
 ### Cards / Containers
 
-- **Corner Style:** 10px em painel e recorte, 14px em cartão, moldura do vídeo e painel de latão.
-- **Background:** `#1a130c` para painel escuro no papel, `#221a10` para linhas internas,
-  latão para o painel da "conta honesta".
-- **Shadow Strategy:** uma sombra dura por peça, cor conforme o fundo (ver Elevation).
-- **Border:** entre zonas de app (1px), como régua editorial no papel (2–3px) e como moldura de
-  tinta de 3px da peça pousada na mesa.
-- **Internal Padding:** 18–26px é a faixa recorrente.
+- **Corner Style:** 10px on panels and crops, 14px on cards, the video frame and the brass panel.
+- **Background:** `#1a130c` for a dark panel on paper, `#221a10` for inner rows, brass for the
+  "honest math" panel.
+- **Shadow Strategy:** one hard shadow per piece, colored according to the background (see
+  Elevation).
+- **Border:** between app zones (1px), as an editorial rule on paper (2–3px) and as the 3px ink
+  frame of a piece resting on the desk.
+- **Internal Padding:** 18–26px is the recurring range.
 
 ### Navigation
 
-Header colado no topo em `#0b0805` translúcido com fio `#281f12`. Links em Inter 650 creme
-fosco; no hover o texto vira creme e uma régua de latão de 3px cresce da esquerda. Abaixo de
-760px a navegação sai e sobra a ação compacta.
+Header sticky at the top in translucent `#0b0805` with a `#281f12` hairline. Links in Inter 650,
+muted cream; on hover the text turns cream and a 3px brass bar grows from the left. Below 760px
+the navigation goes away and only the compact action remains.
 
-### Signature: o vídeo na mesa
+### Signature: the video on the desk
 
-A peça central é o vídeo de apresentação da Corneta (o mesmo "papel sobre a mesa" dos anúncios),
-na versão do idioma da página. É um `<video>` nativo com controles e pôster — o quadro "seu PC →
-Corneta → Twitch, YouTube e Kick" — que toca sem JavaScript; com JavaScript entram a capa com o
-play de latão e a duração, e os atalhos "ver no vídeo" dos passos. Na capa, o pôster fica
-escurecido por um véu chapado de noite a 80%, sem desfoque, e o play pousa exatamente sobre o
-logo de latão do pôster, com a etiqueta da duração sobre a palavra "Corneta"; o véu some no
-play. Não há capítulos nem transcrição na página: a narração vem em legendas WebVTT no próprio
-player (desligadas por padrão), geradas dos tempos reais de cada fala. O vídeo não toca sozinho
-e só baixa no clique (`preload="none"`): AV1/Opus em WebM e, para quem não decodifica AV1,
-H.264/AAC em MP4 de 720p.
+The centerpiece is Corneta's intro video (the same "paper on the desk" as the ads), in the
+page's language version. It is a native `<video>` with controls and a poster — the "your PC →
+Corneta → Twitch, YouTube and Kick" frame — that plays without JavaScript; with JavaScript, the
+cover with the brass play button and the duration comes in, along with the steps' "Watch it"
+shortcuts. On the cover, the poster is darkened by a flat 80% night veil, with no blur, and the
+play button sits exactly on the poster's brass logo, with the duration tag over the word
+"Corneta"; the veil disappears on play. There are no chapters or transcript on the page: the
+narration comes as WebVTT captions in the player itself (off by default), generated from the
+real timing of each line. The video does not autoplay and only downloads on click
+(`preload="none"`): AV1/Opus in WebM and, for browsers that cannot decode AV1, H.264/AAC in 720p
+MP4.
 
-### Signature: recortes do app
+### Signature: app screen crops
 
-As telas que aparecem nos recursos são recortes das telas reais do app em 2×,
-tirados do modo demo de contribuidor, com os mesmos dados de exemplo do vídeo e rotulados como
-"telas do app com dados de exemplo". Ficam dentro dos cartões de papel do mosaico, em moldura de
-tinta de 2px e canto 10px, embaixo do título e da frase. Como a tela Qualidade só foi capturada em português, o recorte em inglês troca cada texto pelo
-do dicionário do próprio app, chave por chave. Dois cartões largos empilham peças. No relatório, a
-lista "Momentos de destaque (pra clipar)" pousa na borda direita da curva de audiência por
-plataforma, com Pop de Tinta, e as três exportações (capítulos do YouTube, CSV, EDL) ficam em
-chips embaixo da curva. No modo deck, que vem antes do relatório porque é o "durante" da live,
-duas telas do celular em pé (os botões e o chat com um aviso) ficam lado a lado. A do chat desce
-e encosta na outra, as duas com moldura de tinta de 5px, canto 14px e Pop de Tinta, para lerem
-como aparelho e não como recorte. O texto fica ao lado: título, frase, chips do que o celular faz
-e a ressalva da rede numa linha. Nunca se redesenha a interface do app em HTML para a página: quando o
-app muda, os recortes são refeitos.
+The screens shown in the features are crops of the real app screens at 2×, taken from the
+contributor demo mode, with the same sample data as the video and labeled "App screens with
+sample data." They sit inside the mosaic's paper cards, in a 2px ink frame with a 10px corner,
+below the title and the sentence. Since the Quality screen was only captured in Portuguese, the English crop replaces each string with
+the one from the app's own dictionary, key by key. Two wide cards stack pieces. In the report,
+the "Highlights (worth clipping)" list rests on the right edge of the per-platform audience
+curve, with Pop Ink, and the three exports (YouTube chapters, CSV, EDL) sit in chips below the
+curve. In Deck mode, which comes before the report because it is the "during" of the stream,
+two upright phone screens (the buttons, and the chat with a notice) sit side by side. The chat
+one sits lower and leans against the other, both with a 5px ink frame, a 14px corner and Pop
+Ink, so they read as a device and not as a crop. The text sits beside them: title, sentence,
+chips for what the phone does and the network caveat in one line. The app interface is never
+redrawn in HTML for the page: when the app changes, the crops are redone.
 
-### Listra de acento
+### Accent stripe
 
-Herdada do app (`.accent-l`): uma barra de latão de 4px na borda esquerda de um bloco de
-superfície mais funda. É o único lugar onde uma borda colorida grossa é permitida, e existe para
-destacar uma observação dentro de texto corrido (o callout das páginas legais). Fora dessa
-função, borda colorida grossa continua proibida.
+Inherited from the app (`.accent-l`): a 4px brass bar on the left edge of a block on a deeper
+surface. It is the only place where a thick colored border is allowed, and it exists to
+highlight a note within running text (the callout on the legal pages). Outside that role, a
+thick colored border remains forbidden.
 
-### Bloco de proteção
+### Safety net block
 
-A rede de proteção é o cartão alto do mosaico de recursos: título em Baloo, uma frase em Inter,
-o recorte da gaveta de proteções do app (com os interruptores como o app os mostra).
+The safety net is the tall card in the feature mosaic: title in Baloo, one sentence in Inter,
+and the crop of the app's Safety nets drawer (with the switches as the app shows them).
 
-**A Regra do Custo Visível.** Nenhum bloco de proteção fecha sem dizer o que ele cobra (atraso,
-carga, conflito com o OBS). Vender a rede sem o preço é o oposto do tom da marca.
+**The Visible Cost Rule.** No safety net block ends without saying what it costs (delay, load,
+conflict with OBS). Selling the net without the price is the opposite of the brand's tone.
 
 ### Motion
 
-Uma entrada orquestrada e nada mais: adesivo, título, pitch e vídeo sobem 16px com
-`cubic-bezier(0.16, 1, 0.3, 1)` em 500–720ms escalonados, partindo de um estado já visível
-(opacidade 0.2). Logo depois, o traço de marca-texto se desenha uma vez sob a segunda linha do
-título (720ms). O único movimento contínuo é o "grito" do mascote no CTA (2.4s); quem se mexe na
-página é o vídeo, e só quando a pessoa aperta o play. `prefers-reduced-motion` corta todos e faz
-os atalhos do vídeo pularem sem rolagem suave.
+One orchestrated entrance and nothing more: sticker, title, pitch and video rise 16px with
+`cubic-bezier(0.16, 1, 0.3, 1)` over staggered 500–720ms, starting from an already visible
+state (opacity 0.2). Right after, the highlighter stroke draws itself once under the second
+line of the title (720ms). The only continuous motion is the mascot's "shout" in the CTA
+(2.4s); what moves on the page is the video, and only when the person presses play.
+`prefers-reduced-motion` cuts all of them and makes the video shortcuts jump without smooth
+scrolling.
 
 ## Do's and Don'ts
 
 ### Do:
 
-- **Do** herdar tokens de `../src/index.css`: mudou no app, muda aqui.
-- **Do** usar sombra dura com offset e sem blur, com a cor escolhida pelo fundo.
-- **Do** manter o latão como marca/destaque e o tomate como única cor de ação.
-- **Do** mostrar o app trabalhando (o vídeo e os recortes das telas reais) em vez de ilustrar
-  conceito.
-- **Do** rotular as telas como dados de exemplo; a foto do vídeo já vem com o selo "imagem
-  ilustrativa".
-- **Do** mostrar banda e carga só pelo recorte da tela Qualidade do app (que calcula com
-  `src/lib/estimates.ts`), nunca com valores inventados.
-- **Do** manter a página utilizável sem JavaScript: o vídeo é um `<video>` nativo, e a capa e
-  os atalhos só melhoram o que já funciona.
-- **Do** dizer o custo de cada recurso na mesma peça que o vende.
-- **Do** usar os logos oficiais das plataformas nas cores reais, como o app faz.
-- **Do** alternar palco escuro e faixa de papel para dar ritmo à leitura.
+- **Do** inherit tokens from `../src/index.css`: if it changes in the app, it changes here.
+- **Do** use a hard shadow with an offset and no blur, with the color chosen by the background.
+- **Do** keep brass as brand/emphasis and tomato as the only action color.
+- **Do** show the app working (the video and the crops of the real screens) instead of
+  illustrating a concept.
+- **Do** label the screens as sample data; the photo in the video already carries the "imagem
+  ilustrativa" (illustrative image) seal.
+- **Do** show bandwidth and load only through the crop of the app's Quality screen (which
+  computes with `src/lib/estimates.ts`), never with made-up values.
+- **Do** keep the page usable without JavaScript: the video is a native `<video>`, and the cover
+  and shortcuts only enhance what already works.
+- **Do** state the cost of each feature in the same piece that sells it.
+- **Do** use the platforms' official logos in their real colors, as the app does.
+- **Do** alternate the dark stage and paper bands to give the reading a rhythm.
 
 ### Don't:
 
-- **Don't** usar azul, gradiente, glow, vidro ou sombra difusa decorativa.
-- **Don't** passar de 14px de raio nem usar pílula como silhueta de botão, chip ou painel.
-- **Don't** transformar a página em grade de cards iguais de ícone + título + texto.
-- **Don't** girar texto corrido; a inclinação é só para adesivo e bloco sólido pequeno.
-- **Don't** pintar de tomate o play do vídeo ou um enfeite: tomate é baixar.
-- **Don't** redesenhar telas do app em HTML para a página; use recortes das telas reais.
-- **Don't** escrever texto branco sobre latão, menta ou âmbar.
-- **Don't** inventar métrica, depoimento ou logo de cliente: não existem.
-- **Don't** mostrar um recurso desligado por feature flag (a “Mesa” de co-stream está fora).
-- **Don't** organizar a página por status interno de QA (“validado”, “pendente”): isso é
-  papelada do projeto. A ressalva vai junto do item, na linguagem de quem usa.
-- **Don't** usar monoespaçado fora de valor copiável.
+- **Don't** use blue, gradients, glow, glass or decorative diffuse shadows.
+- **Don't** go past a 14px radius or use a pill as the silhouette of a button, chip or panel.
+- **Don't** turn the page into a grid of identical icon + title + text cards.
+- **Don't** rotate running text; tilt is only for stickers and small solid blocks.
+- **Don't** paint the video's play button or an ornament tomato: tomato means download.
+- **Don't** redraw app screens in HTML for the page; use crops of the real screens.
+- **Don't** put white text on brass, mint or amber.
+- **Don't** invent metrics, testimonials or customer logos: there are none.
+- **Don't** show a feature that is turned off by a feature flag (the co-stream “Table” is out).
+- **Don't** organize the page by internal QA status (“validated”, “pending”): that is project
+  paperwork. The caveat goes with the item, in the words of the person using it.
+- **Don't** use monospace outside copyable values.

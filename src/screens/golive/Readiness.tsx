@@ -330,7 +330,7 @@ export function ReadinessDrawer({
           variant="subtle"
           className="w-full"
           onClick={() => {
-            setSettingsTab("seguranca");
+            setSettingsTab("safety");
             go("settings");
           }}
         >

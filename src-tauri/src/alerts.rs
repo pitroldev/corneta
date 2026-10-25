@@ -322,8 +322,8 @@ where
                 "alerts: handshake rejected (HTTP {}) — invalid or expired token",
                 resp.status().as_u16()
             );
-            // Legacy IPC status value; changing it requires coordinating frontend consumers.
-            alert_status(&app, source, "token inválido");
+            // IPC status value; the frontend maps it to a localized label (ALERT_STATUS).
+            alert_status(&app, source, "invalid-token");
             return ConnResult::AuthFailed;
         }
         Err(e) => {

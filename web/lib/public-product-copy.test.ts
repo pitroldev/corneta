@@ -99,15 +99,11 @@ describe("public product claims", () => {
 
   it("distinguishes RTMP input from the OBS-only integration", () => {
     const product = source("../PRODUCT.md");
-    expect(product).not.toContain("Requer OBS para produzir a transmissão");
-    expect(product).toContain(
-      "Requer uma fonte de vídeo/áudio compatível com RTMP",
-    );
-    expect(product).toContain("O OBS é recomendado, mas não obrigatório");
-    expect(product).toContain("A configuração automática");
-    expect(product).toContain(
-      "as estatísticas integradas são específicos do OBS",
-    );
+    expect(product).not.toContain("Requires OBS to produce the stream");
+    expect(product).toContain("Requires an RTMP-compatible video/audio source");
+    expect(product).toContain("OBS is recommended but not required");
+    expect(product).toContain("Automatic setup");
+    expect(product).toContain("the built-in stats are specific to OBS");
     const ptTerms = source(
       "../app/(legal)/[locale]/legal/_content/terms.pt.tsx",
     );

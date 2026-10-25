@@ -29,13 +29,13 @@
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
       "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
-      "reason": "A tela Ao vivo só ganhou o aviso de tela preta e a dica do atalho no Marcar momento; o que o artigo mostra sobre plataforma desconectada não mudou."
+      "reason": "The Live screen only gained the black screen warning and the shortcut hint on Mark a moment; what the article shows about a disconnected platform did not change."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
@@ -53,31 +53,31 @@
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/compositor.rs",
       "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
-      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+      "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
       "sourceBlob": "94f34a3787c14d6a8da06f836da7d83dbe38c23c",
-      "reason": "Só saíram os campos do Guardião da configuração; nada do que o artigo descreve mudou."
+      "reason": "Only the privacy guard fields left the configuration; nothing the article describes changed."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
       "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
-      "reason": "Só saíram os padrões do Guardião; nada do que o artigo descreve mudou."
+      "reason": "Only the privacy guard defaults were removed; nothing the article describes changed."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
+      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -89,13 +89,13 @@
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
       "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
-      "reason": "Só passou a repassar mensagens e alertas para o celular pareado no modo deck; a configuração do chat descrita no artigo não mudou."
+      "reason": "It only started forwarding messages and alerts to the phone paired in deck mode; the chat setup described in the article did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
       "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
-      "reason": "O BORA AO VIVO só deixou de mandar guardian_enabled na telemetria; o fluxo que o artigo descreve não mudou."
+      "reason": "GO LIVE only stopped sending guardian_enabled in telemetry; the flow the article describes did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
@@ -107,73 +107,73 @@
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
       "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
-      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
+      "reason": "It only gained the deck mode fields (port, paired phones, keys and combos); nothing the article describes changed."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "reason": "engine.rs only gained the black screen alert field in the live state; metrics, copy, re-encoding and reconnection did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
+      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "reason": "It only gained the deck mode commands and saving settings from the phone; nothing the article describes changed."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
       "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
+      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
       "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
-      "reason": "Só saíram os textos do Guardião; os textos que o artigo cita não mudaram."
+      "reason": "Only the privacy guard strings were removed; the strings the article cites did not change."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src-tauri/src/compositor.rs",
       "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
-      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+      "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
       "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
-      "reason": "Só ganhou o cartão do modo deck em Geral; a configuração do JÁ VOLTO descrita no artigo não mudou."
+      "reason": "It only gained the deck mode card under General; the BE RIGHT BACK setup described in the article did not change."
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
       "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
+      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
       "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
-      "reason": "Só saiu o status do Guardião do retrato do motor; os estados que o artigo explica não mudaram."
+      "reason": "Only the privacy guard status left the engine snapshot; the states the article explains did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -191,13 +191,13 @@
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
       "source": "src/lib/platforms.ts",
       "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
-      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+      "reason": "The presets moved to src/platforms/<id>/destination.json with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/multistream/local-vs-cloud.mdx",
@@ -215,13 +215,13 @@
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
       "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
-      "reason": "A tela Ao vivo só ganhou o aviso de tela preta e a dica do atalho no Marcar momento; o que o artigo mostra sobre plataforma desconectada não mudou."
+      "reason": "The Live screen only gained the black screen warning and the shortcut hint on Mark a moment; what the article shows about a disconnected platform did not change."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -239,97 +239,97 @@
       "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
       "source": "src/lib/report.ts",
       "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
-      "reason": "O replay passou a guardar emotes, selos e marcas do chat e os novos tipos de alerta ganharam rótulo; o que o artigo descreve continua correto."
+      "reason": "The replay now stores chat emotes, badges and marks, and the new alert kinds got labels; what the article describes is still correct."
     },
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
+      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/compositor.rs",
       "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
-      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+      "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
       "sourceBlob": "c291d26e80c13ce5f4fbd2490521418eec48af47",
-      "reason": "Os processos do splicer entram num job object e o vigia mata a saída travada pelo handle, sem taskkill; o JÁ VOLTO, o que a proteção cobre e o teste citados não mudaram."
+      "reason": "The splicer processes join a job object and the watchdog kills a stuck output by handle, without taskkill; BE RIGHT BACK, what the protection covers and the cited test did not change."
     },
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
+      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
       "sourceBlob": "94f34a3787c14d6a8da06f836da7d83dbe38c23c",
-      "reason": "Só saíram os campos do Guardião da configuração; nada do que o artigo descreve mudou."
+      "reason": "Only the privacy guard fields left the configuration; nothing the article describes changed."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
       "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
-      "reason": "Só saíram os padrões do Guardião; nada do que o artigo descreve mudou."
+      "reason": "Only the privacy guard defaults were removed; nothing the article describes changed."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
+      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/streaming-glossary.mdx",
       "source": "src/lib/platforms.ts",
       "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
-      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+      "reason": "The presets moved to src/platforms/<id>/destination.json with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/platforms.ts",
       "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
-      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+      "reason": "The presets moved to src/platforms/<id>/destination.json with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/screens/EncodingScreen.tsx",
       "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
-      "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda, e uma variável foi renomeada; modos, padrões de bitrate e cards citados não mudaram."
+      "reason": "The mode cards and load bar now use m, with the animation loaded on demand, and a variable was renamed; the cited modes, bitrate defaults and cards did not change."
     },
     {
       "article": "pt-BR/guides/quality/why-stream-lags.mdx",
@@ -341,37 +341,37 @@
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src-tauri/src/overlay.rs",
       "sourceBlob": "09a6b7e4b0b1142fe8595a14892f91b4563061d0",
-      "reason": "O overlay de chat passou a receber as exclusões e os fixados; a configuração descrita no artigo não mudou."
+      "reason": "The chat overlay started receiving deletions and pinned messages; the setup described in the article did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
+      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
       "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
-      "reason": "Só passou a repassar mensagens e alertas para o celular pareado no modo deck; a configuração do chat descrita no artigo não mudou."
+      "reason": "It only started forwarding messages and alerts to the phone paired in deck mode; the chat setup described in the article did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/components/ChatFeed.tsx",
       "sourceBlob": "8b1c2f8a0b6f29bc4f8c733d1890a2db4ca65378",
-      "reason": "O feed passou a mostrar GIFs, respostas, destaques e linhas de aviso das plataformas; o que o artigo descreve continua correto, mas vale revisar para incluir os recursos novos."
+      "reason": "The feed started showing GIFs, replies, highlights and platform notice lines; what the article describes is still correct, but it is worth revising to include the new features."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "9d8d840a3c2d7e9d972686b3b22efd2016369dad",
-      "reason": "A tela de chat ganhou fixados, enquetes, modos do chat e limite de caracteres por plataforma; os passos e cuidados do artigo continuam corretos, mas vale revisar para citar os recursos novos."
+      "reason": "The chat screen gained pinned messages, polls, chat modes and per-platform character limits; the article's steps and cautions are still correct, but it is worth revising to mention the new features."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
       "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
-      "reason": "O BORA AO VIVO só deixou de mandar guardian_enabled na telemetria; o fluxo que o artigo descreve não mudou."
+      "reason": "GO LIVE only stopped sending guardian_enabled in telemetry; the flow the article describes did not change."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -383,109 +383,109 @@
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
       "sourceBlob": "b82e3122fe5e243eeb1f4340053de761bd7c4950",
-      "reason": "O destino Personalizado passou a ser reconhecido por capacidade do catálogo; a tela e os passos do artigo não mudaram."
+      "reason": "The Custom RTMP destination is now recognized by a catalog capability; the screen and the article's steps did not change."
     },
     {
       "article": "pt-BR/help/platforms/streaming-keys-and-urls.mdx",
       "source": "src/lib/platforms.ts",
       "sourceBlob": "15437bf04222431a0f60e26d13f0c6d057a00c55",
-      "reason": "Os presets foram para src/platforms/<id>/destination.json com os mesmos valores; o artigo continua correto."
+      "reason": "The presets moved to src/platforms/<id>/destination.json with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
       "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
-      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
+      "reason": "It only gained the deck mode fields (port, paired phones, keys and combos); nothing the article describes changed."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "reason": "engine.rs only gained the black screen alert field in the live state; metrics, copy, re-encoding and reconnection did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "Os cálculos de upload e de peso passaram a ler os presets do catálogo por pasta, com os mesmos valores; o artigo continua correto."
+      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
       "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
-      "reason": "Os cards de modo e a barra de carga passam a usar m, com a animação carregada sob demanda; modos, ajuste fino, cards e métricas ao vivo citados não mudaram."
+      "reason": "The mode cards and load bar now use m, with the animation loaded on demand; the cited modes, fine-tuning, cards and live metrics did not change."
     },
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
-      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
+      "reason": "commands.rs only lost the privacy guard activation; with BE RIGHT BACK on, the no-re-encode path stays the same and nothing the article describes changed."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "reason": "It only gained the deck mode commands and saving settings from the phone; nothing the article describes changed."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
       "source": "src/lib/report.ts",
       "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
-      "reason": "O replay passou a guardar emotes, selos e marcas do chat e os novos tipos de alerta ganharam rótulo; o que o artigo descreve continua correto."
+      "reason": "The replay now stores chat emotes, badges and marks, and the new alert kinds got labels; what the article describes is still correct."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
       "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
+      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/components/ObsWizard.tsx",
       "sourceBlob": "e16359a0f9136cd3da1027c6e93796df998dabf5",
-      "reason": "Depois de configurado, o assistente pode propor ajustar o vídeo do OBS, com Desfazer; ativar o WebSocket, Configura pra mim e o estado configurado continuam como o artigo descreve."
+      "reason": "Once set up, the wizard can offer to adjust the OBS video, with Undo; enabling the WebSocket, Set it up for me and the configured state remain as the article describes."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
       "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
-      "reason": "Só saíram os textos do Guardião; os textos que o artigo cita não mudaram."
+      "reason": "Only the privacy guard strings were removed; the strings the article cites did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src-tauri/src/compositor.rs",
       "sourceBlob": "c03d3daaeed9f2c8132864b33976d828e054db18",
-      "reason": "O compositor.rs só passou a compartilhar o caminho do FFmpeg com o alerta de tela preta; a tela JÁ VOLTO e a recuperação do sinal funcionam igual."
+      "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
       "sourceBlob": "34e49f5f20332d5a7721fe87dba4fcf028c1f7dd",
-      "reason": "Só ganhou o cartão do modo deck em Geral; a configuração do JÁ VOLTO descrita no artigo não mudou."
+      "reason": "It only gained the deck mode card under General; the BE RIGHT BACK setup described in the article did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
       "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "Ganhou uma conexão separada com o obs-websocket, usada só pelo modo deck para cenas e microfone; a conexão do app com o OBS e a configuração automática não mudaram."
+      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
       "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
+      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
       "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
-      "reason": "Só saiu o status do Guardião do retrato do motor; os estados que o artigo explica não mudaram."
+      "reason": "Only the privacy guard status left the engine snapshot; the states the article explains did not change."
     }
   ]
 }

@@ -1,6 +1,6 @@
 # Source language and comments
 
-- Use English for source identifiers, comments, docstrings, test descriptions, assertion diagnostics, logs, build output, and developer-facing errors.
+- Use English for documentation, templates, source identifiers, comments, docstrings, test descriptions, assertion diagnostics, logs, build output, and developer-facing errors.
 - Keep localized interface copy in its existing translation/content layer. Preserve multilingual test inputs, protocol values, stored data, and proper product names; these are not developer prose. Do not change a public or persisted contract just to translate its spelling.
 - Keep a comment only when it explains a non-obvious constraint, safety requirement, compatibility decision, or reason the implementation must work this way. Keep it short and next to the relevant code.
 - Remove comments that narrate statements, repeat names/types, decorate sections, describe old implementations, or teach general concepts. Put architecture, setup instructions, workflows, and product explanations in maintained documentation instead of source comments. Do not create historical cleanup reports.

@@ -371,7 +371,7 @@ export function ChatScreen() {
   const isOwnMessage = (m: ChatMessage) => {
     const author = m.author.toLowerCase();
     return (
-      m.author === "você" ||
+      m.own ||
       CHAT_PROVIDERS.some(
         (p) =>
           p.echoesOwnMessages &&

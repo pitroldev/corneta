@@ -201,11 +201,11 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("generates deterministically, replaces registered files, and cleans only its own files", () => {
     const { root, run } = isolatedSeeder();
-    const first = run("--scenario", "live-perfeita");
+    const first = run("--scenario", "flawless-stream");
     expect(first.status, first.stderr).toBe(0);
     const manifestPath = join(root, ".report-fixtures.json");
     const before = JSON.parse(readFileSync(manifestPath, "utf8"));
-    const second = run("--scenario", "live-perfeita");
+    const second = run("--scenario", "flawless-stream");
     expect(second.status, second.stderr).toBe(0);
     const after = JSON.parse(readFileSync(manifestPath, "utf8"));
     expect(after.generatedHashes).toEqual(before.generatedHashes);
@@ -220,7 +220,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("detects a chat collision before removing the prior generation or creating any report", () => {
     const { root, run } = isolatedSeeder();
-    expect(run("--scenario", "live-perfeita").status).toBe(0);
+    expect(run("--scenario", "flawless-stream").status).toBe(0);
     const manifestPath = join(root, ".report-fixtures.json");
     const before = readFileSync(manifestPath, "utf8");
     const id = String(
@@ -241,7 +241,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("preserves installed reports when video generation fails in staging", () => {
     const { workspace, scripts, root, run } = isolatedSeeder();
-    expect(run("--scenario", "live-perfeita").status).toBe(0);
+    expect(run("--scenario", "flawless-stream").status).toBe(0);
     const manifestPath = join(root, ".report-fixtures.json");
     const before = readFileSync(manifestPath, "utf8");
     const binaries = join(workspace, "src-tauri", "binaries");
@@ -259,7 +259,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
         'function createVideo(file, seconds, frequency) { throw new Error("SIMULATED_VIDEO_FAILURE");',
       ),
     );
-    const result = run("--scenario", "gravacao-completa", "--video");
+    const result = run("--scenario", "complete-recording", "--video");
     expect(result.status).not.toBe(0);
     expect(result.stderr).toContain("SIMULATED_VIDEO_FAILURE");
     expect(readFileSync(manifestPath, "utf8")).toBe(before);
@@ -274,7 +274,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("refuses a dangling restore destination before deleting registered reports", () => {
     const { root, run } = isolatedSeeder();
-    expect(run("--scenario", "live-perfeita").status).toBe(0);
+    expect(run("--scenario", "flawless-stream").status).toBe(0);
     const manifest = JSON.parse(
       readFileSync(join(root, ".report-fixtures.json"), "utf8"),
     );
@@ -299,7 +299,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("uses only explicitly supplied temporary APPDATA for --contributor", () => {
     const { root, appData, run } = isolatedSeeder();
-    const result = run("--contributor", "--scenario", "live-perfeita");
+    const result = run("--contributor", "--scenario", "flawless-stream");
     expect(result.status, result.stderr).toBe(0);
     const contributor = join(appData, "br.com.pitroldev.corneta.contributor");
     expect(existsSync(join(contributor, ".report-fixtures.json"))).toBe(true);
@@ -310,7 +310,7 @@ describe("seeder integration in an isolated temporary workspace", () => {
 
   it("restores missing backup files but preserves current unrelated files", () => {
     const { root, run } = isolatedSeeder();
-    expect(run("--scenario", "live-perfeita").status).toBe(0);
+    expect(run("--scenario", "flawless-stream").status).toBe(0);
     const manifest = JSON.parse(
       readFileSync(join(root, ".report-fixtures.json"), "utf8"),
     );

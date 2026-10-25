@@ -445,8 +445,8 @@ async fn encoder_environment_signature(app: &AppHandle) -> String {
                         .next()
                         .map(str::to_owned)
                 })
-                .unwrap_or_else(|| "ffmpeg-desconhecido".into()),
-            Err(_) => "ffmpeg-indisponível".into(),
+                .unwrap_or_else(|| "ffmpeg-unknown".into()),
+            Err(_) => "ffmpeg-unavailable".into(),
         }
     };
     let (ffmpeg, gpu) = tokio::join!(

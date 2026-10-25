@@ -1,2 +1,2 @@
-# Os binários dos sidecars (ffmpeg / mediamtx) NÃO são versionados.
-# Rode scripts/fetch-binaries.ps1 para baixá-los com o sufixo do target-triple.
+# Sidecar binaries (ffmpeg / mediamtx) are NOT versioned.
+# Run scripts/fetch-binaries.ps1 to download them with the target-triple suffix.

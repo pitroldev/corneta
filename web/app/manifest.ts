@@ -5,12 +5,12 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Corneta",
     short_name: "Corneta",
     description:
-      "Multistream local para streamers, com saídas independentes e controle no seu PC.",
+      "Local multistream for streamers, with independent outputs and control on your PC.",
     start_url: "/",
     display: "standalone",
     background_color: "#100b07",
     theme_color: "#100b07",
-    lang: "pt-BR",
+    lang: "en",
     icons: [{ src: "/icon.svg", sizes: "any", type: "image/svg+xml" }],
   };
 }

@@ -18,7 +18,6 @@ impl Locale {
     #[cfg(test)]
     pub const ALL: [Locale; 2] = [Locale::PtBr, Locale::En];
 
-    #[cfg(test)]
     pub fn tag(self) -> &'static str {
         match self {
             Locale::PtBr => "pt-BR",

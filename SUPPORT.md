@@ -1,15 +1,15 @@
-# Suporte
+# Support
 
-Corneta é um app desktop para Windows x64. Português e inglês são aceitos. O suporte é comunitário, sem SLA ou garantia de prazo. Para transmitir, use os instaladores de release; reserve builds de contribuição para desenvolvimento e testes.
+Corneta is a desktop app for Windows x64. Portuguese and English are accepted. Support is community-based, with no SLA or guaranteed response time. To stream, use the release installers; keep contributor builds for development and testing.
 
-- Dúvidas de uso: comece pelo [README](README.md), pela [documentação](docs/README.md) e pela ajuda do [site oficial](https://www.corneta.live).
-- Bug reproduzível: use o formulário de bug nas [issues](https://github.com/pitroldev/corneta/issues).
-- Proposta: descreva o objetivo e o problema no formulário de melhoria antes de implementar algo grande.
-- Vulnerabilidade, token exposto ou dados pessoais: siga [SECURITY.md](SECURITY.md), nunca uma issue pública.
-- Conflito ou conduta inadequada: consulte [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
+- Usage questions: start with the [README](README.md), the [documentation](docs/README.md) and the help on the [official website](https://www.corneta.live).
+- Reproducible bug: use the bug form in [issues](https://github.com/pitroldev/corneta/issues).
+- Proposal: describe the goal and the problem in the enhancement form before implementing anything large.
+- Vulnerability, exposed token or personal data: follow [SECURITY.md](SECURITY.md), never a public issue.
+- Conflict or inappropriate conduct: see [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md).
 
-Informe versão/commit, Windows, OBS e modo de transmissão. GPU/driver importam quando o problema envolve vídeo. Envie passos mínimos e, se necessário, um recorte sanitizado. Não envie stream keys, tokens, URLs com credenciais, chat privado, cofre, relatório completo ou vídeo de terceiros. Você pode reproduzir com [fixtures descartáveis](docs/RELATORIOS-FICTICIOS.md).
+Include version/commit, Windows, OBS and streaming mode. GPU/driver matter when the problem involves video. Send minimal steps and, if needed, a sanitized excerpt. Do not send stream keys, tokens, URLs with credentials, private chat, the vault, a full report or third-party video. You can reproduce with [disposable fixtures](docs/SYNTHETIC-REPORTS.md).
 
-macOS, Linux, ARM e distribuições próprias não estão certificados. Problemas de quota, permissão ou indisponibilidade do provedor podem precisar de atendimento da própria plataforma. Não desative antivírus/firewall para contornar erros; reporte a mensagem sanitizada.
+macOS, Linux, ARM and self-built distributions are not certified. Quota, permission or availability problems on the provider side may need support from the platform itself. Do not disable your antivirus/firewall to work around errors; report the sanitized message.
 
-O mantenedor pode agrupar duplicatas, solicitar informação e encerrar relatos que não permitam investigação, preservando a possibilidade de reabrir com novos dados. Não há serviço comercial de atendimento implícito na licença MIT.
+The maintainer may group duplicates, ask for information and close reports that cannot be investigated, while keeping the option to reopen them with new data. The MIT license does not imply any commercial support service.

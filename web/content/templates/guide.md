@@ -1,15 +1,16 @@
 # Template: guide
 
-Crie `{locale}/guides/{english-category}/{english-slug}.mdx` com o conteúdo do
-bloco YAML abaixo, sem as cercas de código, começando por `---`. Escreva o corpo
-depois do segundo `---`; não copie o título e as instruções deste template.
+Create `{locale}/guides/{english-category}/{english-slug}.mdx` with the content
+of the YAML block below, without the code fences, starting at `---`. Write the
+body after the second `---`; do not copy the title and the instructions of this
+template.
 
 ```yaml
 ---
 contentId: guide_change_me
-title: Título localizado que responde à consulta
-description: Descrição factual e única entre 40 e 180 caracteres.
-summary: Resposta direta em duas a quatro frases.
+title: Localized title that answers the query
+description: Unique, factual description of 40 to 180 characters.
+summary: Direct answer in two to four sentences.
 locale: pt-BR
 collection: guides
 kind: guide
@@ -23,29 +24,35 @@ productVersion: 0.6.0
 testedWith: []
 reviewIntervalDays: 90
 experimental: false
-primaryQuery: consulta principal localizada
+primaryQuery: localized main query
 related: []
 sources: []
 images: []
 ---
 ```
 
-As datas e versões são exemplos. Antes de publicar, substitua-as por evidência
-real e preencha `publishedAt`, `author` e `reviewedBy`, seguindo o
-[contrato de autoria](../README.md#identidade-e-autoria). Não atribua uma revisão
-antes que ela aconteça.
+The site publishes every article in `pt-BR` and `en`. Create the file once per
+locale, under `pt-BR/` with `locale: pt-BR` and under `en/` with `locale: en`,
+keeping the same collection, category and slug, and add the same
+`translationKey` (the slug) to both. Each file needs its own `contentId`; the
+`en` one appends `_en`.
 
-Ordem do corpo:
+The dates and versions are examples. Before publishing, replace them with real
+evidence and fill in `publishedAt`, `author` and `reviewedBy`, following the
+[authorship contract](../README.md#identity-and-authorship). Do not attribute a
+review before it happens.
 
-1. resposta direta e cenário em que ela se aplica;
-2. versão, ambiente e método de teste;
-3. decisão, cálculo ou procedimento reproduzível;
-4. evidência própria e fontes primárias próximas da afirmação;
-5. limites, inclusive quando a Corneta não é a melhor opção;
-6. próximo passo e link relacionado contextual.
+Body order:
 
-Use H2 e H3; o template da rota cria o H1.
+1. direct answer and the scenario where it applies;
+2. version, environment and test method;
+3. reproducible decision, calculation or procedure;
+4. own evidence and primary sources next to the claim;
+5. limits, including when Corneta is not the best option;
+6. next step and a contextual related link.
 
-Para uma imagem inline, declare-a em `frontmatter.images` e use uma única vez:
-`<ContentImage baseName="english-base-name" />`. Não use sintaxe Markdown ou
+Use H2 and H3; the route template creates the H1.
+
+For an inline image, declare it in `frontmatter.images` and use it exactly once:
+`<ContentImage baseName="english-base-name" />`. Do not use Markdown syntax or
 `<img>`.

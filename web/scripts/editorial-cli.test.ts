@@ -170,7 +170,7 @@ describe("executable editorial instructions", () => {
   );
 
   it.each([
-    ["docs/RUNBOOK-MANUTENCAO-EDITORIAL.md", 5],
+    ["docs/EDITORIAL-MAINTENANCE.md", 5],
     ["web/content/README.md", 1],
   ])("validates arguments copied from %s", (file, count) => {
     const commands = editorialCommands(source(file as string));

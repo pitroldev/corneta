@@ -72,7 +72,7 @@ describe("pt/en dictionaries", () => {
       .map(([key]) => key);
     expect(leaked).toEqual([]);
   });
-  // Reject internal design-system vocabulary in user-facing copy; see docs/TOM-DE-VOZ.md.
+  // Reject internal design-system vocabulary in user-facing copy; see docs/VOICE-AND-TONE.md.
   it("do not expose internal vocabulary in user-facing copy", () => {
     const INTERNAL_VOCABULARY =
       /\b(lat[ãa]o|breu|compositor|splicer|bomba|slate|ndjson|schemaVersion|halftone)\b/i;

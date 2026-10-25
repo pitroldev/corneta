@@ -49,8 +49,10 @@ struct Ctx {
     shutdown: watch::Receiver<bool>,
 }
 
-async fn studio_page() -> Html<&'static str> {
-    Html(STUDIO_HTML)
+/// Guests see this page in OBS, so it follows the app's language like the overlays.
+async fn studio_page() -> Html<String> {
+    let lang = format!("<html lang=\"{}\">", crate::i18n::locale().tag());
+    Html(STUDIO_HTML.replacen("<html lang=\"pt-BR\">", &lang, 1))
 }
 
 async fn ws_handler(ws: WebSocketUpgrade, State(ctx): State<Ctx>) -> impl IntoResponse {

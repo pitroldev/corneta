@@ -69,6 +69,7 @@ impl ChatProvider for Youtube {
                     platform: "youtube".into(),
                     source: out.label.to_string(),
                     author: Msg::ChatSelfAuthor.now(),
+                    own: true,
                     author_id: None,
                     native_id: None,
                     color: Some("#ffb323".into()),

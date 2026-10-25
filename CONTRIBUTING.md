@@ -1,52 +1,52 @@
-# Como contribuir com a Corneta
+# How to contribute to Corneta
 
-Contribuições pequenas, correções de documentação e relatos reproduzíveis são bem-vindos. Issues, discussões e documentação podem ser escritas em português ou inglês; **o código é sempre em inglês**. A revisão das contribuições segue a disponibilidade dos mantenedores, sem promessa de prazo ou suporte contínuo.
+Small contributions, documentation fixes and reproducible reports are welcome. Issues and discussions can be written in English or Portuguese; **code, comments, tests and documentation are always in English**. Contributions are reviewed as maintainers have time, with no promised turnaround or ongoing support.
 
-## Primeiro passo
+## First step
 
-Siga o [README](README.md) e o [guia de desenvolvimento](docs/DESENVOLVIMENTO.md). Para UI e lógica de relatórios, comece pela demonstração; não precisa instalar OBS/Rust nem pedir credenciais ao mantenedor.
+Follow the [README](README.md) and the [development guide](docs/DEVELOPMENT.md). For UI and report logic, start with the demo; you don't need to install OBS/Rust or ask the maintainer for credentials.
 
 ```sh
 pnpm install --frozen-lockfile
 pnpm contrib:demo
 ```
 
-Antes do PR:
+Before the PR:
 
 ```sh
 pnpm contrib:check
 ```
 
-Use um clone limpo para essa validação. Não copie seu `.env`, cofre, configuração pessoal, banco de relatórios ou chave do updater para o projeto de teste. Não teste a contribuição durante sua live de produção.
+Use a clean clone for this validation. Do not copy your `.env`, vault, personal settings, report database or updater key into the test project. Do not test the contribution during your production stream.
 
-## Idioma e comentários no código
+## Language and code comments
 
-Use inglês nos identificadores, comentários, docstrings, descrições de testes, mensagens de asserção, logs e diagnósticos das ferramentas. Textos da interface continuam nas traduções correspondentes; entradas multilíngues de testes, nomes próprios e contratos de integração ou persistência não devem ser alterados só para traduzir sua grafia.
+Use English for identifiers, comments, docstrings, test descriptions, assertion messages, logs and tool diagnostics. Interface text stays in the corresponding translations; multilingual test inputs, proper names and integration or persistence contracts must not be changed just to translate their spelling.
 
-Mantenha comentários curtos apenas para explicar uma restrição não óbvia, um risco, uma decisão de compatibilidade ou o motivo de uma implementação. Remova narração do código, separadores decorativos, histórico de mudanças e repetição de nomes ou tipos. Arquitetura, tutoriais e instruções de uso pertencem à documentação. Preserve avisos de licença, diretivas de ferramentas, justificativas de segurança e contratos úteis de APIs públicas. Essas regras também estão em [AGENTS.md](AGENTS.md).
+Keep comments short and only to explain a non-obvious constraint, a risk, a compatibility decision or the reason for an implementation. Remove code narration, decorative separators, change history and repeated names or types. Architecture, tutorials and usage instructions belong in the documentation. Preserve license notices, tool directives, security justifications and useful public API contracts. These rules are also in [AGENTS.md](AGENTS.md).
 
-`pnpm source:check` verifica padrões conhecidos de português técnico e comentários decorativos em JS/TS, Rust, CSS e HTML, sem executar as fontes. A mesma regra JS/TS integra o ESLint do app e do site; o check completo também roda no CI por `scripts:check`. Textos localizados e fixtures não são tratados como prosa técnica. A detecção é heurística, não prova que todo texto esteja em inglês ou que todo comentário seja útil; comentários, formatos não cobertos e mensagens que circulam entre funções ainda precisam de revisão humana. Logs devem usar diagnósticos em inglês ou códigos estáveis, separados da tradução exibida ao usuário; não altere mensagens externas do sistema operacional ou de provedores só para mudar o idioma.
+`pnpm source:check` checks known patterns of technical Portuguese and decorative comments in JS/TS, Rust, CSS and HTML, without running the sources. The same JS/TS rule is part of the app's and the site's ESLint; the full check also runs in CI through `scripts:check`. Localized text and fixtures are not treated as technical prose. Detection is heuristic: it does not prove that all text is in English or that every comment is useful; comments, uncovered formats and messages passed between functions still need human review. Logs must use English diagnostics or stable codes, kept separate from the translation shown to the user; do not change external messages from the operating system or providers just to change their language.
 
-## Escolha uma mudança delimitada
+## Pick a well-scoped change
 
-Para bug, descreva resultado esperado, resultado observado e passos mínimos. Para uma feature grande, discuta primeiro em uma issue: implementação pronta não garante que a mudança será aceita. Mantenha refatoração, normalização de arquivos e alteração de comportamento em PRs separados quando possível.
+For a bug, describe the expected result, the observed result and minimal steps. For a large feature, discuss it in an issue first: a finished implementation does not guarantee the change will be accepted. Keep refactoring, file normalization and behavior changes in separate PRs when possible.
 
-Inclua versão/commit, Windows, OBS, GPU/driver e modo de transmissão quando forem relevantes. Use dados fictícios ou exemplos mínimos sanitizados; não anexe logs/NDJSON/vídeos pessoais indiscriminadamente. Suspeita de vulnerabilidade vai para o [canal privado](SECURITY.md), não para uma issue pública.
+Include version/commit, Windows, OBS, GPU/driver and streaming mode when they are relevant. Use made-up data or minimal sanitized examples; do not attach personal logs/NDJSON/videos indiscriminately. A suspected vulnerability goes to the [private channel](SECURITY.md), not to a public issue.
 
-## Onde trabalhar
+## Where to work
 
-| Área                              | Código                                                       | Validação principal                                           |
-| --------------------------------- | ------------------------------------------------------------ | ------------------------------------------------------------- |
-| UI e design system                | `src/components/`, `src/screens/`                            | lint, tipos, testes e demonstração                            |
-| Relatórios e chat no replay       | `src/screens/reports/`, `src/lib/report*`, `src/lib/replay*` | fixtures, testes de relógio/paginação e smoke de relatórios   |
-| Processamento e integração nativa | `src-tauri/src/`                                             | rustfmt, Clippy, testes Rust; testes reais quando necessários |
-| Site e API                        | `web/app/`, `web/lib/`                                       | lint/tipos, build e testes das rotas/contratos                |
-| Conteúdo de ajuda                 | `web/content/`                                               | [protocolo editorial](web/content/README.md)                  |
-| Distribuição                      | `scripts/`, `.github/workflows/`, `compliance/`              | testes dos scripts e gates; não publicar para testar um PR    |
+| Area                              | Code                                                         | Main validation                                             |
+| --------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- |
+| UI and design system              | `src/components/`, `src/screens/`                            | lint, types, tests and demo                                 |
+| Reports and replay chat           | `src/screens/reports/`, `src/lib/report*`, `src/lib/replay*` | fixtures, clock/pagination tests and the reports smoke test |
+| Processing and native integration | `src-tauri/src/`                                             | rustfmt, Clippy, Rust tests; real-world tests when needed   |
+| Website and API                   | `web/app/`, `web/lib/`                                       | lint/types, build and route/contract tests                  |
+| Help content                      | `web/content/`                                               | [editorial protocol](web/content/README.md)                 |
+| Distribution                      | `scripts/`, `.github/workflows/`, `compliance/`              | script and gate tests; do not publish to test a PR          |
 
-Os testes JS/TS são encontrados pelo Vitest da raiz, inclusive os testes pertinentes de `web/`. Para um ciclo focado, `pnpm exec vitest run CAMINHO_DO_TESTE` pode reduzir o tempo; não substitui a validação integrada antes de entregar.
+JS/TS tests are picked up by the root Vitest, including the relevant tests in `web/`. For a focused loop, `pnpm exec vitest run PATH_TO_TEST` can save time; it does not replace the integrated validation before you submit.
 
-Para Rust, prepare os sidecars e execute dentro de `src-tauri/`:
+For Rust, prepare the sidecars and run inside `src-tauri/`:
 
 ```sh
 cargo fmt --all -- --check
@@ -54,24 +54,24 @@ cargo clippy --locked --all-targets --all-features -- -D warnings
 cargo test --locked --all-targets
 ```
 
-Esses comandos podem ler a configuração pública de build do workspace; execute-os no clone limpo de contribuição, não reutilizando um `.env` oficial. Para os testes `ignored` de mídia, siga a [preparação e execução dos testes nativos de integração](docs/DESENVOLVIMENTO.md#testes-nativos-de-integração). Não informe que foram executados se rodou apenas testes unitários.
+These commands may read the workspace's public build configuration; run them in the clean contribution clone, without reusing an official `.env`. For the `ignored` media tests, follow the [setup and execution of the native integration tests](docs/DEVELOPMENT.md#native-integration-tests). Do not report that they were run if you only ran unit tests.
 
-## Invariantes que uma contribuição deve preservar
+## Invariants a contribution must preserve
 
-- **Transmissão antes de tarefas auxiliares.** Relatórios, chat, gravação e diagnóstico não podem bloquear o caminho de envio por conveniência. Preserve cancelamento, filas limitadas e liberação de processos.
-- **Segredos ficam fora do frontend e dos artefatos públicos.** Prefixos `VITE_`/`NEXT_PUBLIC_` são públicos; não usar para segredos. PKCE, validação de callbacks, cofre e redatores não devem ser relaxados para passar um teste.
-- **Uma falha deve ser isolada.** Tratar cancelamento, destino desconectado, arquivo ausente, resposta inválida e encerramento no subsistema adequado.
-- **Performance é parte do comportamento.** Preserve lazy loading, workers, virtualização e limites de retenção. Meça antes/depois de mudanças em hot paths; não alegue ganho com base apenas em menos linhas de código.
-- **Interface consistente.** Use os componentes do design system, incluindo `Select`, e mantenha navegação por teclado. Atualize português e inglês quando introduzir texto público.
-- **Dados locais são do usuário.** Alterações de formato precisam de compatibilidade/migração e testes; não resetar configurações, cofre ou relatórios para corrigir um problema.
-- **Gates oficiais continuam fechados.** Um perfil local não autoriza publicação sem assinatura do updater, fontes correspondentes e demais verificações.
+- **Streaming comes before auxiliary tasks.** Reports, chat, recording and diagnostics must not block the sending path for convenience. Preserve cancellation, bounded queues and process cleanup.
+- **Secrets stay out of the frontend and public artifacts.** `VITE_`/`NEXT_PUBLIC_` prefixes are public; do not use them for secrets. PKCE, callback validation, the vault and redactors must not be relaxed to make a test pass.
+- **A failure must stay isolated.** Handle cancellation, a disconnected destination, a missing file, an invalid response and shutdown in the appropriate subsystem.
+- **Performance is part of behavior.** Preserve lazy loading, workers, virtualization and retention limits. Measure before/after changes to hot paths; do not claim a gain based only on fewer lines of code.
+- **Consistent interface.** Use the design system components, including `Select`, and keep keyboard navigation working. Update Portuguese and English when you introduce public text.
+- **Local data belongs to the user.** Format changes need compatibility/migration and tests; do not reset settings, the vault or reports to fix a problem.
+- **Official gates stay closed.** A local profile does not authorize publishing without the updater signature, the corresponding sources and the other checks.
 
-## O que deve acompanhar o PR
+## What the PR should include
 
-Explique o problema, a solução escolhida e o que ficou fora do escopo. Liste os comandos realmente executados e seus resultados, inclusive verificações não feitas. Adicione teste de regressão para bugs e evidência visual sanitizada se mudar a interface. Em mudanças de performance, descreva cenário, volume de dados, hardware e medição.
+Explain the problem, the chosen solution and what was left out of scope. List the commands you actually ran and their results, including checks you did not run. Add a regression test for bugs and sanitized visual evidence if you change the interface. For performance changes, describe the scenario, data volume, hardware and measurement.
 
-Você deve ter direito de contribuir com código e materiais enviados, mantendo autoria e avisos de terceiros. O código próprio do projeto segue a [MIT](LICENSE); não introduza conteúdo de licença incompatível ou dados privados. Ferramentas de assistência não dispensam revisão, testes e verificação de procedência.
+You must have the right to contribute the code and materials you submit, preserving authorship and third-party notices. The project's own code is under the [MIT](LICENSE) license; do not introduce content under an incompatible license or private data. Assistive tools do not exempt you from review, testing and provenance checks.
 
-Seja respeitoso, discuta decisões técnicas com evidências e evite ataques pessoais. O mantenedor pode pedir ajustes ou recusar uma mudança por escopo, segurança, manutenção ou prioridade do produto.
+Be respectful, discuss technical decisions with evidence and avoid personal attacks. The maintainer may ask for changes or decline a change for reasons of scope, security, maintenance or product priority.
 
-Consulte também [conduta](CODE_OF_CONDUCT.md), [suporte](SUPPORT.md), [arquitetura](docs/ARQUITETURA.md) e [performance](docs/PERFORMANCE.md). CODEOWNERS identifica responsáveis pela revisão, mas não substitui a aprovação do PR.
+See also [conduct](CODE_OF_CONDUCT.md), [support](SUPPORT.md), [architecture](docs/ARCHITECTURE.md) and [performance](docs/PERFORMANCE.md). CODEOWNERS identifies who is responsible for review, but does not replace PR approval.

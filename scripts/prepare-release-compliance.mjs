@@ -72,7 +72,7 @@ try {
       "",
       "Source archives are at this directory's root; their identities are in compliance/ffmpeg-sources.json.",
       "Binary identities and build configuration are in sidecars.json and FFmpeg-buildconf.txt.",
-      "See LICENSE, THIRD_PARTY_NOTICES.md, compliance/ffmpeg-provenance.json and docs/CONFORMIDADE-FFMPEG.md.",
+      "See LICENSE, THIRD_PARTY_NOTICES.md, compliance/ffmpeg-provenance.json and docs/FFMPEG-COMPLIANCE.md.",
       "Some documentation links refer to the full source repository: https://github.com/pitroldev/corneta",
       "A package generator is not legal certification or evidence of a completed source correspondence review.",
       "",

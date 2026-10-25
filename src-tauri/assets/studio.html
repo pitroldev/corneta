@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Corneta · Mesa (estúdio)</title>
+    <title>Corneta · Table (studio)</title>
     <style>
       :root {
         --brass: #ffb323;
@@ -137,6 +137,25 @@
     <script>
       (() => {
         "use strict";
+        // The local server sets <html lang> from the app's language when it serves this page.
+        const TEXT =
+          document.documentElement.lang === "en"
+            ? {
+                kicker: "Corneta · Table",
+                brb: "BE RIGHT BACK",
+                brbSub: "back in a moment — hold on to your corneta 📣",
+                guest: "guest",
+                noRoom: "No room",
+                noRoomSub: "open it from Corneta (the code is missing)",
+              }
+            : {
+                kicker: "Corneta · Mesa",
+                brb: "JÁ VOLTO",
+                brbSub: "já já tá de volta — segura a corneta 📣",
+                guest: "convidado",
+                noRoom: "Sem sala",
+                noRoomSub: "abra pela Corneta (faltou o código)",
+              };
         const q = new URLSearchParams(location.search);
         const ROOM = q.get("room") || "";
         const SIGNAL = q.get("signal") || `ws://${location.host}/ws`;
@@ -222,14 +241,14 @@
           const brb = document.createElement("div");
           brb.className = "brb";
           brb.innerHTML =
-            '<div class="kicker">Corneta · Mesa</div>' +
-            '<div class="slab">JÁ VOLTO</div>' +
-            '<div class="sub">já já tá de volta — segura a corneta 📣</div>';
+            `<div class="kicker">${TEXT.kicker}</div>` +
+            `<div class="slab">${TEXT.brb}</div>` +
+            `<div class="sub">${TEXT.brbSub}</div>`;
           const dot = document.createElement("div");
           dot.className = "dot";
           const label = document.createElement("div");
           label.className = "label";
-          label.textContent = names.get(peerId) || "convidado";
+          label.textContent = names.get(peerId) || TEXT.guest;
           tile.append(video, brb, dot, label);
           if (HIDE_SELF && peerId === SELF) tile.style.display = "none";
           stage.appendChild(tile);
@@ -454,8 +473,8 @@
         if (!ROOM) {
           stage.innerHTML =
             '<div class="tile down"><div class="brb" style="display:flex">' +
-            '<div class="kicker">Corneta · Mesa</div><div class="slab">Sem sala</div>' +
-            '<div class="sub">abra pela Corneta (faltou o código)</div></div></div>';
+            `<div class="kicker">${TEXT.kicker}</div><div class="slab">${TEXT.noRoom}</div>` +
+            `<div class="sub">${TEXT.noRoomSub}</div></div></div>`;
           return;
         }
         connect();
