@@ -350,6 +350,7 @@ pub(crate) fn emit_chat(app: &AppHandle, msg: ChatMessage) {
         }
     }
     crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
+    crate::deck::chat_message(app, &msg);
     let _ = app.emit("chat://message", msg);
 }
 
@@ -451,10 +452,9 @@ pub(crate) fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
             crate::session::record_chat_delete(&p, native_id);
         }
     }
-    let _ = app.emit(
-        "chat://delete",
-        json!({ "scope": "message", "platform": platform, "nativeId": native_id }),
-    );
+    let event = json!({ "scope": "message", "platform": platform, "nativeId": native_id });
+    crate::deck::chat_deleted(app, &event);
+    let _ = app.emit("chat://delete", event);
 }
 /// Removes one author's messages: a ban, a timeout (`seconds`) or a hide.
 pub(crate) fn delete_user(
@@ -484,6 +484,7 @@ pub(crate) fn clear_source(app: &AppHandle, platform: &str, source: &str) {
 
 fn publish_delete(app: &AppHandle, event: Value) {
     crate::overlay::push_chat_event(&app.state::<AppState>().overlay, "delete", &event);
+    crate::deck::chat_deleted(app, &event);
     let _ = app.emit("chat://delete", event);
 }
 
@@ -597,6 +598,7 @@ pub fn emit_alert(app: &AppHandle, alert: Alert) {
     // Borrow for the overlay before emit consumes the alert, avoiding a clone.
 
     crate::overlay::push(&app.state::<AppState>().overlay, &alert);
+    crate::deck::alert(app, &alert);
     let _ = app.emit("alert://event", alert);
 }
 
@@ -960,10 +962,10 @@ fn run_viewers(
         if !is_current() {
             return;
         }
-        let _ = app.emit(
-            "viewers://update",
-            json!({ "total": sample.total, "anyLive": sample.any_live, "items": sample.items }),
-        );
+        let update =
+            json!({ "total": sample.total, "anyLive": sample.any_live, "items": sample.items });
+        crate::deck::viewers_changed(&app, &update);
+        let _ = app.emit("viewers://update", update);
 
         for _ in 0..150 {
             if !is_current() {

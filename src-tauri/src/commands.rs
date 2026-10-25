@@ -78,8 +78,8 @@ fn quiet_command(program: &str) -> std::process::Command {
     cmd
 }
 
-const OBS_WS_HOST: &str = "127.0.0.1";
-const OBS_WS_PORT: u16 = 4455;
+pub(crate) const OBS_WS_HOST: &str = "127.0.0.1";
+pub(crate) const OBS_WS_PORT: u16 = 4455;
 
 /// Stable IPC cancellation code; the frontend suppresses its error toast.
 pub const START_CANCELLED: &str = "corneta:start-cancelled";
@@ -245,15 +245,33 @@ fn refresh_secret_presence_with(config: &mut AppConfig, mut has_secret: impl FnM
 #[tauri::command]
 pub fn save_config(app: AppHandle, config: AppConfig) -> Result<AppConfig, String> {
     let mut config = config.validate_and_normalize()?;
-    let disk_revision = config::load(&app).revision;
+    let current = config::load(&app);
+    let disk_revision = current.revision;
     if config.revision < disk_revision {
         return Err(Msg::ConfigSaveStaleRevision.now());
     }
     config.revision = disk_revision.saturating_add(1);
+    // Phones pair and unpair through native prompts; a webview's copy may be stale.
+    config.settings.deck_devices = current.settings.deck_devices;
     config::save(&app, &config)?;
     crate::apply_native_language(&app, &config.settings.language);
     refresh_secret_presence(&app, &mut config);
     // Other webviews must update their save baseline without persisting this event again.
+    let _ = app.emit("config://changed", &config);
+    Ok(config)
+}
+
+/// Native edits (deck pairing and layout) take the same validation, save and broadcast as the webview's.
+pub(crate) fn save_native_config(
+    app: &AppHandle,
+    edit: impl FnOnce(&mut AppConfig),
+) -> Result<AppConfig, String> {
+    let mut config = config::load(app);
+    edit(&mut config);
+    let mut config = config.validate_and_normalize()?;
+    config.revision = config.revision.saturating_add(1);
+    config::save(app, &config)?;
+    refresh_secret_presence(app, &mut config);
     let _ = app.emit("config://changed", &config);
     Ok(config)
 }
@@ -758,6 +776,7 @@ fn emit(app: &AppHandle, snap: &EngineSnapshot) {
     }
     let _ = app.emit("engine://status", snap);
     update_tray(app, snap);
+    crate::deck::engine_changed(app);
 }
 
 pub(crate) fn notify(app: &AppHandle, title: &str, body: &str) {
@@ -3462,6 +3481,37 @@ pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), S
     .map_err(|e| format!("join: {e}"))?
 }
 
+#[tauri::command]
+pub fn deck_status(app: AppHandle) -> crate::deck::DeckStatus {
+    crate::deck::status(&app)
+}
+
+#[tauri::command]
+pub fn deck_pair_start(app: AppHandle) -> Result<crate::deck::PairTicket, String> {
+    crate::deck::pair_start(&app)
+}
+
+#[tauri::command]
+pub fn deck_pair_answer(app: AppHandle, request_id: String, allow: bool) -> Result<(), String> {
+    crate::deck::pair_answer(&app, &request_id, allow)
+}
+
+#[tauri::command]
+pub fn deck_device_remove(app: AppHandle, id: String) -> Result<(), String> {
+    crate::deck::remove_device(&app, &id)
+}
+
+/// The main window reports how a start or stop asked by the phone went.
+#[tauri::command]
+pub fn deck_request_done(app: AppHandle, id: String, ok: bool, message: Option<String>) {
+    let outcome = if ok {
+        Ok(())
+    } else {
+        Err(message.unwrap_or_default().chars().take(400).collect())
+    };
+    crate::deck::desktop_done(&app, &id, outcome);
+}
+
 // Keep OS settings destinations allowlisted outside the webview.
 #[tauri::command]
 pub fn open_privacy_settings(app: AppHandle, which: String) -> Result<(), String> {
@@ -3520,6 +3570,7 @@ pub async fn mark_moment(
     };
     let path = path.ok_or_else(|| Msg::SessionNotRecording.now())?;
     session::record_marker(&path, &label);
+    crate::deck::moment_marked(&app, &label);
     let mut marks = Vec::new();
     for &provider in crate::platforms::account_providers() {
         let platform = provider.id();

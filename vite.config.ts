@@ -105,6 +105,7 @@ export default defineConfig(({ command }) => ({
       input: {
         main: "index.html",
         chat: "chat.html",
+        deck: "deck.html",
       },
     },
   },

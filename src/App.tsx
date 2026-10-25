@@ -31,6 +31,7 @@ import { shortcutErrorKey } from "./lib/shortcuts";
 import { Toaster } from "./components/Toaster";
 import { Onboarding } from "./components/Onboarding";
 import { TelemetryConsentNotice } from "./components/TelemetryConsent";
+import { DeckPairPrompt } from "./components/DeckPairPrompt";
 import { Mascot, SoundWaves } from "./components/decor";
 const loadPlatformsScreen = () =>
   import("./screens/PlatformsScreen").then((m) => ({
@@ -193,6 +194,26 @@ export default function App() {
     const unbindAlertStatus = bindAlertStatus();
     const unbindChatAuth = bindChatAuth();
     const unbindAuthFlow = bindAuthFlow(t);
+    // A paired phone starts and stops through the same path as the BORA AO VIVO button.
+    const unbindDeck = api.subscribeDeck({
+      request: ({ id, action }) => {
+        const s = useStore.getState();
+        const st = s.snapshot.state;
+        const run =
+          action === "start"
+            ? st === "live" || st === "starting"
+              ? Promise.reject(new Error(t("deck.desktop.alreadyLive")))
+              : s.start()
+            : st === "live" || st === "starting"
+              ? s.stop()
+              : Promise.resolve();
+        run.then(
+          () => void api.deckRequestDone(id, true),
+          (error: unknown) =>
+            void api.deckRequestDone(id, false, errMsg(error)),
+        );
+      },
+    });
     const unbindShortcut = api.subscribeShortcut((action) => {
       const s = useStore.getState();
       const st = s.snapshot.state;
@@ -231,6 +252,7 @@ export default function App() {
       unbindChatAuth();
       unbindAuthFlow();
       unbindShortcut();
+      unbindDeck();
     };
   }, [
     t,
@@ -542,6 +564,7 @@ export default function App() {
           }}
         />
         <TelemetryConsentNotice />
+        {loaded && <DeckPairPrompt />}
       </div>
     </MotionConfig>
   );

@@ -1,61 +1,15 @@
 import { memo, useMemo } from "react";
 import { cn } from "../lib/utils";
-import { useI18n, type I18n, type MessageKey } from "../lib/i18n";
+import { useI18n } from "../lib/i18n";
+import { ALERT_KIND_META, alertDetail } from "../lib/alertText";
 import { PlatformGlyph } from "./ui";
 import { ChatFragments } from "./ChatFragments";
-import type { Alert, AlertKind, PlatformId } from "../lib/types";
+import type { Alert, PlatformId } from "../lib/types";
 
 const ORIGIN: Record<string, string> = {
   streamlabs: "Streamlabs",
   streamelements: "StreamElements",
 };
-
-// Alert kinds are backend enum values, not display copy.
-const KIND_META: Record<
-  AlertKind,
-  { emoji: string; verbKey: MessageKey; accent: string }
-> = {
-  follow: { emoji: "💜", verbKey: "chat.alerts.verb.follow", accent: "info" },
-  sub: { emoji: "⭐", verbKey: "chat.alerts.verb.sub", accent: "brass" },
-  resub: { emoji: "🔁", verbKey: "chat.alerts.verb.resub", accent: "brass" },
-  subgift: {
-    emoji: "🎁",
-    verbKey: "chat.alerts.verb.subgift",
-    accent: "tomato",
-  },
-  bits: { emoji: "💎", verbKey: "chat.alerts.verb.bits", accent: "brass" },
-  tip: { emoji: "💰", verbKey: "chat.alerts.verb.tip", accent: "ok" },
-  raid: { emoji: "🚀", verbKey: "chat.alerts.verb.raid", accent: "info" },
-  member: { emoji: "🏅", verbKey: "chat.alerts.verb.member", accent: "ok" },
-  superchat: {
-    emoji: "💬",
-    verbKey: "chat.alerts.verb.superchat",
-    accent: "brass",
-  },
-  upgrade: {
-    emoji: "⏫",
-    verbKey: "chat.alerts.verb.upgrade",
-    accent: "brass",
-  },
-  payforward: {
-    emoji: "🤝",
-    verbKey: "chat.alerts.verb.payforward",
-    accent: "tomato",
-  },
-  streak: { emoji: "🔥", verbKey: "chat.alerts.verb.streak", accent: "info" },
-  charity: { emoji: "💚", verbKey: "chat.alerts.verb.charity", accent: "ok" },
-  gift: { emoji: "🎀", verbKey: "chat.alerts.verb.gift", accent: "tomato" },
-  kicks: { emoji: "🟩", verbKey: "chat.alerts.verb.kicks", accent: "ok" },
-  reward: { emoji: "🎟️", verbKey: "chat.alerts.verb.reward", accent: "info" },
-  milestone: {
-    emoji: "🏆",
-    verbKey: "chat.alerts.verb.milestone",
-    accent: "brass",
-  },
-};
-
-const money = (a: Alert) =>
-  a.amount ? `${a.currency ? a.currency + " " : ""}${a.amount}` : "";
 
 const ACCENT: Record<string, { bar: string }> = {
   brass: { bar: "border-brass" },
@@ -63,50 +17,6 @@ const ACCENT: Record<string, { bar: string }> = {
   info: { bar: "border-info" },
   ok: { bar: "border-ok" },
 };
-
-/** Platform-provided tier labels are displayed verbatim. */
-function detail(a: Alert, i18n: Pick<I18n, "t" | "tp">): string {
-  const months = (n: number) => i18n.tp("chat.alerts.detail.months", n);
-  switch (a.kind) {
-    case "bits":
-      return a.amount ? i18n.t("chat.alerts.detail.bits", { n: a.amount }) : "";
-    case "resub":
-      return [a.amount ? months(a.amount) : "", a.tier]
-        .filter(Boolean)
-        .join(" · ");
-    case "sub":
-      return a.tier ?? "";
-    case "subgift":
-      return i18n.tp("chat.alerts.detail.subs", a.amount ?? 1);
-    case "raid":
-      return a.amount
-        ? i18n.t("chat.alerts.detail.raidViewers", { n: a.amount })
-        : "";
-    case "member":
-      return [a.tier, a.amount && a.amount > 1 ? months(a.amount) : ""]
-        .filter(Boolean)
-        .join(" · ");
-    case "superchat":
-    case "tip":
-    case "charity":
-      // The platform's own amount text (localized) when it has one.
-      return a.title && a.kind === "superchat" && !a.image ? a.title : money(a);
-    case "gift":
-      return a.currency === "JEWELS" && a.amount
-        ? i18n.t("chat.alerts.detail.jewels", { n: a.amount })
-        : "";
-    case "kicks":
-      return a.amount
-        ? i18n.t("chat.alerts.detail.kicks", { n: a.amount })
-        : "";
-    case "streak":
-      return a.amount ? i18n.tp("chat.alerts.detail.streak", a.amount) : "";
-    case "milestone":
-      return a.amount ? String(a.amount) : "";
-    default:
-      return "";
-  }
-}
 
 const AlertRow = memo(function AlertRow({
   a,
@@ -116,9 +26,9 @@ const AlertRow = memo(function AlertRow({
   fontSize: number;
 }) {
   const { t, tp } = useI18n();
-  const meta = KIND_META[a.kind];
+  const meta = ALERT_KIND_META[a.kind];
   const accent = ACCENT[meta.accent] ?? ACCENT.brass;
-  const d = detail(a, { t, tp });
+  const d = alertDetail(a, { t, tp });
   return (
     <div
       style={{ fontSize }}

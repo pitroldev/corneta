@@ -309,7 +309,7 @@ pub fn stop(server: &Mutex<StudioServer>) {
 }
 
 /// UDP connect selects a route without sending a packet.
-fn lan_ipv4() -> Option<Ipv4Addr> {
+pub(crate) fn lan_ipv4() -> Option<Ipv4Addr> {
     let sock = UdpSocket::bind((Ipv4Addr::UNSPECIFIED, 0)).ok()?;
     sock.connect((Ipv4Addr::new(8, 8, 8, 8), 80)).ok()?;
     match sock.local_addr().ok()?.ip() {

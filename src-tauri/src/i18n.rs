@@ -352,6 +352,54 @@ messages! {
     NotifySignalLostBody = "rust.notify.signalLost.body" =>
         pt: "Sua live está sem imagem — confira o OBS.",
         en: "Your stream has no picture — check OBS.";
+    NotifyDeckPairTitle = "rust.notify.deckPair.title" =>
+        pt: "Um celular quer controlar a live",
+        en: "A phone wants to control your stream";
+    NotifyDeckPairBody { name: &'a str } = "rust.notify.deckPair.body" =>
+        pt: "“{name}” pediu pra parear. Abra a Corneta pra permitir ou recusar.",
+        en: "“{name}” asked to pair. Open Corneta to allow or decline.";
+    DeckServerOpenFailed { port: u16, e: &'a str } = "rust.deck.serverOpenFailed" =>
+        pt: "não consegui abrir o modo deck na porta {port}: {e}",
+        en: "couldn't open the deck on port {port}: {e}";
+    DeckOff = "rust.deck.off" =>
+        pt: "O modo deck tá desligado. Ligue em Configurações → Geral.",
+        en: "The deck is off. Turn it on in Settings → General.";
+    DeckNoNetwork = "rust.deck.noNetwork" =>
+        pt: "Não achei uma rede local neste PC. Conecte o PC ao Wi-Fi ou ao cabo de rede.",
+        en: "I couldn't find a local network on this PC. Connect it to Wi-Fi or a network cable.";
+    DeckPairGone = "rust.deck.pairGone" =>
+        pt: "Esse pedido de pareamento não vale mais.",
+        en: "That pairing request is no longer valid.";
+    DeckDeviceUnknown = "rust.deck.deviceUnknown" =>
+        pt: "Esse celular não tá pareado.",
+        en: "That phone isn't paired.";
+    DeckDefaultDeviceName = "rust.deck.defaultDeviceName" =>
+        pt: "Celular",
+        en: "Phone";
+    DeckObsUnavailable = "rust.deck.obsUnavailable" =>
+        pt: "Não consegui falar com o OBS — vê se ele tá aberto.",
+        en: "I couldn't reach OBS — check that it's open.";
+    DeckObsNoMic = "rust.deck.obsNoMic" =>
+        pt: "Não achei um microfone configurado no áudio do OBS.",
+        en: "I couldn't find a microphone in OBS's audio settings.";
+    DeckObsRefused { e: &'a str } = "rust.deck.obsRefused" =>
+        pt: "O OBS recusou: {e}",
+        en: "OBS refused: {e}";
+    DeckRequestTimeout = "rust.deck.requestTimeout" =>
+        pt: "A Corneta do PC não respondeu a tempo. Confere a tela do PC.",
+        en: "Corneta on the PC didn't answer in time. Check the PC screen.";
+    DeckUnknownAction = "rust.deck.unknownAction" =>
+        pt: "Esse botão não existe nesta versão da Corneta.",
+        en: "That button doesn't exist in this version of Corneta.";
+    DeckNoPlatformTarget = "rust.deck.noPlatformTarget" =>
+        pt: "Essa plataforma não tá na live.",
+        en: "That platform isn't part of the stream.";
+    DeckTooManyDevices { max: u16 } = "rust.deck.tooManyDevices" =>
+        pt: "Já tem {max} celulares pareados. Remova um em Configurações → Geral → Modo deck.",
+        en: "{max} phones are already paired. Remove one in Settings → General → Phone deck.";
+    DeckTooFast = "rust.deck.tooFast" =>
+        pt: "Calma, muitos toques seguidos. Tenta de novo em um instante.",
+        en: "Too many taps in a row. Try again in a moment.";
     NotifyUpdateTitle { version: &'a str } = "rust.notify.update.title" =>
         pt: "Saiu a Corneta {version}",
         en: "Corneta {version} is out";

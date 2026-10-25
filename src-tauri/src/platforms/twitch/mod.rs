@@ -40,6 +40,10 @@ impl ChatProvider for Twitch {
         )
     }
 
+    fn mention_login<'a>(&self, source: &'a ChatSource) -> Option<&'a str> {
+        Some(&source.value)
+    }
+
     fn start_shared(&self, session: &ChatSession) {
         // One EventSub socket covers every Twitch channel; follows need the app's own login.
         let channels: Vec<eventsub::FollowChannel> = session

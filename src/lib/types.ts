@@ -165,6 +165,15 @@ export interface AppSettings {
   overlaySound: boolean;
   overlayPosition: string;
   overlayPort: number;
+  /** Opt-in: the phone deck listens on the home network only while this is on. */
+  deckEnabled: boolean;
+  deckPort: number;
+  /** Deck action ids in key order; empty means the built-in layout. */
+  deckLayout: string[];
+  /** Combos built on the phone; the layout refers to them as `combo:<id>`. */
+  deckCombos: DeckCombo[];
+  /** Paired phones; only native code adds or removes them. */
+  deckDevices: DeckDevice[];
   overlayChatPosition: string;
   /** Alert display duration in seconds. */
   overlayDurationSecs: number;
@@ -511,6 +520,60 @@ export interface EngineSnapshot {
 export interface PlatformMark {
   platform: string;
   outcome: "marked" | "unavailable" | "reconnect" | "failed";
+}
+
+export interface DeckDevice {
+  id: string;
+  name: string;
+  pairedAt: number;
+}
+
+export type DeckComboAction =
+  "mark" | "brb" | "mic" | "scene" | "say" | "pause" | "wait";
+
+/** One combo step; only the fields its action uses are set. */
+export interface DeckComboStep {
+  action: DeckComboAction;
+  label?: string;
+  on?: boolean;
+  muted?: boolean;
+  scene?: string;
+  text?: string;
+  platform?: string;
+  paused?: boolean;
+  seconds?: number;
+}
+
+export interface DeckCombo {
+  id: string;
+  name: string;
+  steps: DeckComboStep[];
+}
+
+export interface DeckStatus {
+  running: boolean;
+  port: number;
+  /** LAN address the phone opens, like "192.168.0.12:7394". */
+  address?: string | null;
+  error?: string | null;
+  devices: (DeckDevice & { connected: boolean })[];
+}
+
+export interface DeckPairTicket {
+  url: string;
+  expiresInMs: number;
+}
+
+export interface DeckPairRequest {
+  requestId: string;
+  name: string;
+  code: string;
+}
+
+/** Start and stop asked by a phone run in the main window, like its own buttons. */
+export interface DeckDesktopRequest {
+  id: string;
+  action: "start" | "stop";
 }
 
 export interface EncoderInfo {

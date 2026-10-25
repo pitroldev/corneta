@@ -6,6 +6,7 @@ import {
   Check,
   Gauge,
   Plug,
+  Smartphone,
   Sparkles,
   Tv2,
 } from "lucide-react";
@@ -17,6 +18,8 @@ import { useI18n, type MessageKey } from "../../lib/i18n";
 import { Mascot, SoundWaves } from "../decor";
 import { LegalAcceptNote } from "../legal";
 import { Button } from "../ui";
+import { useDeckStatus } from "../deck/pairing";
+import { DeckStep } from "./DeckStep";
 import {
   DoneStep,
   ObsStep,
@@ -26,13 +29,15 @@ import {
   type ConsentDraft,
 } from "./steps";
 
-export type SetupStep = "welcome" | "platforms" | "obs" | "quality" | "done";
+export type SetupStep =
+  "welcome" | "platforms" | "obs" | "quality" | "deck" | "done";
 
 const STEPS: { id: SetupStep; labelKey: MessageKey; icon: typeof Tv2 }[] = [
   { id: "welcome", labelKey: "components.setup.rail.welcome", icon: Sparkles },
   { id: "platforms", labelKey: "components.setup.rail.platforms", icon: Tv2 },
   { id: "obs", labelKey: "components.setup.rail.obs", icon: Plug },
   { id: "quality", labelKey: "components.setup.rail.quality", icon: Gauge },
+  { id: "deck", labelKey: "components.setup.rail.deck", icon: Smartphone },
   { id: "done", labelKey: "components.setup.rail.done", icon: Check },
 ];
 
@@ -81,12 +86,14 @@ export function SetupWizard({
   const r = useReadiness();
   const obs = useStore((s) => s.obs);
   const uploadMbps = useStore((s) => s.uploadMbps);
+  const deck = useDeckStatus();
 
   const done: Record<SetupStep, boolean> = {
     welcome: visited.has("platforms"),
     platforms: r.ready.length > 0,
     obs: obsConfigured(obs),
-    quality: uploadMbps != null && visited.has("done"),
+    quality: uploadMbps != null && visited.has("deck"),
+    deck: (deck?.devices.length ?? 0) > 0,
     done: false,
   };
 
@@ -256,6 +263,7 @@ export function SetupWizard({
               {step === "platforms" && <PlatformsStep titleRef={titleRef} />}
               {step === "obs" && <ObsStep titleRef={titleRef} />}
               {step === "quality" && <QualityStep titleRef={titleRef} />}
+              {step === "deck" && <DeckStep titleRef={titleRef} />}
               {step === "done" && (
                 <DoneStep titleRef={titleRef} onChat={() => onFinish("chat")} />
               )}

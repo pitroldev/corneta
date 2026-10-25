@@ -149,6 +149,15 @@ impl std::fmt::Display for ConnErr {
 }
 
 fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, ConnErr> {
+    connect_with_events(host, port, password, 0)
+}
+
+fn connect_with_events(
+    host: &str,
+    port: u16,
+    password: &str,
+    events: u32,
+) -> Result<Socket, ConnErr> {
     let url = format!("ws://{host}:{port}");
     let (mut socket, _resp) = tungstenite::connect(url.as_str()).map_err(|e| ConnErr {
         failure: ConnFailure::Connect,
@@ -165,7 +174,7 @@ fn connect_identify(host: &str, port: u16, password: &str) -> Result<Socket, Con
     }
 
     let hello = read_json(&mut socket)?;
-    let mut identify = json!({ "op": 1, "d": { "rpcVersion": 1, "eventSubscriptions": 0 } });
+    let mut identify = json!({ "op": 1, "d": { "rpcVersion": 1, "eventSubscriptions": events } });
     if let Some(auth) = hello.get("d").and_then(|d| d.get("authentication")) {
         if password.is_empty() {
             return Err(ConnErr {
@@ -754,9 +763,411 @@ pub fn poll_stats(
     let _ = socket.close(None);
 }
 
+/// Scenes and Inputs event categories in obs-websocket v5.
+const LINK_EVENTS: u32 = (1 << 2) | (1 << 3);
+
+/// What the phone deck shows from OBS: scenes, the scene on air and the microphone.
+#[derive(Clone, Debug, Default, PartialEq, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LinkState {
+    pub connected: bool,
+    pub scenes: Vec<String>,
+    pub scene: Option<String>,
+    pub mic: Option<MicState>,
+}
+
+#[derive(Clone, Debug, PartialEq, serde::Serialize)]
+pub struct MicState {
+    pub name: String,
+    pub muted: bool,
+}
+
+pub enum LinkCmd {
+    Scene(String),
+    Mute(bool),
+}
+
+pub struct LinkRequest {
+    pub cmd: LinkCmd,
+    pub reply: std::sync::mpsc::Sender<Result<(), String>>,
+}
+
+/// OBS lists scenes bottom-up by index; the deck shows them in the order OBS's dock does.
+pub(crate) fn scene_names(data: &Value) -> Vec<String> {
+    let mut scenes: Vec<(i64, String)> = data
+        .get("scenes")
+        .and_then(Value::as_array)
+        .map(|list| {
+            list.iter()
+                .filter_map(|scene| {
+                    Some((
+                        scene.get("sceneIndex").and_then(Value::as_i64).unwrap_or(0),
+                        scene.get("sceneName")?.as_str()?.to_string(),
+                    ))
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    scenes.sort_by_key(|scene| std::cmp::Reverse(scene.0));
+    scenes.into_iter().map(|(_, name)| name).collect()
+}
+
+/// Applies one obs-websocket event (op 5); true when the deck needs a fresh state.
+pub(crate) fn apply_link_event(state: &mut LinkState, message: &Value) -> bool {
+    let kind = message.pointer("/d/eventType").and_then(Value::as_str);
+    let data = message
+        .pointer("/d/eventData")
+        .cloned()
+        .unwrap_or(Value::Null);
+    let text = |key: &str| data.get(key).and_then(Value::as_str).map(str::to_string);
+    match kind {
+        Some("CurrentProgramSceneChanged") => {
+            let next = text("sceneName");
+            let changed = state.scene != next;
+            state.scene = next;
+            changed
+        }
+        Some("SceneListChanged") => {
+            let next = scene_names(&data);
+            let changed = state.scenes != next;
+            state.scenes = next;
+            changed
+        }
+        Some("SceneNameChanged") => {
+            let (Some(old), Some(new)) = (text("oldSceneName"), text("sceneName")) else {
+                return false;
+            };
+            for name in &mut state.scenes {
+                if *name == old {
+                    name.clone_from(&new);
+                }
+            }
+            if state.scene.as_deref() == Some(old.as_str()) {
+                state.scene = Some(new);
+            }
+            true
+        }
+        Some("InputMuteStateChanged") => {
+            let muted = data.get("inputMuted").and_then(Value::as_bool);
+            match (&mut state.mic, text("inputName"), muted) {
+                (Some(mic), Some(name), Some(muted)) if mic.name == name && mic.muted != muted => {
+                    mic.muted = muted;
+                    true
+                }
+                _ => false,
+            }
+        }
+        Some("InputNameChanged") => match (&mut state.mic, text("oldInputName"), text("inputName"))
+        {
+            (Some(mic), Some(old), Some(new)) if mic.name == old => {
+                mic.name = new;
+                true
+            }
+            _ => false,
+        },
+        _ => false,
+    }
+}
+
+fn link_idle(error: &tungstenite::Error) -> bool {
+    matches!(error, tungstenite::Error::Io(e)
+        if matches!(e.kind(), std::io::ErrorKind::WouldBlock | std::io::ErrorKind::TimedOut))
+}
+
+/// Sends a request and waits for its response, applying events that arrive in between.
+fn link_call(
+    socket: &mut Socket,
+    state: &mut LinkState,
+    seq: &mut u64,
+    req_type: &str,
+    data: Value,
+) -> Result<Value, String> {
+    *seq += 1;
+    let id = format!("corneta-deck-{seq}");
+    send_json(
+        socket,
+        &json!({ "op": 6, "d": { "requestType": req_type, "requestId": id, "requestData": data } }),
+    )?;
+    let deadline = std::time::Instant::now() + Duration::from_secs(5);
+    while std::time::Instant::now() < deadline {
+        match socket.read() {
+            Ok(Message::Text(text)) => {
+                let Ok(message) = serde_json::from_str::<Value>(&text) else {
+                    continue;
+                };
+                match message.get("op").and_then(Value::as_i64) {
+                    Some(5) => {
+                        apply_link_event(state, &message);
+                    }
+                    Some(7)
+                        if message.pointer("/d/requestId").and_then(Value::as_str) == Some(&id) =>
+                    {
+                        if req_ok(&message) {
+                            return Ok(message
+                                .pointer("/d/responseData")
+                                .cloned()
+                                .unwrap_or(Value::Null));
+                        }
+                        let comment = message
+                            .pointer("/d/requestStatus/comment")
+                            .and_then(Value::as_str)
+                            .unwrap_or(req_type);
+                        return Err(Msg::DeckObsRefused { e: comment }.now());
+                    }
+                    _ => {}
+                }
+            }
+            Ok(Message::Close(_)) => return Err(Msg::ObsConnectionClosed.now()),
+            Ok(_) => {}
+            Err(e) if link_idle(&e) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    Err(Msg::DeckObsUnavailable.now())
+}
+
+fn link_snapshot(socket: &mut Socket, seq: &mut u64) -> Result<LinkState, String> {
+    let mut state = LinkState {
+        connected: true,
+        ..LinkState::default()
+    };
+    let scenes = link_call(socket, &mut state, seq, "GetSceneList", json!({}))?;
+    state.scenes = scene_names(&scenes);
+    state.scene = scenes
+        .get("currentProgramSceneName")
+        .and_then(Value::as_str)
+        .map(str::to_string);
+    let special = link_call(socket, &mut state, seq, "GetSpecialInputs", json!({}))?;
+    if let Some(name) = special.get("mic1").and_then(Value::as_str) {
+        let mute = link_call(
+            socket,
+            &mut state,
+            seq,
+            "GetInputMute",
+            json!({ "inputName": name }),
+        )?;
+        state.mic = Some(MicState {
+            name: name.to_string(),
+            muted: mute
+                .get("inputMuted")
+                .and_then(Value::as_bool)
+                .unwrap_or(false),
+        });
+    }
+    Ok(state)
+}
+
+fn link_run_command(
+    socket: &mut Socket,
+    state: &mut LinkState,
+    seq: &mut u64,
+    cmd: LinkCmd,
+) -> Result<(), String> {
+    match cmd {
+        LinkCmd::Scene(name) => {
+            link_call(
+                socket,
+                state,
+                seq,
+                "SetCurrentProgramScene",
+                json!({ "sceneName": name }),
+            )?;
+            state.scene = Some(name);
+        }
+        LinkCmd::Mute(muted) => {
+            let Some(mic) = state.mic.clone() else {
+                return Err(Msg::DeckObsNoMic.now());
+            };
+            link_call(
+                socket,
+                state,
+                seq,
+                "SetInputMute",
+                json!({ "inputName": mic.name, "inputMuted": muted }),
+            )?;
+            if let Some(mic) = &mut state.mic {
+                mic.muted = muted;
+            }
+        }
+    }
+    Ok(())
+}
+
+/// Keeps one OBS connection for the phone deck while `wanted` holds. Blocking; run on its own thread.
+pub(crate) fn run_link(
+    password: impl Fn() -> String,
+    wanted: impl Fn() -> bool,
+    alive: Arc<AtomicBool>,
+    shared: Arc<std::sync::Mutex<LinkState>>,
+    requests: std::sync::mpsc::Receiver<LinkRequest>,
+    changed: impl Fn(),
+) {
+    let publish = |next: LinkState| {
+        let mut current = shared.lock().unwrap();
+        if *current != next {
+            *current = next;
+            drop(current);
+            changed();
+        }
+    };
+    let refuse_pending = || {
+        while let Ok(request) = requests.try_recv() {
+            let _ = request.reply.send(Err(Msg::DeckObsUnavailable.now()));
+        }
+    };
+    let pause = |ms: u64| {
+        for _ in 0..(ms / 100) {
+            if !alive.load(Ordering::Relaxed) {
+                return;
+            }
+            std::thread::sleep(Duration::from_millis(100));
+        }
+    };
+    while alive.load(Ordering::Relaxed) {
+        if !wanted() {
+            publish(LinkState::default());
+            refuse_pending();
+            pause(400);
+            continue;
+        }
+        let mut socket = match connect_with_events(
+            crate::commands::OBS_WS_HOST,
+            crate::commands::OBS_WS_PORT,
+            &password(),
+            LINK_EVENTS,
+        ) {
+            Ok(socket) => socket,
+            Err(_) => {
+                publish(LinkState::default());
+                refuse_pending();
+                pause(3000);
+                continue;
+            }
+        };
+        if let tungstenite::stream::MaybeTlsStream::Plain(tcp) = socket.get_mut() {
+            let _ = tcp.set_read_timeout(Some(Duration::from_millis(200)));
+        }
+        let mut seq = 0u64;
+        let mut state = match link_snapshot(&mut socket, &mut seq) {
+            Ok(state) => state,
+            Err(e) => {
+                log::warn!("deck: OBS link setup failed: {e}");
+                let _ = socket.close(None);
+                publish(LinkState::default());
+                pause(3000);
+                continue;
+            }
+        };
+        publish(state.clone());
+        'session: while alive.load(Ordering::Relaxed) && wanted() {
+            while let Ok(request) = requests.try_recv() {
+                let result = link_run_command(&mut socket, &mut state, &mut seq, request.cmd);
+                let _ = request.reply.send(result);
+                publish(state.clone());
+            }
+            match socket.read() {
+                Ok(Message::Text(text)) => {
+                    if let Ok(message) = serde_json::from_str::<Value>(&text) {
+                        if message.get("op").and_then(Value::as_i64) == Some(5)
+                            && apply_link_event(&mut state, &message)
+                        {
+                            publish(state.clone());
+                        }
+                    }
+                }
+                Ok(Message::Close(_)) => break 'session,
+                Ok(_) => {}
+                Err(e) if link_idle(&e) => {}
+                Err(_) => break 'session,
+            }
+        }
+        let _ = socket.close(None);
+        publish(LinkState::default());
+    }
+    publish(LinkState::default());
+    refuse_pending();
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn deck_scenes_follow_the_obs_dock_order() {
+        let data = json!({ "scenes": [
+            { "sceneName": "Intervalo", "sceneIndex": 0 },
+            { "sceneName": "Conversa", "sceneIndex": 1 },
+            { "sceneName": "Jogo", "sceneIndex": 2 },
+        ]});
+        assert_eq!(scene_names(&data), ["Jogo", "Conversa", "Intervalo"]);
+        assert!(scene_names(&json!({})).is_empty());
+    }
+
+    #[test]
+    fn deck_link_events_update_scene_and_microphone() {
+        let event = |kind: &str, data: Value| json!({ "op": 5, "d": { "eventType": kind, "eventData": data } });
+        let mut state = LinkState {
+            connected: true,
+            scenes: vec!["Jogo".into(), "Conversa".into()],
+            scene: Some("Jogo".into()),
+            mic: Some(MicState {
+                name: "Mic/Aux".into(),
+                muted: false,
+            }),
+        };
+        assert!(apply_link_event(
+            &mut state,
+            &event(
+                "CurrentProgramSceneChanged",
+                json!({ "sceneName": "Conversa" })
+            )
+        ));
+        assert_eq!(state.scene.as_deref(), Some("Conversa"));
+        assert!(!apply_link_event(
+            &mut state,
+            &event(
+                "CurrentProgramSceneChanged",
+                json!({ "sceneName": "Conversa" })
+            )
+        ));
+        assert!(apply_link_event(
+            &mut state,
+            &event(
+                "SceneNameChanged",
+                json!({ "oldSceneName": "Conversa", "sceneName": "Papo" })
+            )
+        ));
+        assert_eq!(state.scenes, ["Jogo", "Papo"]);
+        assert_eq!(state.scene.as_deref(), Some("Papo"));
+        assert!(apply_link_event(
+            &mut state,
+            &event(
+                "InputMuteStateChanged",
+                json!({ "inputName": "Mic/Aux", "inputMuted": true })
+            )
+        ));
+        assert!(state.mic.as_ref().unwrap().muted);
+        // Another input muting is not the deck's microphone.
+        assert!(!apply_link_event(
+            &mut state,
+            &event(
+                "InputMuteStateChanged",
+                json!({ "inputName": "Desktop Audio", "inputMuted": false })
+            )
+        ));
+        assert!(apply_link_event(
+            &mut state,
+            &event(
+                "InputNameChanged",
+                json!({ "oldInputName": "Mic/Aux", "inputName": "Microfone" })
+            )
+        ));
+        assert_eq!(state.mic.as_ref().unwrap().name, "Microfone");
+        assert!(!apply_link_event(
+            &mut state,
+            &event("StreamStateChanged", json!({}))
+        ));
+    }
 
     #[test]
     fn connection_diagnostics_and_ipc_messages_have_separate_contracts() {
