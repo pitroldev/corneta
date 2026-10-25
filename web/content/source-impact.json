@@ -2,16 +2,52 @@
   "version": 1,
   "declarations": [
     {
+      "article": "en/guides/comparisons/multistream-tools.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
+    },
+    {
+      "article": "en/guides/comparisons/restream-alternative.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
+    },
+    {
+      "article": "en/guides/multistream/local-vs-cloud.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
+    },
+    {
+      "article": "en/guides/multistream/obs-multistream.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
+    },
+    {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
       "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
       "reason": "A tela Ao vivo só ganhou o aviso de tela preta e a dica do atalho no Marcar momento; o que o artigo mostra sobre plataforma desconectada não mudou."
+    },
+    {
+      "article": "en/guides/multistream/twitch-youtube-kick.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
+    },
+    {
+      "article": "en/guides/multistream/twitch-youtube-simultaneously.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
@@ -22,32 +58,50 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
-      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
+      "sourceBlob": "94f34a3787c14d6a8da06f836da7d83dbe38c23c",
+      "reason": "Só saíram os campos do Guardião da configuração; nada do que o artigo descreve mudou."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "9fe1333c4007cc52aec42474b42f76923ace5d1b",
-      "reason": "Só ganhou os padrões do modo deck, que vem desligado; nada do que o artigo descreve mudou."
+      "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
+      "reason": "Só saíram os padrões do Guardião; nada do que o artigo descreve mudou."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
+      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
+    },
+    {
+      "article": "en/guides/quality/why-stream-lags.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
       "sourceBlob": "c6a3611e3dd465887f1773854a8083ecac1e31af",
       "reason": "Só passou a repassar mensagens e alertas para o celular pareado no modo deck; a configuração do chat descrita no artigo não mudou."
+    },
+    {
+      "article": "en/help/getting-started/first-stream.mdx",
+      "source": "src/lib/store.ts",
+      "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
+      "reason": "O BORA AO VIVO só deixou de mandar guardian_enabled na telemetria; o fluxo que o artigo descreve não mudou."
+    },
+    {
+      "article": "en/help/getting-started/first-stream.mdx",
+      "source": "web/PRODUCT.md",
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
@@ -64,14 +118,14 @@
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
+      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -88,8 +142,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "e4873b79063468f5605c5a60397b12a1d7a1efd6",
-      "reason": "Só ganhou os textos do modo deck e do passo opcional do celular na configuração inicial; os textos que o artigo cita não mudaram."
+      "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
+      "reason": "Só saíram os textos do Guardião; os textos que o artigo cita não mudaram."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -112,26 +166,26 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "1cfd703a3de6bb8423346f0bbb976ab0ff11c597",
-      "reason": "O engine_policy.rs só mudou num teste, por causa do campo novo do alerta de tela preta; os status da live são os mesmos."
+      "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
+      "reason": "Só saiu o status do Guardião do retrato do motor; os estados que o artigo explica não mudaram."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/comparisons/restream-alternative.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
@@ -148,20 +202,20 @@
     {
       "article": "pt-BR/guides/multistream/local-vs-cloud.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/multistream/obs-multistream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -172,14 +226,14 @@
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-simultaneously.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
@@ -214,26 +268,26 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a08bd172303c369598031fbf9fd607e8eb406fa8",
-      "reason": "Só ganhou os campos do modo deck (porta, celulares pareados, botões e combos); nada do que o artigo descreve mudou."
+      "sourceBlob": "94f34a3787c14d6a8da06f836da7d83dbe38c23c",
+      "reason": "Só saíram os campos do Guardião da configuração; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "9fe1333c4007cc52aec42474b42f76923ace5d1b",
-      "reason": "Só ganhou os padrões do modo deck, que vem desligado; nada do que o artigo descreve mudou."
+      "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
+      "reason": "Só saíram os padrões do Guardião; nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
+      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -280,8 +334,8 @@
     {
       "article": "pt-BR/guides/quality/why-stream-lags.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
@@ -316,14 +370,14 @@
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "0baa491691070ea7d29cf2c102481778277c7806",
-      "reason": "As ações de conta e de chave viraram genéricas por provedor; o primeiro uso descrito no artigo não mudou."
+      "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
+      "reason": "O BORA AO VIVO só deixou de mandar guardian_enabled na telemetria; o fluxo que o artigo descreve não mudou."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "web/PRODUCT.md",
-      "sourceBlob": "7d444ae9c6cbba962a795151362654421b773f63",
-      "reason": "O PRODUCT.md só trocou a evidência da LP (vídeo de apresentação e recortes das telas reais) e passou a apontar os presets para o catálogo por destino, com os mesmos valores; nada do que o artigo afirma mudou."
+      "sourceBlob": "5cfeffa9c913159cc31c8b9b3cbea8631247d362",
+      "reason": "O PRODUCT.md só trocou a linha do Guardião, que saiu do produto, pela do modo deck; nada do que o artigo afirma sobre multistream mudou."
     },
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
@@ -364,14 +418,14 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "e9d7938d9ab0d6f31663250da6bc8774c004dda6",
-      "reason": "Só ganhou os comandos do modo deck e o salvamento de configuração pelo celular; nada do que o artigo descreve mudou."
+      "sourceBlob": "ce374a7664156cb167ec6d9dd2e5c0fe99da4ffa",
+      "reason": "Do commands.rs só saiu a ativação do Guardião; com o JÁ VOLTO ligado o caminho sem recodificar continua o mesmo, e nada do que o artigo descreve mudou."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -400,8 +454,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "e4873b79063468f5605c5a60397b12a1d7a1efd6",
-      "reason": "Só ganhou os textos do modo deck e do passo opcional do celular na configuração inicial; os textos que o artigo cita não mudaram."
+      "sourceBlob": "f156a0be6db196b22e1ecaa4d4edf431cad97f5e",
+      "reason": "Só saíram os textos do Guardião; os textos que o artigo cita não mudaram."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -424,14 +478,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "O engine.rs só ganhou o campo do alerta de tela preta no estado da live; métricas, cópia, recodificação e reconexão não mudaram."
+      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
+      "reason": "Do engine.rs só saíram o atraso, a resolução forçada e o status do Guardião; presets, estados dos destinos e métricas que o artigo descreve não mudaram."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "1cfd703a3de6bb8423346f0bbb976ab0ff11c597",
-      "reason": "O engine_policy.rs só mudou num teste, por causa do campo novo do alerta de tela preta; os status da live são os mesmos."
+      "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
+      "reason": "Só saiu o status do Guardião do retrato do motor; os estados que o artigo explica não mudaram."
     }
   ]
 }
