@@ -62,13 +62,13 @@ state depends on permissions, plan and visibility; a missing field or an error
 response does not prove that a control is active.
 
 - The `Proteger main` ruleset blocks deletion and force pushes on the default
-  branch, including for administrators.
-- The same ruleset requires a pull request with one approval, an up-to-date branch
-  and the `resolve`, `secrets`, `frontend` and `rust` checks from
-  [CI](../.github/workflows/ci.yml), bound to GitHub Actions. The `frontend` job
-  requires `browser-smoke` to succeed; a skipped job must not be treated as
-  approval. Repository administrators may bypass the pull request and checks to
-  push directly, and stay responsible for running the checks before they do.
+  branch, with no bypass, including for administrators.
+- The `Require review and CI on main` ruleset requires a pull request with one
+  approval, an up-to-date branch and the `resolve`, `secrets`, `frontend` and
+  `rust` checks from [CI](../.github/workflows/ci.yml), bound to GitHub Actions.
+  The `frontend` job requires `browser-smoke` to succeed; a skipped job must not
+  be treated as approval. Repository administrators may bypass this ruleset only,
+  to push directly, and stay responsible for running the checks before they do.
 - In the Vercel project, Deployment Checks hold each production deployment until
   the same four checks pass, so a red commit on `main` never reaches the site.
 - Check the actual names in a run before changing the protection. Renaming
