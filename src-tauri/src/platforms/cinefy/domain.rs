@@ -2,6 +2,7 @@
 pub(crate) struct Badge {
     pub label: String,
     pub kind: String,
+    pub title: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

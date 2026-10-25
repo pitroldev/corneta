@@ -48,6 +48,7 @@ impl super::OutputPort for CinefySink {
                             .map(|badge| ChatBadge {
                                 label: badge.label,
                                 kind: badge.kind,
+                                title: badge.title,
                                 ..Default::default()
                             })
                             .collect(),

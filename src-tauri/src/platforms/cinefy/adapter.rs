@@ -197,18 +197,65 @@ fn badge(value: &Value) -> Option<Badge> {
     let name = value
         .get("name")
         .and_then(Value::as_str)
-        .unwrap_or_default();
+        .unwrap_or_default()
+        .trim();
     let (label, kind) = match id.as_str() {
         "creator" | "verified" => ("✓".into(), "partner".into()),
         "moderator" | "mod" => ("MOD".into(), "moderator".into()),
         "subscriber" | "sub" => ("SUB".into(), "subscriber".into()),
+        _ if subscription_months(&id).is_some() => ("SUB".into(), "subscriber".into()),
         _ if !name.is_empty() => (
-            name.chars().take(10).collect::<String>().to_uppercase(),
+            name.chars()
+                .take(10)
+                .collect::<String>()
+                .trim_end()
+                .to_uppercase(),
             "subscriber".into(),
         ),
         _ => return None,
     };
-    Some(Badge { label, kind })
+    Some(Badge {
+        label,
+        kind,
+        title: (!name.is_empty()).then(|| name.to_string()),
+    })
+}
+
+/// Subscription badges are `sub-<tier>` plus a `sub-<tier>_<n>months` tenure variant.
+fn subscription_months(id: &str) -> Option<u32> {
+    let rest = id.strip_prefix("sub-").filter(|rest| !rest.is_empty())?;
+    match rest.split_once('_') {
+        None => Some(0),
+        Some((_, tenure)) => tenure.strip_suffix("months")?.parse().ok(),
+    }
+}
+
+/// Cinefy sends a subscriber's tenure badge next to the plain one, so both collapse into one
+/// badge that keeps the longest tenure as its tooltip.
+fn badges(items: &[Value]) -> Vec<Badge> {
+    let mut out: Vec<(Badge, u32)> = Vec::new();
+    for item in items {
+        let Some(badge) = badge(item) else {
+            continue;
+        };
+        let months = item
+            .get("id")
+            .and_then(Value::as_str)
+            .and_then(|id| subscription_months(&id.to_ascii_lowercase()))
+            .unwrap_or(0);
+        match out
+            .iter_mut()
+            .find(|(kept, _)| kept.label == badge.label && kept.kind == badge.kind)
+        {
+            Some((kept, kept_months)) if months > *kept_months => {
+                *kept = badge;
+                *kept_months = months;
+            }
+            Some(_) => {}
+            None => out.push((badge, months)),
+        }
+    }
+    out.into_iter().map(|(badge, _)| badge).collect()
 }
 
 fn parse_thread(thread: &Value) -> Option<ChatMessage> {
@@ -240,7 +287,7 @@ fn parse_thread(thread: &Value) -> Option<ChatMessage> {
         badges: author
             .get("badges")
             .and_then(Value::as_array)
-            .map(|items| items.iter().filter_map(badge).collect())
+            .map(|items| badges(items))
             .unwrap_or_default(),
         published_at_ms,
     })
@@ -458,6 +505,44 @@ mod tests {
         assert_eq!(message.color.as_deref(), Some("#d2a70b"));
         assert_eq!(message.badges[0].kind, "partner");
         assert_eq!(message.published_at_ms, 1_788_216_530_813);
+    }
+
+    #[test]
+    fn subscription_tiers_and_tenure_collapse_into_one_badge() {
+        let mut value = thread();
+        value["author"]["badges"] = json!([
+            { "id": "sub-exclusive", "name": "Assinante (exclusivo)" },
+            { "id": "sub-exclusive_3months", "name": "Assinante (exclusivo): 3 meses" },
+            { "id": "sub-global_2months", "name": "Assinante (global): 2 meses" },
+            { "id": "moderator", "name": "Moderador" },
+            { "id": "sub-global", "name": "Assinante (global)" }
+        ]);
+        let badges = parse_thread(&value).expect("valid thread").badges;
+        assert_eq!(
+            badges,
+            vec![
+                Badge {
+                    label: "SUB".into(),
+                    kind: "subscriber".into(),
+                    title: Some("Assinante (exclusivo): 3 meses".into()),
+                },
+                Badge {
+                    label: "MOD".into(),
+                    kind: "moderator".into(),
+                    title: Some("Moderador".into()),
+                },
+            ]
+        );
+    }
+
+    #[test]
+    fn unknown_badges_keep_a_trimmed_label_and_the_full_name() {
+        let named = badge(&json!({ "id": "member-tier", "name": "Assinante x" })).unwrap();
+        assert_eq!(named.label, "ASSINANTE");
+        assert_eq!(named.title.as_deref(), Some("Assinante x"));
+        assert_eq!(subscription_months("sub-"), None);
+        assert_eq!(subscription_months("sub-exclusive_months"), None);
+        assert_eq!(subscription_months("sub-exclusive_12months"), Some(12));
     }
 
     #[test]
