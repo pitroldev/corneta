@@ -1,0 +1,16 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "identifier": "br.com.pitroldev.corneta.store",
+  "build": {
+    "beforeBuildCommand": "node scripts/store-msix.mjs frontend"
+  },
+  "bundle": {
+    "active": false,
+    "createUpdaterArtifacts": false,
+    "publisher": "pitroldev",
+    "copyright": "© 2026 Petro Cardoso (pitroldev)"
+  },
+  "plugins": {
+    "updater": { "endpoints": [], "pubkey": "" }
+  }
+}

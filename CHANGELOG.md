@@ -8,6 +8,10 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Added
+
+- A Microsoft Store MSIX build with verified package identity, isolated settings and credentials, Store-managed updates, and Windows startup-task support.
+
 ### Changed
 
 - Corneta speaks English by default in the app, the installer and the website, and switches to Portuguese only when Windows or the browser asks for it. The Portuguese home page of the website moved to `/pt-BR`.

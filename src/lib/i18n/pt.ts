@@ -1472,6 +1472,8 @@ export const pt = {
     "Você tá no ar — instalar agora derrubaria a live.",
   "components.update.check.busy": "Olhando…",
   "components.update.check.cta": "Ver se tem versão nova",
+  "components.update.store":
+    "As atualizações são gerenciadas pela Microsoft Store.",
   "components.update.check.error": "Não consegui checar agora: {error}",
   "components.update.check.found":
     "Saiu a Corneta {version} — o aviso tá lá em cima.",

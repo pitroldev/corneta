@@ -16,6 +16,8 @@
     "contrib:web:check": "node scripts/contributor.mjs web:check",
     "contrib:app:dev": "node scripts/contributor.mjs app:dev",
     "contrib:app:build": "node scripts/contributor.mjs app:build",
+    "store:build": "node scripts/store-msix.mjs build",
+    "store:package": "node scripts/store-msix.mjs package",
     "dev": "vite",
     "typecheck": "tsc --noEmit",
     "build:fast": "vite build",

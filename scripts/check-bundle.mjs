@@ -21,7 +21,9 @@ const root = process.cwd();
 const dist = join(root, "dist");
 const assets = join(dist, "assets");
 const limit = 110 * 1024;
-const requestedRoots = process.argv.slice(2);
+const args = process.argv.slice(2);
+const msixLayoutMode = args[0] === "--msix-layout";
+const requestedRoots = msixLayoutMode ? [dist, ...args.slice(1)] : args;
 const artifactMode = requestedRoots.length > 0;
 const resolvedRoots = (artifactMode ? requestedRoots : [dist]).map((path) =>
   resolve(root, path),
@@ -31,6 +33,19 @@ const fail = (message) => {
   console.error(message);
   process.exit(1);
 };
+
+if (msixLayoutMode) {
+  if (args.length !== 2)
+    fail("Usage: check-bundle.mjs --msix-layout DIRECTORY");
+  for (const file of [
+    "AppxManifest.xml",
+    "corneta.exe",
+    "ffmpeg.exe",
+    "mediamtx.exe",
+  ])
+    if (!existsSync(resolve(root, args[1], file)))
+      fail(`MSIX layout is missing ${file}.`);
+}
 
 const missingRoots = resolvedRoots.filter((path) => !existsSync(path));
 if (missingRoots.length) {
@@ -114,7 +129,7 @@ const cleanupExtractedRoot = () => {
 };
 process.once("exit", cleanupExtractedRoot);
 
-if (artifactMode) {
+if (artifactMode && !msixLayoutMode) {
   const installers = files.filter((path) => {
     const normalized = path.replaceAll("\\", "/").toLowerCase();
     return normalized.includes("/bundle/nsis/") && normalized.endsWith(".exe");
@@ -279,7 +294,9 @@ if (leaks.length) {
 }
 
 console.log(
-  artifactMode
-    ? "Artifacts and extractable NSIS contents: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget."
-    : "Bundle: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget.",
+  msixLayoutMode
+    ? "MSIX layout: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget."
+    : artifactMode
+      ? "Artifacts and extractable NSIS contents: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget."
+      : "Bundle: no source maps or secrets detected; JS chunks are within the 110 KiB gzip budget.",
 );

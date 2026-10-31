@@ -127,7 +127,7 @@ pub async fn install_update(
     rid: ResourceId,
     on_event: Channel<DownloadEvent>,
 ) -> Result<(), String> {
-    if cfg!(corneta_contributor) || webview.label() != "main" {
+    if cfg!(any(corneta_contributor, corneta_store)) || webview.label() != "main" {
         return Err(Msg::UpdateUnavailable.now());
     }
     // Use the signed update obtained by the plugin's check, never a URL supplied by JS.

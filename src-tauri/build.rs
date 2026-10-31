@@ -9,6 +9,11 @@ const BAKEABLE: &[&str] = &[
 ];
 
 fn main() {
+    println!("cargo:rustc-check-cfg=cfg(corneta_store)");
+    println!("cargo:rerun-if-env-changed=CORNETA_STORE");
+    if std::env::var("CORNETA_STORE").as_deref() == Ok("1") {
+        println!("cargo:rustc-cfg=corneta_store");
+    }
     println!("cargo:rustc-check-cfg=cfg(corneta_contributor)");
     println!("cargo:rerun-if-env-changed=CORNETA_CONTRIBUTOR");
     if std::env::var("CORNETA_CONTRIBUTOR").as_deref() == Ok("1") {

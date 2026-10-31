@@ -4,8 +4,10 @@ use std::sync::{Mutex, OnceLock};
 
 use keyring::Entry;
 
-#[cfg(not(corneta_contributor))]
+#[cfg(not(any(corneta_contributor, corneta_store)))]
 const SERVICE: &str = "br.com.pitroldev.corneta";
+#[cfg(all(corneta_store, not(corneta_contributor)))]
+const SERVICE: &str = "br.com.pitroldev.corneta.store";
 #[cfg(corneta_contributor)]
 const SERVICE: &str = "br.com.pitroldev.corneta.contributor";
 

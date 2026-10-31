@@ -1479,6 +1479,7 @@ export const en: Dict = {
     "You're live — installing now would kill the stream.",
   "components.update.check.busy": "Looking…",
   "components.update.check.cta": "Check for a new version",
+  "components.update.store": "Updates are managed by Microsoft Store.",
   "components.update.check.error": "Couldn't check right now: {error}",
   "components.update.check.found":
     "Corneta {version} is out — the notice is up top.",

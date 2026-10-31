@@ -114,6 +114,13 @@ export function CheckUpdateButton({ version }: { version: string }) {
   const installing = useUpdate(updateBusy);
   const setInfo = useUpdate((s) => s.setInfo);
 
+  if (import.meta.env.VITE_STORE === "1")
+    return (
+      <span className="text-xs text-ink-faint">
+        {t("components.update.store")}
+      </span>
+    );
+
   const run = async () => {
     setBusy(true);
     try {

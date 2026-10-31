@@ -62,6 +62,22 @@ afterEach(() => {
 });
 
 describe("native updater request lifecycle", () => {
+  it("never checks, subscribes, or installs an external update in the Store edition", async () => {
+    vi.stubEnv("VITE_STORE", "1");
+    vi.useFakeTimers();
+    const stopChecks = updater.scheduleUpdateChecks(vi.fn());
+    const stopStatus = updater.subscribeUpdateStatus();
+    expect(await updater.checkForUpdate()).toBeNull();
+    await expect(updater.installUpdate(info)).rejects.toThrow(
+      "Microsoft Store",
+    );
+    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    expect(mocks.check).not.toHaveBeenCalled();
+    expect(mocks.invoke).not.toHaveBeenCalled();
+    expect(mocks.listen).not.toHaveBeenCalled();
+    stopChecks();
+    stopStatus();
+  });
   it("deduplicates installation immediately and uses only the guarded native command", async () => {
     const request = deferred<void>();
     mocks.invoke.mockReturnValue(request.promise);

@@ -46,6 +46,9 @@ Include version/commit, Windows, OBS, GPU/driver and streaming mode when they ar
 
 JS/TS tests are picked up by the root Vitest, including the relevant tests in `web/`. For a focused loop, `pnpm exec vitest run PATH_TO_TEST` can save time; it does not replace the integrated validation before you submit.
 
+For the isolated Microsoft Store build and package checks, see
+[Microsoft Store MSIX](docs/MICROSOFT-STORE.md).
+
 For Rust, prepare the sidecars and run inside `src-tauri/`:
 
 ```sh

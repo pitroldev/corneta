@@ -44,6 +44,7 @@ export const updateBusy = (state: UpdateState): boolean =>
 let installation: Promise<void> | null = null;
 
 const inTauri = (): boolean =>
+  import.meta.env.VITE_STORE !== "1" &&
   import.meta.env.VITE_CONTRIBUTOR !== "1" &&
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
@@ -67,6 +68,8 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 
 /** Share one request across buttons and remounts; native code also rejects competing starts. */
 export function installUpdate(info: UpdateInfo): Promise<void> {
+  if (import.meta.env.VITE_STORE === "1")
+    return Promise.reject(new Error("Updates are managed by Microsoft Store."));
   if (installation) return installation;
   useUpdate.setState({
     installing: true,

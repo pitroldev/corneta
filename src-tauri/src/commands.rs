@@ -630,6 +630,7 @@ pub async fn test_upload() -> Result<f64, String> {
     .map_err(|e| format!("join: {e}"))?
 }
 
+#[cfg(not(corneta_store))]
 #[tauri::command]
 pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     use tauri_plugin_autostart::ManagerExt;
@@ -639,6 +640,33 @@ pub fn set_autostart(app: AppHandle, enabled: bool) -> Result<(), String> {
     } else {
         m.disable().map_err(|e| e.to_string())
     }
+}
+
+#[cfg(corneta_store)]
+#[tauri::command]
+pub async fn set_autostart(enabled: bool) -> Result<(), String> {
+    use windows::ApplicationModel::{StartupTask, StartupTaskState};
+    let result = async {
+        let task = StartupTask::GetAsync(&windows::core::HSTRING::from("CornetaStartup"))?.await?;
+        if enabled {
+            let state = task.RequestEnableAsync()?.await?;
+            if !matches!(
+                state,
+                StartupTaskState::Enabled | StartupTaskState::EnabledByPolicy
+            ) {
+                return Err(windows::core::Error::new(
+                    windows::core::HRESULT(0x80070005_u32 as i32),
+                    "Windows has disabled this startup task. Enable Corneta in Windows Startup Apps settings.",
+                ));
+            }
+        } else {
+            task.Disable()?;
+        }
+        Ok(())
+    };
+    result
+        .await
+        .map_err(|error: windows::core::Error| error.to_string())
 }
 
 const OBS_VIDEO_BACKUP: &str = "obs-video-backup.json";

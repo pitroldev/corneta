@@ -251,8 +251,8 @@ pub fn run() {
                 .build(),
         )
         .plugin(tauri_plugin_dialog::init());
-    // Contributor builds omit the updater plugin so they cannot install official releases over themselves.
-    #[cfg(not(corneta_contributor))]
+    // Store and contributor builds must not replace themselves with an NSIS release.
+    #[cfg(not(any(corneta_contributor, corneta_store)))]
     let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
     builder
         .manage(AppState {
@@ -400,6 +400,7 @@ pub fn run() {
                 show_main(app.handle());
             }
             // Entries registered by older versions lack the argument; enabling again rewrites them.
+            #[cfg(not(corneta_store))]
             if config::load(app.handle()).settings.autostart {
                 use tauri_plugin_autostart::ManagerExt;
                 if let Err(error) = app.autolaunch().enable() {

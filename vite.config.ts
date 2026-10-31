@@ -33,8 +33,11 @@ const shouldUploadSourceMaps = Boolean(
 );
 
 export default defineConfig(({ command }) => ({
-  // The explicit contributor profile must never compile the maintainer's .env.
-  envDir: process.env.CORNETA_CONTRIBUTOR === "1" ? false : undefined,
+  // Isolated build profiles must never compile the maintainer's .env.
+  envDir:
+    process.env.CORNETA_CONTRIBUTOR === "1" || process.env.CORNETA_STORE === "1"
+      ? false
+      : undefined,
   plugins: [
     react(),
     tailwindcss(),
