@@ -182,7 +182,7 @@ describe("workflow safety contracts", () => {
     );
   });
 
-  it.each(["ci", "release", "codeql", "scorecard"])(
+  it.each(["ci", "release", "codeql", "scorecard", "distribution"])(
     "pins every external action implementation in %s",
     (name) => {
       const actions = workflowSteps(workflow(name)).filter((step) => step.uses);
@@ -198,12 +198,12 @@ describe("workflow safety contracts", () => {
     expect(
       assertLockedWorkflows(sources, {
         "cargo clippy": 1,
-        "cargo test": 2,
+        "cargo test": 3,
         "node node_modules/@tauri-apps/cli/tauri.js build": 1,
       }),
     ).toEqual({
       "cargo clippy": 1,
-      "cargo test": 2,
+      "cargo test": 3,
       "node node_modules/@tauri-apps/cli/tauri.js build": 1,
     });
     const toolchains = sources

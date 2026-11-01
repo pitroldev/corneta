@@ -1,5 +1,9 @@
 # Microsoft Store MSIX
 
+For automated submissions after an approved GitHub release, see
+[Release distribution](DISTRIBUTION.md). Building a package alone does not
+submit it to Microsoft.
+
 The Microsoft Store edition uses `pitroldev.Corneta`, publisher
 `CN=CA9298D5-25D1-490F-8BFE-5807D0ACE4EC`, and publisher display name `pitroldev`.
 The listing credits Petro Cardoso (pitroldev). Package versions append `.0` to
