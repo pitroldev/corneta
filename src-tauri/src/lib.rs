@@ -27,6 +27,8 @@ mod resources;
 mod session;
 mod shortcut;
 mod splicer;
+#[cfg(windows)]
+mod store_updater;
 mod studio;
 mod telemetry;
 mod updater;
@@ -281,6 +283,8 @@ pub fn run() {
             commands::start_engine,
             commands::stop_engine,
             updater::install_update,
+            updater::check_store_update,
+            updater::install_store_update,
             updater::notify_update_available,
             updater::update_installing,
             commands::set_target_paused,

@@ -497,6 +497,15 @@ messages! {
     UpdateFailed = "rust.update.failed" =>
         pt: "Não consegui concluir a atualização. Confira sua conexão e tente de novo.",
         en: "Couldn't complete the update. Check your connection and try again.";
+    StoreUpdateFailed = "rust.update.storeFailed" =>
+        pt: "Não consegui consultar ou atualizar pela Microsoft Store. Confira sua conexão e sua conta na Store e tente novamente.",
+        en: "Couldn't check or update through Microsoft Store. Check your connection and Store account, then retry.";
+    StoreUpdateBattery = "rust.update.storeBattery" =>
+        pt: "Conecte o computador à energia e tente atualizar novamente.",
+        en: "Connect your computer to power, then try updating again.";
+    StoreUpdateNetwork = "rust.update.storeNetwork" =>
+        pt: "A Microsoft Store precisa de uma conexão Wi-Fi adequada para baixar a atualização. Confira a rede e tente novamente.",
+        en: "Microsoft Store needs a suitable Wi-Fi connection to download the update. Check your network and retry.";
     EngineNoPlatformEnabled = "rust.engine.noPlatformEnabled" =>
         pt: "Nenhuma plataforma ativa.",
         en: "No platforms are turned on.";

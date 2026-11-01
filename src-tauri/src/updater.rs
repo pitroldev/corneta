@@ -77,6 +77,60 @@ pub enum DownloadEvent {
         chunk_length: usize,
     },
     Finished,
+    StoreProgress {
+        progress: f64,
+        installing: bool,
+    },
+}
+
+#[derive(Debug, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub enum InstallOutcome {
+    Installed,
+    Cancelled,
+    Current,
+}
+
+fn authorize_store_update(main_window: bool) -> Result<(), String> {
+    if !cfg!(all(windows, corneta_store, not(corneta_contributor))) || !main_window {
+        return Err(Msg::UpdateUnavailable.now());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn check_store_update(webview: Webview) -> Result<bool, String> {
+    authorize_store_update(webview.label() == "main")?;
+    #[cfg(windows)]
+    return crate::store_updater::check(webview.window()).await;
+    #[cfg(not(windows))]
+    Err(Msg::UpdateUnavailable.now())
+}
+
+#[tauri::command]
+pub async fn install_store_update(
+    app: AppHandle,
+    webview: Webview,
+    on_event: Channel<DownloadEvent>,
+) -> Result<InstallOutcome, String> {
+    authorize_store_update(webview.label() == "main")?;
+    #[cfg(windows)]
+    {
+        let window = webview.window();
+        // The Store operation and lease must survive an abandoned IPC request or WebView reload.
+        tauri::async_runtime::spawn(async move {
+            let state = app.state::<AppState>();
+            let _lease = InstallLease::acquire(&state.engine)?.announce(app.clone());
+            crate::store_updater::install(window, on_event).await
+        })
+        .await
+        .map_err(|_| Msg::UpdateFailed.now())?
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = (app, on_event);
+        Err(Msg::UpdateUnavailable.now())
+    }
 }
 
 #[tauri::command]
@@ -164,6 +218,15 @@ pub async fn install_update(
 mod tests {
     use super::*;
     use crate::engine::EngineSnapshot;
+
+    #[test]
+    fn store_commands_require_the_store_build_and_main_window() {
+        assert!(authorize_store_update(false).is_err());
+        assert_eq!(
+            authorize_store_update(true).is_ok(),
+            cfg!(all(windows, corneta_store, not(corneta_contributor)))
+        );
+    }
 
     #[test]
     fn a_notified_version_keeps_only_version_characters() {

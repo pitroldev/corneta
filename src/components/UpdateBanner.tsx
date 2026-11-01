@@ -33,7 +33,7 @@ export function UpdateBanner() {
   useEffect(() => scheduleUpdateChecks(offerUpdate), []);
   useEffect(subscribeUpdateStatus, []);
   useEffect(() => {
-    if (info) void announceUpdate(info.version, live);
+    if (info?.version) void announceUpdate(info.version, live);
   }, [info, live]);
 
   if ((!info || dismissed) && !installing) return null;
@@ -41,8 +41,16 @@ export function UpdateBanner() {
   const install = async () => {
     if (!info || installing || live) return;
     try {
-      await installUpdate(info);
-      toast.info(t("components.update.installed.toast"));
+      const outcome = await installUpdate(info);
+      toast.info(
+        t(
+          outcome === "cancelled"
+            ? "components.update.cancelled"
+            : outcome === "current"
+              ? "components.update.store.current"
+              : "components.update.installed.toast",
+        ),
+      );
     } catch (e) {
       toast.error(t("components.update.install.error", { error: errMsg(e) }));
     }
@@ -55,16 +63,22 @@ export function UpdateBanner() {
       <Download className="size-4 shrink-0 text-brass" />
       <span className="min-w-0 flex-1 basis-64">
         <strong className="font-display font-bold">
-          {info
-            ? t("components.update.headline", { version: info.version })
-            : t("components.update.inProgress")}
+          {info?.source === "store"
+            ? t("components.update.store.headline")
+            : info
+              ? t("components.update.headline", { version: info.version })
+              : t("components.update.inProgress")}
         </strong>
         <span className="ml-2 text-ink-muted">
           {installing
             ? t("golive.block.updating")
             : live
               ? t("components.update.blocked.live")
-              : t("components.update.ready")}
+              : t(
+                  info?.source === "store"
+                    ? "components.update.store.ready"
+                    : "components.update.ready",
+                )}
         </span>
       </span>
 
@@ -77,7 +91,11 @@ export function UpdateBanner() {
           {phase == null
             ? t("components.update.inProgress")
             : phase === "installing"
-              ? t("components.update.installing")
+              ? t(
+                  info?.source === "store"
+                    ? "components.update.store.installing"
+                    : "components.update.installing",
+                )
               : pct == null
                 ? t("components.update.downloading")
                 : t("components.update.downloading.pct", { pct })}
@@ -114,23 +132,23 @@ export function CheckUpdateButton({ version }: { version: string }) {
   const installing = useUpdate(updateBusy);
   const setInfo = useUpdate((s) => s.setInfo);
 
-  if (import.meta.env.VITE_STORE === "1")
-    return (
-      <span className="text-xs text-ink-faint">
-        {t("components.update.store")}
-      </span>
-    );
-
   const run = async () => {
     setBusy(true);
     try {
       const info = await checkForUpdate();
       setInfo(info);
-      if (info)
+      if (info?.source === "store")
+        toast.success(t("components.update.store.found"));
+      else if (info)
         toast.success(
           t("components.update.check.found", { version: info.version }),
         );
-      else toast.info(t("components.update.check.none", { version }));
+      else
+        toast.info(
+          import.meta.env.VITE_STORE === "1"
+            ? t("components.update.store.current")
+            : t("components.update.check.none", { version }),
+        );
     } catch (e) {
       toast.error(t("components.update.check.error", { error: errMsg(e) }));
     } finally {
@@ -150,7 +168,11 @@ export function CheckUpdateButton({ version }: { version: string }) {
       <RefreshCw className={cn("size-3.5", busy && "animate-spin")} />
       {busy
         ? t("components.update.check.busy")
-        : t("components.update.check.cta")}
+        : t(
+            import.meta.env.VITE_STORE === "1"
+              ? "components.update.store.check"
+              : "components.update.check.cta",
+          )}
     </button>
   );
 }

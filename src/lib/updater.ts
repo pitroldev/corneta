@@ -10,11 +10,28 @@ const BOOT_DELAY_MS = 20_000;
 const RECHECK_MS = 6 * 60 * 60 * 1000;
 const NOTIFIED_KEY = "corneta.update.notified";
 
-export interface UpdateInfo {
+export interface DirectUpdateInfo {
+  source?: "direct";
   version: string;
   notes: string;
   handle: Update;
 }
+
+export type UpdateInfo =
+  | DirectUpdateInfo
+  | {
+      source: "store";
+      version: null;
+      notes: "";
+    };
+
+export type InstallOutcome = "installed" | "cancelled" | "current";
+type UpdateEvent =
+  | DownloadEvent
+  | {
+      event: "StoreProgress";
+      data: { progress: number; installing: boolean };
+    };
 
 interface UpdateState {
   info: UpdateInfo | null;
@@ -41,17 +58,22 @@ export const useUpdate = create<UpdateState>((set) => ({
 export const updateBusy = (state: UpdateState): boolean =>
   state.installing || state.nativeInstalling;
 
-let installation: Promise<void> | null = null;
+let installation: Promise<InstallOutcome> | null = null;
 
 const inTauri = (): boolean =>
-  import.meta.env.VITE_STORE !== "1" &&
   import.meta.env.VITE_CONTRIBUTOR !== "1" &&
   typeof window !== "undefined" &&
   "__TAURI_INTERNALS__" in window;
 
-/** Return null when current or unavailable; network check failures do not throw. */
+/** Store errors reach manual checks; background checks suppress them without claiming the app is current. */
 export async function checkForUpdate(): Promise<UpdateInfo | null> {
   if (!inTauri()) return null;
+  if (import.meta.env.VITE_STORE === "1") {
+    const { invoke } = await import("@tauri-apps/api/core");
+    return (await invoke<boolean>("check_store_update"))
+      ? { source: "store", version: null, notes: "" }
+      : null;
+  }
   try {
     const { check } = await import("@tauri-apps/plugin-updater");
     const update = await check();
@@ -67,9 +89,14 @@ export async function checkForUpdate(): Promise<UpdateInfo | null> {
 }
 
 /** Share one request across buttons and remounts; native code also rejects competing starts. */
-export function installUpdate(info: UpdateInfo): Promise<void> {
-  if (import.meta.env.VITE_STORE === "1")
-    return Promise.reject(new Error("Updates are managed by Microsoft Store."));
+export function installUpdate(info: UpdateInfo): Promise<InstallOutcome> {
+  if (
+    !inTauri() ||
+    (import.meta.env.VITE_STORE === "1") !== (info.source === "store")
+  )
+    return Promise.reject(
+      new Error("Update source does not match this app edition."),
+    );
   if (installation) return installation;
   useUpdate.setState({
     installing: true,
@@ -83,14 +110,14 @@ export function installUpdate(info: UpdateInfo): Promise<void> {
   return installation;
 }
 
-async function runInstallation(info: UpdateInfo): Promise<void> {
+async function runInstallation(info: UpdateInfo): Promise<InstallOutcome> {
   addStep("update_install_requested", { stage: "update_install" });
   let total = 0;
   let downloaded = 0;
   let active = true;
   try {
     const { Channel, invoke } = await import("@tauri-apps/api/core");
-    const onEvent = new Channel<DownloadEvent>();
+    const onEvent = new Channel<UpdateEvent>();
     onEvent.onmessage = (ev) => {
       if (!active) return;
       if (ev.event === "Started") {
@@ -103,13 +130,28 @@ async function runInstallation(info: UpdateInfo): Promise<void> {
         });
       } else if (ev.event === "Finished") {
         useUpdate.setState({ progress: 1, phase: "installing" });
+      } else if (ev.event === "StoreProgress") {
+        useUpdate.setState({
+          progress: Number.isFinite(ev.data.progress)
+            ? Math.max(0, Math.min(1, ev.data.progress))
+            : null,
+          phase: ev.data.installing ? "installing" : "downloading",
+        });
       }
     };
+    if (info.source === "store") {
+      const outcome = await invoke<InstallOutcome>("install_store_update", {
+        onEvent,
+      });
+      if (outcome === "installed" || outcome === "current")
+        useUpdate.setState({ info: null });
+      return outcome;
+    }
     await invoke("install_update", { rid: info.handle.rid, onEvent });
   } catch (error) {
     capture("update_completed", {
       from_version: __APP_VERSION__,
-      to_version: info.version,
+      to_version: info.version ?? "unknown",
       outcome: "failed",
       error_code: normalizeErrorCode(error, "update_install_failed"),
     });
@@ -119,10 +161,11 @@ async function runInstallation(info: UpdateInfo): Promise<void> {
   }
   capture("update_completed", {
     from_version: __APP_VERSION__,
-    to_version: info.version,
+    to_version: info.version ?? "unknown",
     outcome: "installed",
     error_code: "none",
   });
+  return "installed";
 }
 
 /** Restore the native gate after reload; an older query cannot overwrite an event. */
@@ -167,9 +210,11 @@ export function scheduleUpdateChecks(
   if (!inTauri()) return () => {};
   let alive = true;
   const run = () => {
-    void checkForUpdate().then((info) => {
-      if (alive && info) onFound(info);
-    });
+    void checkForUpdate()
+      .then((info) => {
+        if (alive && info) onFound(info);
+      })
+      .catch(() => undefined);
   };
   const boot = setTimeout(run, BOOT_DELAY_MS);
   const every = setInterval(run, RECHECK_MS);
@@ -181,7 +226,9 @@ export function scheduleUpdateChecks(
 }
 
 const release = (info: UpdateInfo) =>
-  info.handle.close().catch(() => undefined);
+  info.source === "store"
+    ? Promise.resolve()
+    : info.handle.close().catch(() => undefined);
 
 /** A repeated automatic check keeps the user's dismissal of the same version. */
 export function offerUpdate(next: UpdateInfo): void {
