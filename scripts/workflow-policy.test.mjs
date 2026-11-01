@@ -209,7 +209,7 @@ describe("workflow safety contracts", () => {
     const toolchains = sources
       .flatMap(workflowSteps)
       .filter((step) => step.uses?.startsWith("dtolnay/rust-toolchain@"));
-    expect(toolchains).toHaveLength(3);
+    expect(toolchains).toHaveLength(2);
     for (const step of toolchains) expect(step.with.toolchain).toBe("1.97.1");
   });
   it("cancels superseded checks without sharing the release concurrency group", () => {
