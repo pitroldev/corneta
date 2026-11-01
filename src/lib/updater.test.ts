@@ -1,9 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { DownloadEvent, Update } from "@tauri-apps/plugin-updater";
-import type { UpdateInfo } from "./updater";
+import type { DirectUpdateInfo, InstallOutcome, UpdateInfo } from "./updater";
 
 type StatusListener = (event: { payload: boolean }) => void;
-type ProgressChannel = { onmessage: (event: DownloadEvent) => void };
+type ProgressChannel = {
+  onmessage: (
+    event:
+      | DownloadEvent
+      | {
+          event: "StoreProgress";
+          data: { progress: number; installing: boolean };
+        },
+  ) => void;
+};
 const mocks = vi.hoisted(() => ({
   invoke: vi.fn(),
   listen: vi.fn(),
@@ -39,7 +48,7 @@ function deferred<T>() {
   return { promise, resolve, reject };
 }
 
-const info: UpdateInfo = {
+const info: DirectUpdateInfo = {
   version: "0.8.0",
   notes: "Synthetic update",
   handle: { rid: 42 } as Update,
@@ -62,21 +71,11 @@ afterEach(() => {
 });
 
 describe("native updater request lifecycle", () => {
-  it("never checks, subscribes, or installs an external update in the Store edition", async () => {
+  it("rejects external installers in the Store edition", async () => {
     vi.stubEnv("VITE_STORE", "1");
-    vi.useFakeTimers();
-    const stopChecks = updater.scheduleUpdateChecks(vi.fn());
-    const stopStatus = updater.subscribeUpdateStatus();
-    expect(await updater.checkForUpdate()).toBeNull();
-    await expect(updater.installUpdate(info)).rejects.toThrow(
-      "Microsoft Store",
-    );
-    await vi.advanceTimersByTimeAsync(24 * 60 * 60 * 1000);
+    await expect(updater.installUpdate(info)).rejects.toThrow("Update source");
     expect(mocks.check).not.toHaveBeenCalled();
     expect(mocks.invoke).not.toHaveBeenCalled();
-    expect(mocks.listen).not.toHaveBeenCalled();
-    stopChecks();
-    stopStatus();
   });
   it("deduplicates installation immediately and uses only the guarded native command", async () => {
     const request = deferred<void>();
@@ -309,6 +308,143 @@ describe("native status subscriptions", () => {
   });
 });
 
+describe("Microsoft Store updates", () => {
+  const storeInfo: UpdateInfo = { source: "store", version: null, notes: "" };
+
+  beforeEach(() => vi.stubEnv("VITE_STORE", "1"));
+
+  it("checks only the native Store API and distinguishes an empty result from failure", async () => {
+    mocks.invoke
+      .mockResolvedValueOnce(true)
+      .mockResolvedValueOnce(false)
+      .mockRejectedValueOnce(new Error("Store offline"));
+    expect(await updater.checkForUpdate()).toEqual(storeInfo);
+    expect(await updater.checkForUpdate()).toBeNull();
+    await expect(updater.checkForUpdate()).rejects.toThrow("Store offline");
+    expect(mocks.invoke.mock.calls).toEqual([
+      ["check_store_update"],
+      ["check_store_update"],
+      ["check_store_update"],
+    ]);
+    expect(mocks.check).not.toHaveBeenCalled();
+  });
+
+  it("offers updates in the background without installing or reporting failures as current", async () => {
+    vi.useFakeTimers();
+    mocks.invoke
+      .mockRejectedValueOnce(new Error("Store offline"))
+      .mockResolvedValueOnce(true);
+    const found = vi.fn();
+    const stop = updater.scheduleUpdateChecks(found);
+    await vi.advanceTimersByTimeAsync(20_000);
+    expect(found).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(6 * 60 * 60 * 1000);
+    expect(found).toHaveBeenCalledExactlyOnceWith(storeInfo);
+    expect(mocks.check).not.toHaveBeenCalled();
+    expect(
+      mocks.invoke.mock.calls.every(
+        ([command]) => command === "check_store_update",
+      ),
+    ).toBe(true);
+    stop();
+  });
+
+  it.each(["installed", "current", "cancelled"] as const)(
+    "returns %s without claiming every response is an installation",
+    async (outcome) => {
+      mocks.invoke.mockResolvedValue(outcome);
+      updater.offerUpdate(storeInfo);
+      expect(await updater.installUpdate(storeInfo)).toBe(outcome);
+      expect(mocks.invoke).toHaveBeenCalledExactlyOnceWith(
+        "install_store_update",
+        { onEvent: mocks.channels[0] },
+      );
+      expect(updater.useUpdate.getState().info).toEqual(
+        outcome === "cancelled" ? storeInfo : null,
+      );
+      expect(updater.updateBusy(updater.useUpdate.getState())).toBe(false);
+      expect(mocks.capture).not.toHaveBeenCalled();
+    },
+  );
+
+  it("deduplicates Store installations, forwards progress, and ignores late callbacks", async () => {
+    const request = deferred<InstallOutcome>();
+    mocks.invoke.mockReturnValue(request.promise);
+    const first = updater.installUpdate(storeInfo);
+    expect(updater.installUpdate(storeInfo)).toBe(first);
+    await vi.dynamicImportSettled();
+    const channel = mocks.channels[0];
+    channel.onmessage({
+      event: "StoreProgress",
+      data: { progress: 0.4, installing: false },
+    });
+    expect(updater.useUpdate.getState()).toMatchObject({
+      progress: 0.4,
+      phase: "downloading",
+      installing: true,
+    });
+    channel.onmessage({
+      event: "StoreProgress",
+      data: { progress: 0.9, installing: true },
+    });
+    expect(updater.useUpdate.getState()).toMatchObject({
+      progress: 0.9,
+      phase: "installing",
+    });
+    request.resolve("cancelled");
+    await first;
+    channel.onmessage({
+      event: "StoreProgress",
+      data: { progress: 1, installing: true },
+    });
+    expect(updater.useUpdate.getState()).toMatchObject({
+      progress: null,
+      installing: false,
+    });
+    expect(mocks.invoke).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases UI state after failure and permits a retry", async () => {
+    mocks.invoke
+      .mockRejectedValueOnce(new Error("Store failure"))
+      .mockResolvedValueOnce("installed");
+    await expect(updater.installUpdate(storeInfo)).rejects.toThrow(
+      "Store failure",
+    );
+    expect(updater.updateBusy(updater.useUpdate.getState())).toBe(false);
+    expect(await updater.installUpdate(storeInfo)).toBe("installed");
+  });
+
+  it("restores the native installation lock after a Store WebView reload", async () => {
+    mocks.listen.mockResolvedValue(vi.fn());
+    mocks.invoke.mockResolvedValue(true);
+    const stop = updater.subscribeUpdateStatus();
+    await vi.dynamicImportSettled();
+    expect(mocks.invoke).toHaveBeenCalledExactlyOnceWith("update_installing");
+    expect(updater.updateBusy(updater.useUpdate.getState())).toBe(true);
+    stop();
+  });
+
+  it("rejects Store installs in direct, contributor, and browser builds", async () => {
+    vi.stubEnv("VITE_STORE", "0");
+    await expect(updater.installUpdate(storeInfo)).rejects.toThrow(
+      "Update source",
+    );
+    vi.stubEnv("VITE_STORE", "1");
+    vi.stubEnv("VITE_CONTRIBUTOR", "1");
+    expect(await updater.checkForUpdate()).toBeNull();
+    await expect(updater.installUpdate(storeInfo)).rejects.toThrow(
+      "Update source",
+    );
+    vi.stubEnv("VITE_CONTRIBUTOR", "0");
+    vi.stubGlobal("window", {});
+    await expect(updater.installUpdate(storeInfo)).rejects.toThrow(
+      "Update source",
+    );
+    expect(mocks.invoke).not.toHaveBeenCalled();
+  });
+});
+
 describe("checks and boot cancellation", () => {
   it("does not contact native code in a contributor build or browser demo", async () => {
     vi.stubEnv("VITE_CONTRIBUTOR", "1");
@@ -370,7 +506,7 @@ describe("proactive update offers", () => {
       version,
       close: vi.fn().mockResolvedValue(undefined),
     }) as unknown as Update;
-  const offer = (version: string): UpdateInfo => ({
+  const offer = (version: string): DirectUpdateInfo => ({
     version,
     notes: "",
     handle: handle(version),

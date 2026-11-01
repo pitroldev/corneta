@@ -40,7 +40,18 @@ NSIS installations retain their configuration and updater behavior.
 ## Runtime differences
 
 Store builds omit the Tauri updater plugin and reject external updater commands.
-The About screen identifies Microsoft Store as the update manager. Autostart uses
+The About screen checks for updates through `StoreContext`; the existing update
+banner requests a Store-managed download and installation after the user clicks
+Update now. Background checks only offer updates. Store consent dialogs belong
+to the main window and are started on its UI thread. Installation holds the same
+native exclusion lease as the direct updater, including while awaiting consent,
+so streaming and unfinished recording cleanup cannot overlap an app-initiated update.
+Cancellation releases the lease without reporting success. The Store selects
+packages for the current identity; no package URL or ID comes from the frontend.
+The Store controls app termination during deployment. Users may need to reopen
+Corneta afterwards. Store-managed automatic updates remain independent of this lease.
+
+Autostart uses
 the manifest startup task, initially disabled, and respects Windows user policy.
 The MSVC runtime is statically linked. FFmpeg and MediaMTX remain adjacent to the
 executable; mutable configuration remains in the app config directory.

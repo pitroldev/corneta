@@ -1479,7 +1479,17 @@ export const en: Dict = {
     "You're live — installing now would kill the stream.",
   "components.update.check.busy": "Looking…",
   "components.update.check.cta": "Check for a new version",
-  "components.update.store": "Updates are managed by Microsoft Store.",
+  "components.update.store.check": "Check Microsoft Store",
+  "components.update.store.headline": "Update available in Microsoft Store",
+  "components.update.store.found":
+    "The Store has an update — the notice is up top.",
+  "components.update.store.current":
+    "No update is available for this device in Microsoft Store.",
+  "components.update.store.ready":
+    "Microsoft Store will ask for confirmation. Corneta may close during installation.",
+  "components.update.store.installing": "Finishing through Microsoft Store…",
+  "components.update.cancelled":
+    "Update cancelled. You can try again whenever you're ready.",
   "components.update.check.error": "Couldn't check right now: {error}",
   "components.update.check.found":
     "Corneta {version} is out — the notice is up top.",

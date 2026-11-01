@@ -10,6 +10,7 @@ in English and Portuguese, with the installers.
 
 ### Added
 
+- Microsoft Store installations can check for updates inside Corneta and request installation through the Store, with progress, cancellation handling and protection against updating during a stream.
 - A Microsoft Store MSIX build with verified package identity, isolated settings and credentials, Store-managed updates, and Windows startup-task support.
 
 ### Changed

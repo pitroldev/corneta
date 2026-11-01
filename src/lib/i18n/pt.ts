@@ -1472,8 +1472,18 @@ export const pt = {
     "Você tá no ar — instalar agora derrubaria a live.",
   "components.update.check.busy": "Olhando…",
   "components.update.check.cta": "Ver se tem versão nova",
-  "components.update.store":
-    "As atualizações são gerenciadas pela Microsoft Store.",
+  "components.update.store.check": "Verificar na Microsoft Store",
+  "components.update.store.headline":
+    "Atualização disponível na Microsoft Store",
+  "components.update.store.found":
+    "A Store tem uma atualização — o aviso tá lá em cima.",
+  "components.update.store.current":
+    "Nenhuma atualização disponível para este dispositivo na Microsoft Store.",
+  "components.update.store.ready":
+    "A Microsoft Store vai pedir sua confirmação. A Corneta pode fechar durante a instalação.",
+  "components.update.store.installing": "Concluindo pela Microsoft Store…",
+  "components.update.cancelled":
+    "Atualização cancelada. Você pode tentar novamente quando quiser.",
   "components.update.check.error": "Não consegui checar agora: {error}",
   "components.update.check.found":
     "Saiu a Corneta {version} — o aviso tá lá em cima.",
