@@ -8,6 +8,8 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-11-01
+
 ### Added
 
 - Microsoft Store installations can check for updates inside Corneta and request installation through the Store, with progress, cancellation handling and protection against updating during a stream.
