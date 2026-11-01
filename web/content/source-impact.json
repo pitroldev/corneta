@@ -88,14 +88,20 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; encoder discovery and the capabilities described here are unchanged."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
       "source": "web/PRODUCT.md",
       "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
+    },
+    {
+      "article": "en/guides/security/protect-stream-key.mdx",
+      "source": "src-tauri/src/keys.rs",
+      "sourceBlob": "502e43cf00637997e2e59293a335e73176e9161a",
+      "reason": "Store builds use a separate credential-service name in the same Windows vault; key protection and the reset guidance in this article are unchanged."
     },
     {
       "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
@@ -154,14 +160,14 @@
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; upload measurement and the workflow described here are unchanged."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; diagnostic export fields, redaction and the documented workflow are unchanged."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -172,8 +178,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "1cafb644c07d6be6cfb98115f525f6b2e6be78f8",
-      "reason": "Only a label for an invalid alerts token was added; the strings the article cites did not change."
+      "sourceBlob": "8a626104288b78105916e5bd30f98eb7699e7f38",
+      "reason": "The dictionary changes add alert-token and Microsoft Store update labels and update a documentation pointer; OBS setup labels and the documented workflow are unchanged."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -316,8 +322,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; encoder discovery and the capabilities described here are unchanged."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -366,6 +372,12 @@
       "source": "web/PRODUCT.md",
       "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
+    },
+    {
+      "article": "pt-BR/guides/security/protect-stream-key.mdx",
+      "source": "src-tauri/src/keys.rs",
+      "sourceBlob": "502e43cf00637997e2e59293a335e73176e9161a",
+      "reason": "Store builds use a separate credential-service name in the same Windows vault; key protection and the reset guidance in this article are unchanged."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
@@ -454,14 +466,14 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; upload measurement and the workflow described here are unchanged."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "aac863ca58296fe51eb1ea3b1e2f1314138f8e32",
-      "reason": "Only the FFmpeg fallback strings in the diagnostics became English; nothing the article describes changed."
+      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
+      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; diagnostic export fields, redaction and the documented workflow are unchanged."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -484,8 +496,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "1cafb644c07d6be6cfb98115f525f6b2e6be78f8",
-      "reason": "Only a label for an invalid alerts token was added; the strings the article cites did not change."
+      "sourceBlob": "8a626104288b78105916e5bd30f98eb7699e7f38",
+      "reason": "The dictionary changes add alert-token and Microsoft Store update labels and update a documentation pointer; OBS setup labels and the documented workflow are unchanged."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
