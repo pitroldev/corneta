@@ -48,6 +48,8 @@ JS/TS tests are picked up by the root Vitest, including the relevant tests in `w
 
 For the isolated Microsoft Store build and package checks, see
 [Microsoft Store MSIX](docs/MICROSOFT-STORE.md).
+For downstream package updates and publication workflows, see
+[Release distribution](docs/DISTRIBUTION.md).
 
 For Rust, prepare the sidecars and run inside `src-tauri/`:
 

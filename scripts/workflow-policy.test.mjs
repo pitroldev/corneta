@@ -182,7 +182,7 @@ describe("workflow safety contracts", () => {
     );
   });
 
-  it.each(["ci", "release", "codeql", "scorecard"])(
+  it.each(["ci", "release", "codeql", "scorecard", "distribution"])(
     "pins every external action implementation in %s",
     (name) => {
       const actions = workflowSteps(workflow(name)).filter((step) => step.uses);
@@ -198,18 +198,18 @@ describe("workflow safety contracts", () => {
     expect(
       assertLockedWorkflows(sources, {
         "cargo clippy": 1,
-        "cargo test": 2,
+        "cargo test": 3,
         "node node_modules/@tauri-apps/cli/tauri.js build": 1,
       }),
     ).toEqual({
       "cargo clippy": 1,
-      "cargo test": 2,
+      "cargo test": 3,
       "node node_modules/@tauri-apps/cli/tauri.js build": 1,
     });
     const toolchains = sources
       .flatMap(workflowSteps)
       .filter((step) => step.uses?.startsWith("dtolnay/rust-toolchain@"));
-    expect(toolchains).toHaveLength(2);
+    expect(toolchains).toHaveLength(3);
     for (const step of toolchains) expect(step.with.toolchain).toBe("1.97.1");
   });
   it("cancels superseded checks without sharing the release concurrency group", () => {

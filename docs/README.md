@@ -24,6 +24,7 @@ Start with the [project README](../README.md) to learn about the app, its requir
 ## Operate and distribute
 
 - [Release gates](RELEASE-GATES.md): approval criteria; running a subset does not approve the release.
+- [Release distribution](DISTRIBUTION.md): automated downstream delivery, channel credentials and retries.
 - [Microsoft Store MSIX](MICROSOFT-STORE.md): build the Store edition and validate its package in an isolated checkout.
 - [Signing](SIGNING.md) and [auto-update](AUTO-UPDATE.md): installer integrity, updater and recovery.
 - [FFmpeg compliance](FFMPEG-COMPLIANCE.md) and [third-party notices](../THIRD_PARTY_NOTICES.md): licenses and corresponding sources for the distribution.
