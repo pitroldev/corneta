@@ -83,6 +83,7 @@ export const pt = {
   "closing.footer.link.guides": "Guias",
   "closing.footer.link.help": "Ajuda",
   "closing.footer.link.source": "Código-fonte",
+  "closing.footer.link.store": "Microsoft Store",
   "closing.footer.link.terms": "Termos de uso",
   "closing.footer.nav.ariaLabel": "Links do rodapé",
   "closing.footer.tagline":
@@ -160,6 +161,7 @@ export const pt = {
     "Corneta para Windows 10/11 · sem cadastro · sem assinatura",
   "hero.download.compact": "Baixar",
   "hero.download.full": "Baixar grátis para Windows",
+  "hero.download.store": "Baixar na Microsoft Store",
   "hero.header.brand.aria": "Corneta — início",
   "hero.header.download": "Baixar grátis",
   "hero.nav.aria": "Navegação principal",

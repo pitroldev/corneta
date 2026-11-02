@@ -82,6 +82,7 @@ export const en: Dict = {
   "closing.footer.link.guides": "Guides",
   "closing.footer.link.help": "Help",
   "closing.footer.link.source": "Source code",
+  "closing.footer.link.store": "Microsoft Store",
   "closing.footer.link.terms": "Terms of use",
   "closing.footer.nav.ariaLabel": "Footer links",
   "closing.footer.tagline":
@@ -160,6 +161,7 @@ export const en: Dict = {
     "Corneta for Windows 10/11 · no sign-up · no subscription",
   "hero.download.compact": "Download",
   "hero.download.full": "Download free for Windows",
+  "hero.download.store": "Get it from Microsoft Store",
   "hero.header.brand.aria": "Corneta — home",
   "hero.header.download": "Download free",
   "hero.nav.aria": "Main navigation",

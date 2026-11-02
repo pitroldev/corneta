@@ -8,6 +8,10 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Added
+
+- The website and README link to Corneta's official Microsoft Store listing alongside the standalone Windows installer.
+
 ## [0.13.2] - 2026-11-01
 
 ### Added

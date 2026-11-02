@@ -18,6 +18,11 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.microsoft.com/detail/9P1Q28Q6Q6TD">Get Corneta from Microsoft Store</a> ·
+  <a href="https://www.corneta.live/download">Download the Windows installer</a>
+</p>
+
+<p align="center">
   <a href="#meet-corneta">Meet it</a> ·
   <a href="#try-it-without-rust-obs-or-accounts">Try it</a> ·
   <a href="#develop-and-contribute">Contribute</a> ·
@@ -92,6 +97,8 @@ Open **http://127.0.0.1:1420**. Explore stream setup, chat and the sample report
 The contributor profile does not load your personal `.env` and turns telemetry off. Do not copy real credentials or settings to try it out. The demo simulates streaming: it does not validate OBS, the encoder, the vault or real sign-in.
 
 ## Use it on your stream
+
+Install Corneta from the [official Microsoft Store listing](https://apps.microsoft.com/detail/9P1Q28Q6Q6TD) for Store-managed updates, or [download the standalone Windows installer](https://www.corneta.live/download). Both options are free and support Windows 10/11 x64.
 
 See the [project releases](https://github.com/pitroldev/corneta/releases) for installers and release notes, and the [changelog](CHANGELOG.md) for every version in one place. Before running an installer, check it as described in the [code signing policy](docs/SIGNING.md#code-signing-policy) and [how to verify a release](docs/SIGNING.md#verify-where-a-release-was-built). **Windows x64 is the current platform**; macOS, Linux and Windows ARM do not have a validated distribution yet. Contributor builds are meant for development and do not replace the release installers.
 

@@ -1,4 +1,6 @@
 export const DOWNLOAD_PATH = "/download";
+export const MICROSOFT_STORE_URL =
+  "https://apps.microsoft.com/detail/9P1Q28Q6Q6TD";
 export const RELEASES_URL =
   "https://github.com/pitroldev/corneta/releases/latest";
 
