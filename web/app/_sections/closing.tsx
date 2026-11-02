@@ -2,7 +2,7 @@ import { localePath, type Locale, type T } from "@/lib/i18n";
 import Image from "next/image";
 import Link from "next/link";
 import { faqsFor } from "@/lib/content";
-import { DOWNLOAD_PATH } from "@/lib/download";
+import { DOWNLOAD_PATH, MICROSOFT_STORE_URL } from "@/lib/download";
 import { LEGAL_CNPJ, LEGAL_OPERATOR, legalHref } from "@/lib/legal";
 import { BrandMark } from "../_components/brand-mark";
 import { Mascot, SoundWaves } from "../_components/decor";
@@ -16,7 +16,7 @@ import {
   Shell,
   TwoCol,
 } from "../_components/ui";
-import { DownloadButton } from "./hero";
+import { DownloadButton, StoreDownloadButton } from "./hero";
 
 const FAQ_LIST =
   "border-t-[3px] border-ink max-[980px]:max-w-[720px] " +
@@ -148,6 +148,7 @@ export function FinalCta({ t, locale }: { t: T; locale: Locale }) {
             </h2>
             <div className="mt-8 flex w-[min(420px,100%)] flex-col gap-3.5 [&>a]:w-full [&>p]:text-[0.8rem] [&>p]:font-[650] [&>p]:text-faint">
               <DownloadButton t={t} ctaId="final_download" />
+              <StoreDownloadButton t={t} storeCtaId="final_store" />
               <p>{t("closing.cta.note")}</p>
             </div>
           </div>
@@ -210,6 +211,17 @@ export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
                     data-telemetry-cta="footer_download"
                   >
                     {t("closing.footer.download")}
+                  </a>
+                </li>
+                <li>
+                  <a
+                    className={FOOTER_LINK}
+                    href={MICROSOFT_STORE_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-telemetry-cta="footer_store"
+                  >
+                    {t("closing.footer.link.store")}
                   </a>
                 </li>
                 <li>

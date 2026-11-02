@@ -1,5 +1,5 @@
 import { localePath, type T, type Locale } from "@/lib/i18n";
-import { DOWNLOAD_PATH } from "@/lib/download";
+import { DOWNLOAD_PATH, MICROSOFT_STORE_URL } from "@/lib/download";
 import type { SiteCtaId } from "@/lib/telemetry-schema";
 import { LocaleSwitch } from "../_components/locale-switch";
 import { SiteNav } from "../_components/site-nav";
@@ -37,6 +37,30 @@ export function DownloadButton({
           (compact ? t("hero.download.compact") : t("hero.download.full"))}
       </span>
       {!compact && <DownloadIcon />}
+    </a>
+  );
+}
+
+export function StoreDownloadButton({
+  t,
+  storeCtaId,
+}: {
+  t: T;
+  storeCtaId: SiteCtaId;
+}) {
+  return (
+    <a
+      className={cn(
+        downloadButton,
+        "border-2 border-current bg-transparent text-inherit shadow-none hover:bg-brass hover:text-brass-ink focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-current",
+      )}
+      href={MICROSOFT_STORE_URL}
+      target="_blank"
+      rel="noopener noreferrer"
+      data-telemetry-cta={storeCtaId}
+    >
+      <WindowsIcon />
+      <span>{t("hero.download.store")}</span>
     </a>
   );
 }
@@ -178,8 +202,9 @@ export function Hero({ t, locale }: { t: T; locale: Locale }) {
       </div>
 
       <Shell className="mt-[clamp(40px,4.4vw,60px)] flex flex-col items-center gap-3.5 text-center">
-        <div className="w-[min(440px,100%)] [&>a]:min-h-[70px] [&>a]:w-full [&>a]:text-[1.24rem] max-[760px]:[&>a]:min-h-[62px] max-[760px]:[&>a]:text-[1.06rem]">
+        <div className="flex w-[min(840px,100%)] flex-wrap justify-center gap-4 [&>a]:min-h-[70px] [&>a]:flex-1 [&>a]:text-[1.24rem] max-[760px]:max-w-[440px] max-[760px]:flex-col max-[760px]:[&>a]:min-h-[62px] max-[760px]:[&>a]:text-[1.06rem]">
           <DownloadButton t={t} ctaId="hero_download" />
+          <StoreDownloadButton t={t} storeCtaId="hero_store" />
         </div>
         <p className="text-[0.84rem] font-semibold text-ink-faint">
           {t("hero.cta.footnote")} ·{" "}
