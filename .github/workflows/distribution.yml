@@ -183,7 +183,7 @@ jobs:
           digest-mismatch: error
       - name: Configure Microsoft Store CLI
         if: github.event_name == 'workflow_run' || inputs.publish
-        uses: microsoft/microsoft-store-apppublisher@15abd1c50fcc164b19cb240fb04ef3c49bf715a2 # v1.1
+        uses: microsoft/microsoft-store-apppublisher@cc9910a8d59f2eb55cbb83df0a3800cf3b5300e0 # v1.4
       - name: Submit the verified package to Microsoft Store
         if: github.event_name == 'workflow_run' || inputs.publish
         shell: pwsh
