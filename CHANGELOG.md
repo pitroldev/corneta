@@ -12,6 +12,10 @@ in English and Portuguese, with the installers.
 
 - The website and README link to Corneta's official Microsoft Store listing alongside the standalone Windows installer.
 
+### Changed
+
+- The website's deck mode section shows the phone lying sideways like a stream deck, with what the main buttons do and how a combo runs several steps from one button.
+
 ## [0.13.2] - 2026-11-01
 
 ### Added

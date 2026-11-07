@@ -6,6 +6,8 @@ type ChapterId = "obs" | "platforms" | "golive" | "chat";
 
 type Still = { src: string; width: number; height: number };
 
+export type DeckPin = "mark" | "brb" | "scene";
+
 type LocaleMedia = {
   video: { webm: string; mp4: string; captions: string; seconds: number };
   poster: Still;
@@ -14,14 +16,17 @@ type LocaleMedia = {
     | "independent"
     | "chat"
     | "protection"
-    | "deckKeys"
-    | "deckChat"
+    | "deckSideways"
+    | "deckComboSteps"
+    | "deckComboKey"
     | "reportChart"
     | "reportMoments",
     Still
   >;
   // The quality screen wraps differently in each language, so these crops differ in height.
   honest: { wide: Still; narrow: Still };
+  // Percent of the framed sideways deck; English labels wrap into a taller first row.
+  deckPins: Record<DeckPin, { x: number; y: number }>;
 };
 
 const still = (
@@ -41,8 +46,9 @@ const shared = (locale: Locale) => ({
     independent: still(locale, "feat-independent", 1496, 464),
     chat: still(locale, "feat-chat", 1496, 572),
     protection: still(locale, "feat-protection", 832, 942),
-    deckKeys: still(locale, "feat-deck-keys", 780, 1688),
-    deckChat: still(locale, "feat-deck-chat", 780, 1688),
+    deckSideways: still(locale, "feat-deck-sideways", 1688, 780),
+    deckComboSteps: still(locale, "feat-deck-combo-steps", 780, 640),
+    deckComboKey: still(locale, "feat-deck-combo-key", 780, 700),
     reportChart: still(locale, "feat-report", 1496, 692),
     reportMoments: still(locale, "feat-report-moments", 800, 658),
   },
@@ -66,6 +72,11 @@ const MEDIA: Record<Locale, LocaleMedia> = {
       wide: still("pt-BR", "honest-modes", 1528, 542),
       narrow: still("pt-BR", "honest-mode", 518, 486),
     },
+    deckPins: {
+      mark: { x: 64.1, y: 5.5 },
+      brb: { x: 80.5, y: 5.5 },
+      scene: { x: 47.4, y: 38.3 },
+    },
     ...shared("pt-BR"),
   },
   en: {
@@ -84,6 +95,11 @@ const MEDIA: Record<Locale, LocaleMedia> = {
     honest: {
       wide: still("en", "honest-modes", 1528, 574),
       narrow: still("en", "honest-mode", 518, 518),
+    },
+    deckPins: {
+      mark: { x: 64.1, y: 5.5 },
+      brb: { x: 80.5, y: 5.5 },
+      scene: { x: 47.4, y: 43.3 },
     },
     ...shared("en"),
   },

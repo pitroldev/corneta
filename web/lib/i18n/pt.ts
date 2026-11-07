@@ -231,22 +231,28 @@ export const pt = {
   "feat.chat.text":
     "Twitch, YouTube e Kick no mesmo feed, com alertas e overlay pro OBS.",
   "feat.chat.title": "Chat, alertas e overlay",
-  "feat.deck.title": "Seu celular vira o painel da live",
+  "feat.deck.title": "Um Stream Deck que já tá no seu bolso",
+  // U+2060 keeps "alt-tab" from breaking at its hyphen.
   "feat.deck.text":
-    "Marque momentos, ligue o JÁ VOLTO, troque de cena e responda o chat sem dar alt-tab no jogo, sem instalar app nem criar conta.",
-  "feat.deck.does.label": "No celular",
-  "feat.deck.does.mark": "marcar momento",
-  "feat.deck.does.brb": "JÁ VOLTO",
-  "feat.deck.does.scene": "cena e microfone",
-  "feat.deck.does.alerts": "avisos com a solução",
-  "feat.deck.does.chat": "chat e saúde da live",
-  "feat.deck.does.combos": "combos",
+    "Deixa o celular deitado do lado do teclado e marca o momento, liga o JÁ VOLTO ou troca de cena sem dar alt-\u2060tab.",
+  "feat.deck.sticker": "Sem comprar hardware",
   "feat.deck.cost":
     "Vem desligado, só funciona no mesmo Wi-Fi do PC e a conexão não é criptografada: nada de rede pública.",
   "feat.deck.keys.alt":
-    "Modo deck no celular durante a live, com o botão grande de marcar momento e os de JÁ VOLTO, microfone, cena, título, recado no chat e cortar",
-  "feat.deck.chat.alt":
-    "Chat da Twitch, do YouTube e da Kick no celular, com o aviso de que alguém te marcou e o botão Responder",
+    "Modo deck no celular deitado durante a live, com os botões de marcar momento, JÁ VOLTO, microfone, cena, título e jogo, recado no chat e cortar",
+  "feat.deck.key.mark.title": "Marcar momento",
+  "feat.deck.key.mark.text": "Fica no relatório, com o minuto pra clipar.",
+  "feat.deck.key.brb.title": "JÁ VOLTO",
+  "feat.deck.key.brb.text": "Põe a tela de pausa em todas as plataformas.",
+  "feat.deck.key.scene.title": "Cena",
+  "feat.deck.key.scene.text": "Troca a cena do OBS.",
+  "feat.deck.combo.title": "E um botão faz vários passos",
+  "feat.deck.combo.text":
+    "Um combo como o Patrocínio troca a cena, marca o momento, espera 5 s e manda o link em todos os chats.",
+  "feat.deck.combo.steps.alt":
+    "Editor do combo Patrocínio com quatro passos: trocar pra cena Conversa, marcar Patrocínio, esperar 5 s e mandar o link em todos os chats",
+  "feat.deck.combo.key.alt":
+    "Botão Patrocínio no deck com o aviso de que o combo rodou",
   "feat.protection.alt":
     "Gaveta de proteções da Corneta com o JÁ VOLTO e o auto-bitrate ligados",
   "feat.protection.text":

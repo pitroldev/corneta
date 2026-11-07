@@ -439,10 +439,14 @@ the one from the app's own dictionary, key by key. Two wide cards stack pieces. 
 the "Highlights (worth clipping)" list rests on the right edge of the per-platform audience
 curve, with Pop Ink, and the three exports (YouTube chapters, CSV, EDL) sit in chips below the
 curve. In Deck mode, which comes before the report because it is the "during" of the stream,
-two upright phone screens (the buttons, and the chat with a notice) sit side by side. The chat
-one sits lower and leans against the other, both with a 5px ink frame, a 14px corner and Pop
-Ink, so they read as a device and not as a crop. The text sits beside them: title, sentence,
-chips for what the phone does and the network caveat in one line. The app interface is never
+the phone lies sideways like a deck next to the keyboard: one landscape screen in a 5px ink
+frame with a 14px corner and Pop Ink, so it reads as a device and not as a crop. Brass number
+pins sit on the corners of three keys (mark, BE RIGHT BACK, scene) and a numbered list under the
+phone says what each one does on stream; the pins are decoration and the list carries the
+meaning. A brass sticker on the frame's lower edge says no hardware is needed. The text sits
+beside it: title, sentence and the network caveat in one line. Below a 2px ink rule, the combo
+is the card's second piece: a smaller title, one sentence and two cropped phone screens (the
+combo's steps, and its key after it ran), the second one lower and leaning on the first. The app interface is never
 redrawn in HTML for the page: when the app changes, the crops are redone.
 
 ### Accent stripe

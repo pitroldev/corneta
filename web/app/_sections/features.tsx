@@ -2,27 +2,22 @@ import Image from "next/image";
 import type { ReactNode } from "react";
 import type { Locale, MessageKey, T } from "@/lib/i18n";
 import {
-  BellIcon,
   BoltIcon,
-  ChatIcon,
   ClapperIcon,
   CropIcon,
   GaugeIcon,
   KeyboardIcon,
   LayersIcon,
-  PauseIcon,
-  PinIcon,
   PlayIcon,
   PopoutIcon,
   PowerIcon,
   SaveIcon,
-  SequenceIcon,
   SheetIcon,
   ThemeIcon,
   TrayIcon,
 } from "../_components/icons";
 import { lpMedia } from "@/lib/lp-media";
-import { cn, Section, SectionHeading, Shell } from "../_components/ui";
+import { cn, Section, SectionHeading, Shell, Sticker } from "../_components/ui";
 
 type Still = { src: string; width: number; height: number };
 
@@ -92,10 +87,12 @@ function Phone({
   still,
   alt,
   className,
+  sizes = "(max-width: 760px) 44vw, 280px",
 }: {
   still: Still;
   alt: string;
   className?: string;
+  sizes?: string;
 }) {
   return (
     <div
@@ -109,21 +106,21 @@ function Phone({
         width={still.width}
         height={still.height}
         alt={alt}
-        sizes="(max-width: 760px) 44vw, 280px"
+        sizes={sizes}
         className="h-auto w-full"
       />
     </div>
   );
 }
 
-const DECK = [
-  ["feat.deck.does.mark", <PinIcon key="m" />],
-  ["feat.deck.does.brb", <PauseIcon key="b" />],
-  ["feat.deck.does.scene", <ClapperIcon key="s" />],
-  ["feat.deck.does.alerts", <BellIcon key="a" />],
-  ["feat.deck.does.chat", <ChatIcon key="c" />],
-  ["feat.deck.does.combos", <SequenceIcon key="k" />],
+const DECK_KEYS = [
+  ["mark", "feat.deck.key.mark.title", "feat.deck.key.mark.text"],
+  ["brb", "feat.deck.key.brb.title", "feat.deck.key.brb.text"],
+  ["scene", "feat.deck.key.scene.title", "feat.deck.key.scene.text"],
 ] as const;
+
+const PIN =
+  "grid size-[30px] shrink-0 place-items-center rounded-sm border-[3px] border-ink bg-brass font-display text-base leading-none font-extrabold text-brass-ink max-[760px]:size-[26px] max-[760px]:border-[2.5px] max-[760px]:text-[0.88rem]";
 
 const CHIP =
   "inline-flex items-center gap-1.5 rounded-md border-2 border-ink bg-paper px-2.5 py-1 text-[0.86rem] font-bold [&>svg]:size-4 [&>svg]:fill-none [&>svg]:stroke-current [&>svg]:[stroke-width:2.2]";
@@ -192,7 +189,7 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
           </Card>
 
           <article className={cn(CARD, "col-span-2 max-[980px]:col-span-1")}>
-            <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.05fr)] items-center gap-x-[clamp(28px,4.4vw,64px)] gap-y-8 max-[860px]:grid-cols-1">
+            <div className="grid grid-cols-[minmax(0,0.82fr)_minmax(0,1.18fr)] items-center gap-x-[clamp(28px,4.4vw,64px)] gap-y-8 max-[860px]:grid-cols-1">
               <div>
                 <h3 className="text-[clamp(1.6rem,2.6vw,2.3rem)] leading-[1.04]">
                   {t("feat.deck.title")}
@@ -200,32 +197,80 @@ export function Features({ t, locale }: { t: T; locale: Locale }) {
                 <p className="mt-3 max-w-[48ch] text-[1.02rem] leading-[1.55] font-medium text-ink-muted">
                   {t("feat.deck.text")}
                 </p>
-                <p className="mt-6 text-[0.72rem] font-extrabold tracking-[0.1em] text-ink-faint uppercase">
-                  {t("feat.deck.does.label")}
-                </p>
-                <ul className="mt-2 flex flex-wrap gap-2" role="list">
-                  {DECK.map(([key, icon]) => (
-                    <li key={key} className={CHIP}>
-                      {icon}
-                      {t(key)}
-                    </li>
-                  ))}
-                </ul>
                 <p className="mt-6 max-w-[54ch] text-[0.86rem] leading-[1.5] font-medium text-ink-muted">
                   {t("feat.deck.cost")}
                 </p>
               </div>
-              {/* The chat phone leans on the keys phone, like the report's highlights sheet on its chart. */}
-              <div className="flex items-start justify-center px-[3%] pb-2 max-[860px]:px-0">
+              <div>
+                <div className="relative">
+                  <Phone
+                    still={media.features.deckSideways}
+                    alt={t("feat.deck.keys.alt")}
+                    sizes="(max-width: 980px) 88vw, 680px"
+                  />
+                  {DECK_KEYS.map(([pin], index) => (
+                    <span
+                      key={pin}
+                      aria-hidden="true"
+                      className={cn(PIN, "absolute -translate-1/2")}
+                      style={{
+                        left: `${media.deckPins[pin].x}%`,
+                        top: `${media.deckPins[pin].y}%`,
+                      }}
+                    >
+                      {index + 1}
+                    </span>
+                  ))}
+                  <Sticker className="absolute right-[26px] -bottom-3.5 z-10 max-[560px]:right-2">
+                    {t("feat.deck.sticker")}
+                  </Sticker>
+                </div>
+                <ol
+                  className="mt-[26px] grid grid-cols-3 gap-x-5 gap-y-3.5 max-[560px]:grid-cols-1"
+                  role="list"
+                >
+                  {DECK_KEYS.map(([pin, title, text], index) => (
+                    <li
+                      key={pin}
+                      className="grid grid-cols-[30px_minmax(0,1fr)] content-start items-start gap-x-3 gap-y-0.5 max-[760px]:grid-cols-[26px_minmax(0,1fr)]"
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(PIN, "row-span-2")}
+                      >
+                        {index + 1}
+                      </span>
+                      <span className="pt-[3px] font-display text-[1.08rem] leading-[1.2] font-extrabold">
+                        {t(title)}
+                      </span>
+                      <span className="text-[0.92rem] leading-[1.45] font-medium text-ink-muted">
+                        {t(text)}
+                      </span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            </div>
+            <div className="mt-[30px] grid grid-cols-[minmax(0,1fr)_minmax(0,1.18fr)] items-center gap-x-[clamp(28px,4.4vw,64px)] gap-y-6 border-t-2 border-ink pt-[26px] max-[860px]:grid-cols-1">
+              <div>
+                <h4 className="font-display text-[clamp(1.3rem,2.1vw,1.8rem)] leading-[1.08] font-extrabold tracking-[-0.02em] text-balance">
+                  {t("feat.deck.combo.title")}
+                </h4>
+                <p className="mt-2 max-w-[48ch] text-[1.02rem] leading-[1.55] font-medium text-ink-muted">
+                  {t("feat.deck.combo.text")}
+                </p>
+              </div>
+              {/* The combo key leans on its editor, like the report's highlights sheet on its chart. */}
+              <div className="flex items-start pb-2">
                 <Phone
-                  className="w-[48%] max-w-[280px]"
-                  still={media.features.deckKeys}
-                  alt={t("feat.deck.keys.alt")}
+                  className="w-[46%] max-w-[236px]"
+                  still={media.features.deckComboSteps}
+                  alt={t("feat.deck.combo.steps.alt")}
                 />
                 <Phone
-                  className="relative mt-[16%] -ml-[3%] w-[48%] max-w-[280px]"
-                  still={media.features.deckChat}
-                  alt={t("feat.deck.chat.alt")}
+                  className="relative mt-[9%] -ml-[6%] w-[46%] max-w-[236px]"
+                  still={media.features.deckComboKey}
+                  alt={t("feat.deck.combo.key.alt")}
                 />
               </div>
             </div>

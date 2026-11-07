@@ -231,22 +231,28 @@ export const en: Dict = {
   "feat.chat.text":
     "Twitch, YouTube and Kick in one feed, plus alerts and an OBS overlay.",
   "feat.chat.title": "Chat, alerts and overlay",
-  "feat.deck.title": "Your phone becomes your stream panel",
+  "feat.deck.title": "A Stream Deck that's already in your pocket",
+  // U+2060 keeps "alt-tab" from breaking at its hyphen.
   "feat.deck.text":
-    "Mark moments, turn on BE RIGHT BACK, switch scenes and answer chat without alt-tabbing out of your game, with no app to install and no account.",
-  "feat.deck.does.label": "On your phone",
-  "feat.deck.does.mark": "mark a moment",
-  "feat.deck.does.brb": "BE RIGHT BACK",
-  "feat.deck.does.scene": "scene and mic",
-  "feat.deck.does.alerts": "warnings with the fix",
-  "feat.deck.does.chat": "chat and stream health",
-  "feat.deck.does.combos": "combos",
+    "Lay your phone next to the keyboard and mark the moment, turn on BE RIGHT BACK or switch scenes without alt-\u2060tabbing.",
+  "feat.deck.sticker": "No hardware to buy",
   "feat.deck.cost":
     "Off by default, works only on the PC's Wi-Fi, and the connection isn't encrypted: skip public networks.",
   "feat.deck.keys.alt":
-    "Deck mode on a phone mid-stream, with the big mark-a-moment button plus BE RIGHT BACK, mic, scene, title, chat message and end stream",
-  "feat.deck.chat.alt":
-    "Twitch, YouTube and Kick chat on a phone, with the warning that someone mentioned you and the Reply button",
+    "Deck mode on a phone lying sideways mid-stream, with mark a moment, BE RIGHT BACK, mic, scene, title and game, chat message and end stream",
+  "feat.deck.key.mark.title": "Mark this moment",
+  "feat.deck.key.mark.text": "Goes into the report with the minute to clip.",
+  "feat.deck.key.brb.title": "BE RIGHT BACK",
+  "feat.deck.key.brb.text": "Puts the break screen on every platform.",
+  "feat.deck.key.scene.title": "Scene",
+  "feat.deck.key.scene.text": "Switches your OBS scene.",
+  "feat.deck.combo.title": "And one button can do several steps",
+  "feat.deck.combo.text":
+    "A combo like Sponsor switches the scene, marks the moment, waits 5 s and posts the link in every chat.",
+  "feat.deck.combo.steps.alt":
+    "Editor for the Sponsor combo with four steps: switch to the Just Chatting scene, mark Sponsor, wait 5 s and post the link in every chat",
+  "feat.deck.combo.key.alt":
+    "Sponsor button on the deck with the notice that the combo ran",
   "feat.protection.alt":
     "Corneta's safety nets drawer with BE RIGHT BACK and auto-bitrate turned on",
   "feat.protection.text":
