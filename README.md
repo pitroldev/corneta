@@ -23,6 +23,10 @@
 </p>
 
 <p align="center">
+  <a href="https://www.producthunt.com/products/corneta/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-corneta"><img src="https://api.producthunt.com/widgets/embed-image/v1/product_review.svg?product_id=1369582&theme=light" alt="Review Corneta on Product Hunt" width="250" height="54"></a>
+</p>
+
+<p align="center">
   <a href="#meet-corneta">Meet it</a> ·
   <a href="#try-it-without-rust-obs-or-accounts">Try it</a> ·
   <a href="#develop-and-contribute">Contribute</a> ·

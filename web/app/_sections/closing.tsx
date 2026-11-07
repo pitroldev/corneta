@@ -180,6 +180,9 @@ const FOOTER_LINK =
   "inline-flex min-h-9 items-center rounded-sm text-[0.84rem] font-[650] text-muted underline-offset-4 transition-colors duration-120 " +
   "hover:text-brass hover:underline focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass [@media(pointer:coarse)]:min-h-11";
 
+const PRODUCT_HUNT_REVIEW_URL =
+  "https://www.producthunt.com/products/corneta/reviews/new?utm_source=badge-product_review&utm_medium=badge&utm_source=badge-corneta";
+
 const FOOTER_GROUP_TITLE =
   "mb-3 font-display text-[0.92rem] font-extrabold text-cream";
 
@@ -193,6 +196,22 @@ export function SiteFooter({ t, locale }: { t: T; locale: Locale }) {
             <p className="max-w-[36ch] text-[0.84rem] leading-[1.6] font-[550] text-faint-raised">
               {t("closing.footer.tagline")}
             </p>
+            {/* A local copy of the badge, so footer visits never load anything from Product Hunt. */}
+            <a
+              className="mt-1 rounded-[10px] transition-transform duration-120 hover:-translate-y-0.5 focus-visible:outline-[3px] focus-visible:outline-offset-4 focus-visible:outline-brass"
+              href={PRODUCT_HUNT_REVIEW_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              data-telemetry-cta="footer_product_hunt"
+            >
+              <Image
+                src="/images/product-hunt-review.svg"
+                width={250}
+                height={54}
+                alt={t("closing.footer.productHunt")}
+                unoptimized
+              />
+            </a>
           </div>
 
           <nav

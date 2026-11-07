@@ -87,6 +87,7 @@ export const en: Dict = {
   "closing.footer.nav.ariaLabel": "Footer links",
   "closing.footer.tagline":
     "Multistream that runs on your PC — not in somebody else's cloud.",
+  "closing.footer.productHunt": "Review Corneta on Product Hunt",
 
   "content.faq.free.answer":
     "It's free, with no sign-up and no trial. Everything that runs on your PC is open source and stays that way. If something paid ever shows up, it'll be an optional cloud service, and you'll know before.",

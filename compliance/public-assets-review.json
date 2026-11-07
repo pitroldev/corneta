@@ -204,6 +204,12 @@
       "sha256": "16039cbf98f10edc4cd21b1fa0e827af0db230aaf7237cd92aa8509e1aa1b1cc"
     },
     {
+      "file": "web/public/images/product-hunt-review.svg",
+      "sha256": "f99b3fad73d5898ba4b94aed1fd1a073edd02b8054a9668b2032a4ebda6d1c4b",
+      "reviewedAt": "2026-11-07",
+      "reviewScope": "Visual inspection by a coding agent of Product Hunt's official review badge (dark theme), downloaded unchanged from the Product Hunt widget API and read as SVG code with no scripts, links or external references; the Product Hunt name and logo belong to Product Hunt; not a human sign-off or legal approval."
+    },
+    {
       "file": "web/public/images/editorial/chat-and-alerts/corneta-unified-chat.webp",
       "sha256": "ef3c59c3ccca49d2612f4fa1ddb53751e037159935fb16b9b936cc84a2ee9e16"
     },

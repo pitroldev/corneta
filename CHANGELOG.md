@@ -11,6 +11,7 @@ in English and Portuguese, with the installers.
 ### Added
 
 - The website and README link to Corneta's official Microsoft Store listing alongside the standalone Windows installer.
+- The website footer and the README show Product Hunt's review badge, linking to Corneta's Product Hunt page. The website serves its own copy of the badge, so visitors never load anything from Product Hunt.
 
 ### Changed
 

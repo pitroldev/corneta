@@ -88,6 +88,7 @@ export const pt = {
   "closing.footer.nav.ariaLabel": "Links do rodapé",
   "closing.footer.tagline":
     "Multistream que roda no seu PC — não na nuvem de ninguém.",
+  "closing.footer.productHunt": "Avalia a Corneta no Product Hunt",
 
   "content.faq.free.answer":
     "É grátis, sem cadastro e sem período de teste. Tudo que roda no seu PC é de código aberto e vai continuar assim. Se um dia existir algo pago, vai ser um serviço opcional na nuvem, e você vai saber antes.",

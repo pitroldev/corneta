@@ -26,6 +26,7 @@ export const SITE_CTA_IDS = [
   "hero_store",
   "final_store",
   "footer_store",
+  "footer_product_hunt",
   "content_download",
   "content_related",
   "content_open_help",
