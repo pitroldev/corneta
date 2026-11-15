@@ -105,6 +105,11 @@ const SDK_TRANSPORT_PROPERTIES = new Set([
   "$process_person_profile",
   "$geoip_disable",
 ]);
+const EXCEPTION_FRAME_PLATFORMS: ReadonlySet<string> = new Set([
+  "web:javascript",
+  "node:javascript",
+]);
+const FILE_URL_RE = /file:\/{2,3}[^\s<>"'`)\]}]+/gi;
 const URL_RE = /\bhttps?:\/\/[^\s<>"'`]+/gi;
 const BEARER_RE = /\bBearer\s+[A-Za-z0-9._~+/=-]+/gi;
 const JWT_RE = /\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g;
@@ -295,6 +300,7 @@ export function redactTelemetryText(
     .replace(BEARER_RE, "Bearer <redacted>")
     .replace(JWT_RE, "<redacted-jwt>")
     .replace(SECRET_ASSIGNMENT_RE, "$1=<redacted>")
+    .replace(FILE_URL_RE, "<local-path>")
     .replace(URL_RE, sanitizeUrl)
     .replace(WINDOWS_PATH_RE, "<local-path>")
     .replace(UNIX_PATH_RE, "<local-path>")
@@ -481,7 +487,9 @@ function sanitizeExceptionList(value: unknown) {
     if (source.stacktrace && typeof source.stacktrace === "object") {
       const stacktrace = source.stacktrace as Record<string, unknown>;
       if (Array.isArray(stacktrace.frames)) {
+        // PostHog rejects raw frames without `platform` and parses an untyped stack as another language.
         output.stacktrace = {
+          type: "raw",
           frames: stacktrace.frames.slice(-MAX_ARRAY_ITEMS).map((frame) => {
             if (!frame || typeof frame !== "object") return {};
             const sourceFrame = frame as Record<string, unknown>;
@@ -503,6 +511,12 @@ function sanitizeExceptionList(value: unknown) {
             }
             if (typeof sourceFrame.in_app === "boolean") {
               safeFrame.in_app = sourceFrame.in_app;
+            }
+            if (
+              typeof sourceFrame.platform === "string" &&
+              EXCEPTION_FRAME_PLATFORMS.has(sourceFrame.platform)
+            ) {
+              safeFrame.platform = sourceFrame.platform;
             }
             return safeFrame;
           }),

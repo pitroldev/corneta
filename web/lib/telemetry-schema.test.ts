@@ -324,6 +324,66 @@ describe("telemetry catalog", () => {
       }),
     ]);
   });
+
+  it("keeps the frame fields PostHog needs to process a site exception", () => {
+    const message = redactPostHogMessage({
+      event: "$exception",
+      properties: {
+        surface: "marketing_site",
+        error_id: "318f95fc-6f70-4cf5-a625-e250e43b1234",
+        route_id: "home",
+        error_code: "UNEXPECTED_ERROR",
+        $exception_list: [
+          {
+            type: "TypeError",
+            value: "boom",
+            stacktrace: {
+              type: "raw",
+              frames: [
+                {
+                  platform: "web:javascript",
+                  filename: "https://www.corneta.live/_next/static/app.js",
+                  function: "render",
+                  lineno: 1,
+                  colno: 20,
+                  in_app: true,
+                },
+                {
+                  platform: "node:javascript",
+                  filename:
+                    "about://React/Server/file:///C:/Users/Maria/corneta/web/.next/server/page.js?1",
+                  function: "Page",
+                  lineno: 3,
+                  colno: 4,
+                  in_app: false,
+                },
+                {
+                  platform: "custom:<script>",
+                  filename: "https://www.corneta.live/_next/static/other.js",
+                  lineno: 5,
+                  colno: 6,
+                },
+              ],
+            },
+          },
+        ],
+      },
+    });
+    const [exception] = message?.properties.$exception_list as Array<{
+      stacktrace: { type: string; frames: Array<Record<string, unknown>> };
+    }>;
+
+    expect(exception.stacktrace.type).toBe("raw");
+    expect(exception.stacktrace.frames.map((frame) => frame.platform)).toEqual([
+      "web:javascript",
+      "node:javascript",
+      undefined,
+    ]);
+    expect(JSON.stringify(message)).not.toContain("Maria");
+    expect(exception.stacktrace.frames[1]?.filename).toBe(
+      "about://React/Server/<local-path>",
+    );
+  });
 });
 
 describe("telemetry normalization", () => {
