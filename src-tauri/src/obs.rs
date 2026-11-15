@@ -94,6 +94,12 @@ impl ConnFailure {
             Self::PasswordRequired | Self::AuthenticationFailed | Self::Identification
         )
     }
+
+    /// OBS closed, its WebSocket server off or a stale password: the UI explains these, so they
+    /// are not reported as Corneta defects.
+    fn is_user_setup(self) -> bool {
+        self == Self::Connect || self.is_auth()
+    }
 }
 
 /// IPC error for OBS actions: the stable code plus the localized message.
@@ -125,6 +131,12 @@ impl From<ConnErr> for ObsFailure {
 pub(crate) struct ConnErr {
     failure: ConnFailure,
     msg: String,
+}
+
+impl ConnErr {
+    pub(crate) fn is_user_setup(&self) -> bool {
+        self.failure.is_user_setup()
+    }
 }
 
 impl From<String> for ConnErr {
@@ -244,7 +256,12 @@ pub fn autoconfigure(
     }
 }
 
-pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<(), String> {
+pub(crate) fn set_stream(
+    host: &str,
+    port: u16,
+    password: &str,
+    start: bool,
+) -> Result<(), ConnErr> {
     let mut socket = connect_identify(host, port, password)?;
     let req_type = if start { "StartStream" } else { "StopStream" };
     send_json(
@@ -267,11 +284,14 @@ pub fn set_stream(host: &str, port: u16, password: &str, start: bool) -> Result<
     if ok || code == already {
         Ok(())
     } else {
-        Err(Msg::ObsRefusedRequest {
-            req_type,
-            response: &response.to_string(),
-        }
-        .now())
+        Err(ConnErr {
+            failure: ConnFailure::RequestRefused,
+            msg: Msg::ObsRefusedRequest {
+                req_type,
+                response: &response.to_string(),
+            }
+            .now(),
+        })
     }
 }
 
@@ -1091,6 +1111,31 @@ pub(crate) fn run_link(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_protocol_failures_count_as_obs_defects() {
+        for failure in [
+            ConnFailure::Connect,
+            ConnFailure::PasswordRequired,
+            ConnFailure::AuthenticationFailed,
+            ConnFailure::Identification,
+        ] {
+            assert!(failure.is_user_setup(), "{failure:?}");
+        }
+        for failure in [ConnFailure::Exchange, ConnFailure::RequestRefused] {
+            assert!(!failure.is_user_setup(), "{failure:?}");
+        }
+    }
+
+    #[test]
+    fn stream_requests_to_a_closed_obs_are_user_setup_failures() {
+        let port = std::net::TcpListener::bind("127.0.0.1:0")
+            .and_then(|listener| listener.local_addr())
+            .map(|address| address.port())
+            .unwrap();
+        let error = set_stream("127.0.0.1", port, "", true).expect_err("a closed port must fail");
+        assert!(error.is_user_setup());
+    }
 
     #[test]
     fn deck_scenes_follow_the_obs_dock_order() {

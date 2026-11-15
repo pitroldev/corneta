@@ -345,6 +345,25 @@ pub(crate) fn parse_mediamtx_paths(
     (ingest_ready, bytes, prog_ready)
 }
 
+/// Returns the local port MediaMTX could not bind, or `fallback_port` when the line omits it.
+/// Windows words WSAEADDRINUSE and WSAEACCES (ports reserved by Hyper-V/WSL) differently from Unix.
+pub(crate) fn mediamtx_port_conflict(line: &str, fallback_port: u16) -> Option<u16> {
+    let low = line.to_ascii_lowercase();
+    let conflict = low.contains("address already in use")
+        || low.contains("only one usage of each socket address")
+        || low.contains("forbidden by its access permissions");
+    if !conflict {
+        return None;
+    }
+    let port = low
+        .split("listen ")
+        .nth(1)
+        .and_then(|rest| rest.split_whitespace().nth(1))
+        .and_then(|address| address.trim_end_matches(':').rsplit_once(':'))
+        .and_then(|(_, port)| port.parse::<u16>().ok());
+    Some(port.unwrap_or(fallback_port))
+}
+
 pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), String> {
     let after = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
     let hostport = after.split('/').next().unwrap_or("");
@@ -872,6 +891,28 @@ mod tests {
             parse_mediamtx_paths(prog, "live/obs", "live/obs_program"),
             (false, 0, true)
         );
+    }
+
+    #[test]
+    fn mediamtx_port_conflicts_are_recognized_on_windows_and_unix() {
+        // Lines captured from MediaMTX v1.19.3 on Windows and its Unix wording.
+        let windows_in_use = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:19351: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.";
+        let windows_reserved = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:9997: bind: An attempt was made to access a socket in a way forbidden by its access permissions.";
+        let unix_in_use = "2026/11/15 03:13:42 ERR listen udp :8892: bind: address already in use";
+        assert_eq!(mediamtx_port_conflict(windows_in_use, 1935), Some(19351));
+        assert_eq!(mediamtx_port_conflict(windows_reserved, 1935), Some(9997));
+        assert_eq!(mediamtx_port_conflict(unix_in_use, 1935), Some(8892));
+        assert_eq!(
+            mediamtx_port_conflict("ERR bind: address already in use", 1940),
+            Some(1940)
+        );
+        for unrelated in [
+            "2026/11/15 03:12:36 INF [RTMP] started with listener on 127.0.0.1:19351 (TCP/RTMP)",
+            "2026/11/15 03:12:36 WAR [MoQ] failed to save TLS key to auto.key: open auto.key: Access is denied.",
+            "2026/11/15 03:16:11 ERR mapping value is not allowed in this context",
+        ] {
+            assert_eq!(mediamtx_port_conflict(unrelated, 1935), None, "{unrelated}");
+        }
     }
 
     #[test]

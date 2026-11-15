@@ -608,6 +608,8 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
             "hls: no\n",
             "webrtc: no\n",
             "srt: no\n",
+            // MediaMTX 1.19 enables MoQ by default on every interface and writes TLS files to the CWD.
+            "moq: no\n",
             "api: yes\n",
             "apiAddress: 127.0.0.1:9997\n",
             "metrics: no\n",
@@ -1027,6 +1029,22 @@ mod tests {
             profiles: vec![],
             active_profile_id: String::new(),
         }
+    }
+
+    #[test]
+    fn mediamtx_config_opens_only_the_loopback_ingest_and_api() {
+        let yml = mediamtx_config(&cfg("per-platform", vec![]));
+        let lines: Vec<&str> = yml.lines().collect();
+        for protocol in [
+            "rtsp", "hls", "webrtc", "srt", "moq", "metrics", "pprof", "playback",
+        ] {
+            assert!(
+                lines.contains(&format!("{protocol}: no").as_str()),
+                "{protocol} must stay disabled"
+            );
+        }
+        assert!(lines.contains(&"rtmpAddress: 127.0.0.1:1935"));
+        assert!(lines.contains(&"apiAddress: 127.0.0.1:9997"));
     }
 
     #[test]

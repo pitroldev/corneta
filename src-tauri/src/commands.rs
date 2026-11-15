@@ -2,9 +2,9 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, classify_target_line, is_brb_slate_path, parse_ingest_hostport, parse_kv,
-    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
-    TargetErrorUpdate, TargetLine,
+    brb_slate_is_video, classify_target_line, is_brb_slate_path, mediamtx_port_conflict,
+    parse_ingest_hostport, parse_kv, parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic,
+    target_error_update, tray_tooltip, TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -1158,7 +1158,7 @@ pub async fn capture_frame(app: AppHandle) -> Result<String, String> {
 
 #[derive(Clone, Copy, Debug)]
 enum EngineFailure {
-    IngestPortInUse,
+    IngestPortInUse { port: u16 },
     MediamtxExited,
     FfmpegUnavailable,
 }
@@ -1166,7 +1166,7 @@ enum EngineFailure {
 impl EngineFailure {
     fn code(self) -> &'static str {
         match self {
-            Self::IngestPortInUse => "ingest_port_in_use",
+            Self::IngestPortInUse { .. } => "ingest_port_in_use",
             Self::MediamtxExited => "mediamtx_died",
             Self::FfmpegUnavailable => "ffmpeg_spawn_failed",
         }
@@ -1174,14 +1174,14 @@ impl EngineFailure {
 
     fn stage(self) -> &'static str {
         match self {
-            Self::IngestPortInUse | Self::MediamtxExited => "mediamtx",
+            Self::IngestPortInUse { .. } | Self::MediamtxExited => "mediamtx",
             Self::FfmpegUnavailable => "encoder",
         }
     }
 
     fn message(self) -> Msg<'static> {
         match self {
-            Self::IngestPortInUse => Msg::EngineIngestPortInUse,
+            Self::IngestPortInUse { port } => Msg::EngineIngestPortInUse { port },
             Self::MediamtxExited => Msg::EngineMediamtxDied,
             Self::FfmpegUnavailable => Msg::EngineMissingSidecar,
         }
@@ -1698,15 +1698,13 @@ async fn start_engine_inner(
     log::info!("engine: starting MediaMTX ingest and FFmpeg fan-out");
 
     let app_m = app.clone();
+    let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
     tauri::async_runtime::spawn(async move {
         while let Some(ev) = mtx_rx.recv().await {
             match ev {
                 CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
                     let raw = String::from_utf8_lossy(&b);
                     let line = raw.to_lowercase();
-                    if line.contains("address already in use") {
-                        set_engine_error(&app_m, EngineFailure::IngestPortInUse);
-                    }
                     // Retain publisher lifecycle failures without frame-grab noise.
                     if line.contains("publish")
                         || line.contains("available")
@@ -1715,9 +1713,12 @@ async fn start_engine_inner(
                         || line.contains("queue")
                         || line.contains("too slow")
                         || line.contains("timed out")
-                        || (line.contains("err") && !line.contains("address already"))
+                        || line.contains("err")
                     {
                         log::warn!("mediamtx: {}", raw.trim());
+                    }
+                    if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
+                        set_engine_error(&app_m, EngineFailure::IngestPortInUse { port });
                     }
                 }
                 // Unexpected exit is terminal even without a recognized error line.
@@ -3146,17 +3147,25 @@ pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
     match result {
         Ok(Ok(())) => Ok(()),
         Ok(Err(error)) => {
-            capture_native_error(
-                &app,
-                if start {
-                    "obs_start_failed"
-                } else {
-                    "obs_stop_failed"
-                },
-                "obs",
-                true,
-                Some(error.clone()),
-            );
+            let report = !error.is_user_setup();
+            let kind = error.to_string();
+            let error = String::from(error);
+            if report {
+                capture_native_error(
+                    &app,
+                    if start {
+                        "obs_start_failed"
+                    } else {
+                        "obs_stop_failed"
+                    },
+                    "obs",
+                    true,
+                    Some(error.clone()),
+                );
+            } else {
+                let action = if start { "start" } else { "stop" };
+                log::info!("obs: stream {action} failed with {kind}");
+            }
             Err(error)
         }
         Err(error) => {
@@ -3696,10 +3705,10 @@ mod engine_failure_tests {
     fn engine_failures_keep_stable_diagnostics_and_localized_ui_messages() {
         for (failure, code, stage, message) in [
             (
-                EngineFailure::IngestPortInUse,
+                EngineFailure::IngestPortInUse { port: 9997 },
                 "ingest_port_in_use",
                 "mediamtx",
-                Msg::EngineIngestPortInUse,
+                Msg::EngineIngestPortInUse { port: 9997 },
             ),
             (
                 EngineFailure::MediamtxExited,

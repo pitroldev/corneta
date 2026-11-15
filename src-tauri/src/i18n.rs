@@ -515,9 +515,9 @@ messages! {
     EngineMediamtxNoStart = "rust.engine.mediamtxNoStart" =>
         pt: "Não consegui subir o servidor de ingestão — reinicie a Corneta e tente de novo.",
         en: "Couldn't start the ingest server — restart Corneta and try again.";
-    EngineIngestPortInUse = "rust.engine.ingestPortInUse" =>
-        pt: "A porta de ingestão já está em uso. Feche o que estiver usando a porta 1935.",
-        en: "Something else is already on port 1935. Close whatever's using it.";
+    EngineIngestPortInUse { port: u16 } = "rust.engine.ingestPortInUse" =>
+        pt: "A porta {port} já está ocupada por outro programa ou reservada pelo Windows. Feche o que estiver usando essa porta e tenta de novo.",
+        en: "Port {port} is taken by another program or reserved by Windows. Close whatever's using it and try again.";
     EngineInvalidIngestUrl = "rust.engine.invalidIngestUrl" =>
         pt: "URL de ingestão inválida",
         en: "Invalid ingest URL";
