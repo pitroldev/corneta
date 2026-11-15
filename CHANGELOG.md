@@ -17,6 +17,18 @@ in English and Portuguese, with the installers.
 
 - The website's deck mode section shows the phone lying sideways like a stream deck, with what the main buttons do and how a combo runs several steps from one button.
 
+### Fixed
+
+- The pop-out chat no longer sends crash reports for a harmless browser warning while messages resize. It now measures message heights on the next frame, so the warning stops firing.
+- When another program, or a port reservation by Windows, blocks one of Corneta's local ports, going live now names the blocked port instead of saying the ingest server crashed.
+- A closed OBS or a rejected OBS password no longer counts as a Corneta crash when Corneta starts or stops the OBS stream for you.
+- Website error reports keep the stack details that error tracking needs to group them.
+
+### Security
+
+- The ingest server no longer opens an unused MoQ listener on port 8892 on every network interface.
+- Website error reports remove local file paths from stack frames.
+
 ## [0.13.2] - 2026-11-01
 
 ### Added
