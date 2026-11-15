@@ -8,6 +8,8 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+## [0.13.3] - 2026-11-15
+
 ### Added
 
 - The website and README link to Corneta's official Microsoft Store listing alongside the standalone Windows installer.
@@ -173,7 +175,9 @@ Versions 0.8.2, 0.8.3 and 0.8.4 were never published; their changes are included
 
 - First release published on GitHub, with the Windows installer, `SHA256SUMS.txt` and the third-party compliance bundle.
 
-[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.13.1...HEAD
+[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.13.3...HEAD
+[0.13.3]: https://github.com/pitroldev/corneta/compare/v0.13.2...v0.13.3
+[0.13.2]: https://github.com/pitroldev/corneta/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/pitroldev/corneta/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/pitroldev/corneta/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/pitroldev/corneta/compare/v0.11.0...v0.12.0
