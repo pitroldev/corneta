@@ -88,7 +88,7 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
@@ -166,13 +166,13 @@
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
@@ -214,8 +214,8 @@
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "4c4e383d4fdf9b1c449fa3c451c8705563f6bbb3",
-      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port; the states the article explains did not change."
+      "sourceBlob": "19e8840ef29392a08abe344a5cc5c0d51cd1a6cb",
+      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port and a loopback-host check; the states the article explains did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -328,7 +328,7 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
@@ -472,13 +472,13 @@
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "4c5e8590c00797284171d7f0388073584259a737",
+      "sourceBlob": "cab7767cedc382fc3d96355f6a2af44358918993",
       "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
@@ -532,8 +532,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "4c4e383d4fdf9b1c449fa3c451c8705563f6bbb3",
-      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port; the states the article explains did not change."
+      "sourceBlob": "19e8840ef29392a08abe344a5cc5c0d51cd1a6cb",
+      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port and a loopback-host check; the states the article explains did not change."
     }
   ]
 }
