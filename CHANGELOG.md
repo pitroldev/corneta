@@ -28,7 +28,7 @@ in English and Portuguese, with the installers.
 
 ### Security
 
-- Usage data and crash reports from the app no longer let the analytics service work out an approximate location (city and coordinates) from the connection, as the privacy policy promises. The installer's native reports and the website already worked this way.
+- Usage data and crash reports from the app no longer let the analytics service work out an approximate location (city and coordinates) from the connection, as the privacy policy promises. The app's native crash reports and the website already worked this way.
 - The ingest server no longer opens an unused MoQ listener on port 8892 on every network interface.
 - Website error reports remove local file paths from stack frames.
 
