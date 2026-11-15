@@ -592,6 +592,8 @@ pub fn ffmpeg_args_for_encoder(
     args
 }
 
+pub const MEDIAMTX_API_PORT: u16 = 9997;
+
 /// Enable only RTMP ingest and a loopback-only diagnostic API.
 pub fn mediamtx_config(config: &AppConfig) -> String {
     format!(
@@ -611,7 +613,7 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
             // MediaMTX 1.19 enables MoQ by default on every interface and writes TLS files to the CWD.
             "moq: no\n",
             "api: yes\n",
-            "apiAddress: 127.0.0.1:9997\n",
+            "apiAddress: 127.0.0.1:{api_port}\n",
             "metrics: no\n",
             "pprof: no\n",
             "playback: no\n",
@@ -619,7 +621,8 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
             "  all_others:\n",
         ),
         host = config.ingest.host,
-        port = config.ingest.port
+        port = config.ingest.port,
+        api_port = MEDIAMTX_API_PORT
     )
 }
 

@@ -868,7 +868,11 @@ pub(crate) fn update_tray(app: &AppHandle, snap: &EngineSnapshot) {
 // Match exact paths: the compositor publisher must not count as OBS input.
 // Byte counts reveal stalled input while MediaMTX still reports the publisher as ready.
 fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
-    let body = match ureq::get("http://127.0.0.1:9997/v3/paths/list")
+    let url = format!(
+        "http://127.0.0.1:{}/v3/paths/list",
+        engine::MEDIAMTX_API_PORT
+    );
+    let body = match ureq::get(&url)
         .timeout(std::time::Duration::from_millis(700))
         .call()
     {
@@ -1192,6 +1196,25 @@ impl std::fmt::Display for EngineFailure {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "code={} stage={}", self.code(), self.stage())
     }
+}
+
+/// Probes listen addresses before MediaMTX starts: the error kind does not depend on the Windows
+/// display language, unlike the text MediaMTX would log.
+fn first_unavailable_port(addresses: &[(&str, u16)]) -> Option<u16> {
+    addresses.iter().find_map(
+        |&(host, port)| match std::net::TcpListener::bind((host, port)) {
+            Ok(_) => None,
+            Err(error)
+                if matches!(
+                    error.kind(),
+                    std::io::ErrorKind::AddrInUse | std::io::ErrorKind::PermissionDenied
+                ) =>
+            {
+                Some(port)
+            }
+            Err(_) => None,
+        },
+    )
 }
 
 // Preserve track_caller through capture_engine_error for distinct failure fingerprints.
@@ -1570,6 +1593,21 @@ async fn start_engine_inner(
             keymap.insert(t.id.clone(), k);
         }
     }
+    let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
+    if let Some(port) = first_unavailable_port(&[
+        (config.ingest.host.as_str(), ingest_port),
+        ("127.0.0.1", engine::MEDIAMTX_API_PORT),
+    ]) {
+        let message = Msg::EngineIngestPortInUse { port }.now();
+        capture_engine_error(
+            &app,
+            "ingest_port_in_use",
+            "mediamtx",
+            true,
+            Some(message.clone()),
+        );
+        return Err(message);
+    }
     let yml = mediamtx_config_path(&app).inspect_err(|error| {
         capture_engine_error(
             &app,
@@ -1698,7 +1736,6 @@ async fn start_engine_inner(
     log::info!("engine: starting MediaMTX ingest and FFmpeg fan-out");
 
     let app_m = app.clone();
-    let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
     tauri::async_runtime::spawn(async move {
         while let Some(ev) = mtx_rx.recv().await {
             match ev {
@@ -3698,8 +3735,20 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
 
 #[cfg(test)]
 mod engine_failure_tests {
-    use super::EngineFailure;
+    use super::{first_unavailable_port, EngineFailure};
     use crate::i18n::{Locale, Msg};
+
+    #[test]
+    fn a_taken_local_port_is_found_before_mediamtx_starts() {
+        let taken = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let port = taken.local_addr().unwrap().port();
+        assert_eq!(
+            first_unavailable_port(&[("127.0.0.1", 0), ("127.0.0.1", port)]),
+            Some(port)
+        );
+        drop(taken);
+        assert_eq!(first_unavailable_port(&[("127.0.0.1", port)]), None);
+    }
 
     #[test]
     fn engine_failures_keep_stable_diagnostics_and_localized_ui_messages() {

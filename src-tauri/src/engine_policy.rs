@@ -346,18 +346,17 @@ pub(crate) fn parse_mediamtx_paths(
 }
 
 /// Returns the local port MediaMTX could not bind, or `fallback_port` when the line omits it.
-/// Windows words WSAEADDRINUSE and WSAEACCES (ports reserved by Hyper-V/WSL) differently from Unix.
+/// Matches the `listen <net> <addr>: bind:` shape because Windows may localize the OS text after it.
 pub(crate) fn mediamtx_port_conflict(line: &str, fallback_port: u16) -> Option<u16> {
     let low = line.to_ascii_lowercase();
-    let conflict = low.contains("address already in use")
-        || low.contains("only one usage of each socket address")
-        || low.contains("forbidden by its access permissions");
-    if !conflict {
-        return None;
-    }
-    let port = low
+    let listener = low
         .split("listen ")
         .nth(1)
+        .filter(|rest| rest.contains(": bind:"));
+    if listener.is_none() && !low.contains("address already in use") {
+        return None;
+    }
+    let port = listener
         .and_then(|rest| rest.split_whitespace().nth(1))
         .and_then(|address| address.trim_end_matches(':').rsplit_once(':'))
         .and_then(|(_, port)| port.parse::<u16>().ok());
@@ -899,9 +898,14 @@ mod tests {
         let windows_in_use = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:19351: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.";
         let windows_reserved = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:9997: bind: An attempt was made to access a socket in a way forbidden by its access permissions.";
         let unix_in_use = "2026/11/15 03:13:42 ERR listen udp :8892: bind: address already in use";
+        // Go falls back to the system language when Windows lacks the English message table.
+        let localized = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:1935: bind: Normalmente é permitida apenas uma utilização de cada endereço de soquete (protocolo/endereço de rede/porta).";
+        let ipv6 = "2026/11/15 03:13:42 ERR listen tcp [::1]:1940: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.";
         assert_eq!(mediamtx_port_conflict(windows_in_use, 1935), Some(19351));
         assert_eq!(mediamtx_port_conflict(windows_reserved, 1935), Some(9997));
         assert_eq!(mediamtx_port_conflict(unix_in_use, 1935), Some(8892));
+        assert_eq!(mediamtx_port_conflict(localized, 1940), Some(1935));
+        assert_eq!(mediamtx_port_conflict(ipv6, 1935), Some(1940));
         assert_eq!(
             mediamtx_port_conflict("ERR bind: address already in use", 1940),
             Some(1940)
