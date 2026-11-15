@@ -20,7 +20,7 @@ in English and Portuguese, with the installers.
 ### Fixed
 
 - The pop-out chat no longer sends crash reports for a harmless browser warning while messages resize. It now measures message heights on the next frame, so the warning stops firing.
-- When another program, or a port reservation by Windows, blocks one of Corneta's local ports, going live now names the blocked port instead of saying the ingest server crashed.
+- When another program, or a port reservation by Windows, blocks one of Corneta's local ports, the error shown when going live now names that port. Before, Windows users only saw that the ingest server crashed.
 - A closed OBS or a rejected OBS password no longer counts as a Corneta crash when Corneta starts or stops the OBS stream for you.
 - Website error reports keep the stack details that error tracking needs to group them.
 
