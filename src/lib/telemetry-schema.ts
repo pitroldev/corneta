@@ -1188,6 +1188,9 @@ export function sanitizePostHogEvent(
     const value = safeTransportProperty(key, input.properties[key]);
     if (value !== undefined) safe[key] = value;
   }
+  // PostHog derives city and coordinates from the request IP unless each event opts out; the
+  // privacy policy promises no geolocation, as the native and site clients already enforce.
+  safe.$geoip_disable = true;
   // Rebuild the envelope to exclude unknown top-level fields added by the SDK.
   return JSON.stringify(safe).length <= 24_576
     ? { event: input.event, properties: safe }

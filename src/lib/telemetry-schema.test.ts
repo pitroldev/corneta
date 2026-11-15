@@ -364,6 +364,7 @@ describe("telemetry schema", () => {
     expect(result?.properties).toMatchObject({
       screen_id: "settings",
       distinct_id: "00000000-0000-4000-8000-000000000001",
+      $geoip_disable: true,
     });
     expect(result?.properties).not.toHaveProperty("$current_url");
     expect(result?.properties).not.toHaveProperty("$browser");
@@ -436,6 +437,7 @@ describe("telemetry schema", () => {
       }),
     ]);
     expect(result?.properties?.$release_id).toBe("release_12345678");
+    expect(result?.properties?.$geoip_disable).toBe(true);
     expect(result?.properties?.$exception_steps).toEqual([
       {
         $message: "screen_opened",
