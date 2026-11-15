@@ -1594,10 +1594,20 @@ async fn start_engine_inner(
         }
     }
     let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
-    if let Some(port) = first_unavailable_port(&[
+    let listen_addresses = [
         (config.ingest.host.as_str(), ingest_port),
         ("127.0.0.1", engine::MEDIAMTX_API_PORT),
-    ]) {
+    ];
+    let mut blocked = first_unavailable_port(&listen_addresses);
+    // Stopping does not wait for the process tree, so the previous MediaMTX may still hold a port.
+    for _ in 0..10 {
+        if blocked.is_none() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        blocked = first_unavailable_port(&listen_addresses);
+    }
+    if let Some(port) = blocked {
         let message = Msg::EngineIngestPortInUse { port }.now();
         capture_engine_error(
             &app,
