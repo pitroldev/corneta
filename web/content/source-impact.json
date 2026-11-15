@@ -28,8 +28,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -76,8 +76,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -88,8 +88,8 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -154,26 +154,26 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -208,14 +208,14 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5844495a22dfe5fc0f7fa179ae1b0c40369c4920",
-      "reason": "engine_policy.rs only gained the Windows wording for a blocked local port; the states the article explains did not change."
+      "sourceBlob": "4c4e383d4fdf9b1c449fa3c451c8705563f6bbb3",
+      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port; the states the article explains did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -256,8 +256,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -316,8 +316,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -328,8 +328,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -448,8 +448,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -466,20 +466,20 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
-      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "8ebefb5af551c6ef26e6825bbfdc8a3000411c9d",
+      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -526,14 +526,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5844495a22dfe5fc0f7fa179ae1b0c40369c4920",
-      "reason": "engine_policy.rs only gained the Windows wording for a blocked local port; the states the article explains did not change."
+      "sourceBlob": "4c4e383d4fdf9b1c449fa3c451c8705563f6bbb3",
+      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port; the states the article explains did not change."
     }
   ]
 }
