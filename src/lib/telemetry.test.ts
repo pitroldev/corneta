@@ -16,6 +16,7 @@ import {
 } from "./telemetry";
 import {
   errorFromWindowEvent,
+  isBenignWindowError,
   REMOTE_DESKTOP_ERROR_MESSAGE,
   TELEMETRY_NOTICE_VERSION,
   type TelemetryStatus,
@@ -1025,6 +1026,60 @@ describe("telemetry facade", () => {
     const original = new TypeError("boom");
     const event = { error: original, message: "boom" } as unknown as ErrorEvent;
     expect(errorFromWindowEvent(event)).toBe(original);
+  });
+
+  it("recognizes only the error-less ResizeObserver loop notification as benign", () => {
+    const loop =
+      "ResizeObserver loop completed with undelivered notifications.";
+    expect(isBenignWindowError({ error: null, message: loop })).toBe(true);
+    expect(
+      isBenignWindowError({
+        error: undefined,
+        message: "ResizeObserver loop limit exceeded",
+      }),
+    ).toBe(true);
+    expect(isBenignWindowError({ error: new Error(loop), message: loop })).toBe(
+      false,
+    );
+    expect(isBenignWindowError({ error: null, message: "Script error." })).toBe(
+      false,
+    );
+    expect(
+      isBenignWindowError({ error: null, message: `Uncaught ${loop}` }),
+    ).toBe(false);
+  });
+
+  it("does not report the ResizeObserver loop notification from the chat popout", async () => {
+    const listeners = new Map<string, (event: unknown) => void>();
+    vi.stubGlobal("window", {
+      location: { pathname: "/chat.html" },
+      addEventListener: (type: string, listener: (event: unknown) => void) =>
+        listeners.set(type, listener),
+    });
+    const harness = sdkHarness();
+    configure(harness.loader);
+    await initializeTelemetry(backend(status("disabled", "enabled")));
+
+    const onError = listeners.get("error");
+    expect(onError).toBeTypeOf("function");
+    // Chromium uses the document URL and position 0:0 for this browser-generated event.
+    onError?.({
+      error: null,
+      message: "ResizeObserver loop completed with undelivered notifications.",
+      filename: "http://tauri.localhost/chat.html",
+      lineno: 0,
+      colno: 0,
+    });
+    onError?.({ error: new TypeError("boom"), message: "boom" });
+    await flushTelemetry();
+
+    expect(harness.exceptions).toHaveLength(1);
+    expect(harness.exceptions[0]?.error.name).toBe("TypeError");
+    expect(harness.exceptions[0]?.properties).toMatchObject({
+      error_code: "unhandled_error",
+      stage: "window_error",
+      screen_id: "chat_popout",
+    });
   });
 
   it("reports unhandled crashes as unhandled in the exception mechanism", async () => {

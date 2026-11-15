@@ -5,6 +5,7 @@ import { detectSystemLocale } from "./i18n/locale";
 import {
   EMPTY_TELEMETRY_STATUS,
   errorFromWindowEvent,
+  isBenignWindowError,
   REMOTE_DESKTOP_ERROR_MESSAGE,
   TELEMETRY_NOTICE_VERSION,
   TELEMETRY_SCHEMA_VERSION,
@@ -962,6 +963,7 @@ export function installGlobalErrorHandlers(): void {
     ? ("chat_popout" as const)
     : undefined;
   window.addEventListener("error", (event) => {
+    if (isBenignWindowError(event)) return;
     captureException(errorFromWindowEvent(event), {
       handled: false,
       severity: "fatal",
@@ -1037,6 +1039,7 @@ export function __configureTelemetryForTests(input: {
   backend = null;
   initialization = null;
   sdkInstanceSequence = 0;
+  globalHandlersInstalled = false;
   recentErrors.clear();
   recentEvents.clear();
   dropped = 0;

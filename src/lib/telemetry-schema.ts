@@ -772,6 +772,21 @@ export function redactTelemetryText(value: string, maxLength = 1_000): string {
 
 export const REMOTE_DESKTOP_ERROR_MESSAGE = "Unexpected desktop UI error";
 
+// Chromium dispatches deferred ResizeObserver deliveries as an ErrorEvent without an Error object;
+// the observations still arrive on the next frame, so the event is not an application failure.
+const RESIZE_OBSERVER_LOOP =
+  /^ResizeObserver loop (?:completed with undelivered notifications|limit exceeded)/;
+
+export function isBenignWindowError(
+  event: Pick<ErrorEvent, "error" | "message">,
+): boolean {
+  return (
+    (event.error === null || event.error === undefined) &&
+    typeof event.message === "string" &&
+    RESIZE_OBSERVER_LOOP.test(event.message)
+  );
+}
+
 export function errorFromWindowEvent(event: ErrorEvent): unknown {
   if (event.error !== null && event.error !== undefined) return event.error;
   const error = new Error(event.message || "Unknown UI error");

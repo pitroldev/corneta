@@ -114,6 +114,9 @@ export function ChatFeed({
     estimateSize: () => ROW_ESTIMATE,
     overscan: 12,
     getItemKey: (i) => messages[i].id,
+    // A scroll correction inside the ResizeObserver callback re-renders with flushSync and makes
+    // Chromium raise "ResizeObserver loop completed with undelivered notifications".
+    useAnimationFrameWithResizeObserver: true,
   });
   const totalSize = virt.getTotalSize();
 
