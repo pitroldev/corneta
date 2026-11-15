@@ -2,9 +2,9 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, classify_target_line, is_brb_slate_path, mediamtx_port_conflict,
-    parse_ingest_hostport, parse_kv, parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic,
-    target_error_update, tray_tooltip, TargetErrorUpdate, TargetLine,
+    brb_slate_is_video, classify_target_line, is_brb_slate_path, is_loopback_host,
+    mediamtx_port_conflict, parse_ingest_hostport, parse_kv, parse_mediamtx_paths, quality_of,
+    safe_ffmpeg_diagnostic, target_error_update, tray_tooltip, TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -1594,10 +1594,12 @@ async fn start_engine_inner(
         }
     }
     let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
-    let listen_addresses = [
-        (config.ingest.host.as_str(), ingest_port),
-        ("127.0.0.1", engine::MEDIAMTX_API_PORT),
-    ];
+    let mut listen_addresses = vec![("127.0.0.1", engine::MEDIAMTX_API_PORT)];
+    // Listening on a LAN address would make Windows Firewall prompt for Corneta itself; MediaMTX's
+    // own bind error still reports a taken LAN ingest port.
+    if is_loopback_host(&config.ingest.host) {
+        listen_addresses.insert(0, (config.ingest.host.as_str(), ingest_port));
+    }
     let mut blocked = first_unavailable_port(&listen_addresses);
     // Stopping does not wait for the process tree, so the previous MediaMTX may still hold a port.
     for _ in 0..10 {

@@ -363,6 +363,15 @@ pub(crate) fn mediamtx_port_conflict(line: &str, fallback_port: u16) -> Option<u
     Some(port.unwrap_or(fallback_port))
 }
 
+pub(crate) fn is_loopback_host(host: &str) -> bool {
+    host.eq_ignore_ascii_case("localhost")
+        || host
+            .trim_start_matches('[')
+            .trim_end_matches(']')
+            .parse::<std::net::IpAddr>()
+            .is_ok_and(|ip| ip.is_loopback())
+}
+
 pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), String> {
     let after = ingest_url.split("://").nth(1).unwrap_or(ingest_url);
     let hostport = after.split('/').next().unwrap_or("");
@@ -916,6 +925,23 @@ mod tests {
             "2026/11/15 03:16:11 ERR mapping value is not allowed in this context",
         ] {
             assert_eq!(mediamtx_port_conflict(unrelated, 1935), None, "{unrelated}");
+        }
+    }
+
+    #[test]
+    fn loopback_hosts_are_recognized() {
+        for host in [
+            "127.0.0.1",
+            "localhost",
+            "LOCALHOST",
+            "::1",
+            "[::1]",
+            "127.0.0.2",
+        ] {
+            assert!(is_loopback_host(host), "{host}");
+        }
+        for host in ["0.0.0.0", "192.168.0.10", "::", "corneta.local", ""] {
+            assert!(!is_loopback_host(host), "{host}");
         }
     }
 
