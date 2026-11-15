@@ -2,10 +2,10 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, classify_target_line, failure_ends_live, is_brb_slate_path,
-    is_loopback_host, mediamtx_port_conflict, parse_ingest_hostport, parse_kv,
-    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
-    TargetErrorUpdate, TargetLine,
+    brb_slate_is_video, classify_target_line, is_brb_slate_path, is_current_live, is_loopback_host,
+    mediamtx_port_conflict, parse_ingest_hostport, parse_kv, parse_mediamtx_paths, platform_check,
+    platform_check_due, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
+    RestartBudget, TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -1222,12 +1222,7 @@ fn first_unavailable_port(addresses: &[(&str, u16)]) -> Option<u16> {
 #[track_caller]
 fn set_engine_error(app: &AppHandle, failure: EngineFailure, generation: u64) {
     // Child exits after shutdown, or from the live a quick restart replaced, must not end this one.
-    let current = {
-        let state = app.state::<AppState>();
-        let engine = state.engine.lock().unwrap();
-        failure_ends_live(engine.live, engine.start_gen, generation)
-    };
-    if !current {
+    if !live_is_current(app, generation) {
         log::debug!("engine: ignoring {failure} from a stopped live");
         return;
     }
@@ -1242,6 +1237,220 @@ fn set_engine_error(app: &AppHandle, failure: EngineFailure, generation: u64) {
     );
     log::error!("engine: error_id={error_id}");
     stop_engine_internal(app, Some(msg), "error");
+    close_auto_broadcasts_later(app, generation);
+}
+
+/// Crashes allowed within a burst before the live ends; a quiet stretch earns them back.
+const MEDIAMTX_RESTARTS: u32 = 3;
+const MEDIAMTX_QUIET_MS: u64 = 120_000;
+
+fn live_is_current(app: &AppHandle, generation: u64) -> bool {
+    let state = app.state::<AppState>();
+    let engine = state.engine.lock().unwrap();
+    is_current_live(engine.live, engine.start_gen, generation)
+}
+
+/// Starts MediaMTX again for a running live; None when that live ended meanwhile.
+fn restart_mediamtx(
+    app: &AppHandle,
+    yml: &std::path::Path,
+    generation: u64,
+) -> Result<Option<tauri::async_runtime::Receiver<CommandEvent>>, String> {
+    let (events, child) = app
+        .shell()
+        .sidecar("mediamtx")
+        .map_err(|e| e.to_string())?
+        .args([yml.to_string_lossy().to_string()])
+        .spawn()
+        .map_err(|e| e.to_string())?;
+    crate::job::adopt_pid(child.pid());
+    let state = app.state::<AppState>();
+    let mut engine = state.engine.lock().unwrap();
+    if !is_current_live(engine.live, engine.start_gen, generation) {
+        drop(engine);
+        let _ = child.kill();
+        return Ok(None);
+    }
+    engine.mediamtx = Some(child);
+    Ok(Some(events))
+}
+
+/// A destination whose platform can confirm the live through the signed-in account.
+struct PlatformCheckPlan {
+    target_id: String,
+    provider: &'static dyn crate::platforms::provider::AccountProvider,
+    stream_key: String,
+}
+
+/// An account names one channel, so only a platform with a single enabled destination is checked.
+fn platform_check_plan(
+    enabled: &[&config::Target],
+    keymap: &HashMap<String, String>,
+    provisioned: &HashMap<String, ProvisionedIngest>,
+) -> Vec<PlatformCheckPlan> {
+    let mut per_account: HashMap<&'static str, Vec<&config::Target>> = HashMap::new();
+    for &target in enabled {
+        if let Some(account) = crate::platforms::destination_account(&target.platform_id) {
+            per_account.entry(account).or_default().push(target);
+        }
+    }
+    per_account
+        .into_iter()
+        .filter_map(|(account, targets)| {
+            let [target] = targets.as_slice() else {
+                return None;
+            };
+            let provider = crate::platforms::account_provider(account)?;
+            if !provider.signed_in() {
+                return None;
+            }
+            let stream_key = provisioned
+                .get(&target.id)
+                .map(|ingest| ingest.key.clone())
+                .or_else(|| keymap.get(&target.id).cloned())
+                .unwrap_or_default();
+            Some(PlatformCheckPlan {
+                target_id: target.id.clone(),
+                provider,
+                stream_key,
+            })
+        })
+        .collect()
+}
+
+/// Asks each platform whether it really receives the live while Corneta sends it; network and
+/// sign-in failures leave the row as it was, since the destination's own state still applies.
+fn spawn_platform_checks(
+    app: AppHandle,
+    generation: u64,
+    running: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    plans: Vec<PlatformCheckPlan>,
+) {
+    struct Tracked {
+        plan: PlatformCheckPlan,
+        channel: Option<Option<crate::auth::AccountChannel>>,
+        flowing_since: Option<std::time::Instant>,
+        last_check_flowing_ms: Option<u64>,
+        settled: bool,
+    }
+    let mut tracked: Vec<Tracked> = plans
+        .into_iter()
+        .map(|plan| Tracked {
+            plan,
+            channel: None,
+            flowing_since: None,
+            last_check_flowing_ms: None,
+            settled: false,
+        })
+        .collect();
+    tauri::async_runtime::spawn_blocking(move || {
+        while running.load(std::sync::atomic::Ordering::Relaxed) {
+            for item in &mut tracked {
+                let flowing = target_state(&app, &item.plan.target_id)
+                    .is_some_and(|state| state == "live" || state == "brb");
+                if !flowing {
+                    if item.flowing_since.take().is_some() {
+                        item.last_check_flowing_ms = None;
+                        item.settled = false;
+                        set_platform_check(&app, generation, &item.plan.target_id, None);
+                    }
+                    continue;
+                }
+                let since = *item
+                    .flowing_since
+                    .get_or_insert_with(std::time::Instant::now);
+                let flowing_ms = since.elapsed().as_millis() as u64;
+                let interval_ms = item.plan.provider.live_status_interval_ms();
+                if !platform_check_due(
+                    flowing_ms,
+                    item.last_check_flowing_ms,
+                    item.settled,
+                    interval_ms,
+                ) {
+                    continue;
+                }
+                item.last_check_flowing_ms = Some(flowing_ms);
+                let channel = item
+                    .channel
+                    .get_or_insert_with(|| item.plan.provider.account_channel(&app))
+                    .clone();
+                let Some(channel) = channel else {
+                    continue;
+                };
+                let key =
+                    (!item.plan.stream_key.is_empty()).then_some(item.plan.stream_key.as_str());
+                match item.plan.provider.live_status(&app, &channel, key) {
+                    Some(Ok(reading)) => {
+                        if let Some(check) = platform_check(&reading, flowing_ms) {
+                            item.settled = true;
+                            set_platform_check(&app, generation, &item.plan.target_id, Some(check));
+                        }
+                    }
+                    Some(Err(error)) => {
+                        log::debug!(
+                            "{}: live status unavailable: {error}",
+                            item.plan.provider.id()
+                        )
+                    }
+                    None => {}
+                }
+            }
+            std::thread::sleep(std::time::Duration::from_secs(1));
+        }
+    });
+}
+
+fn target_state(app: &AppHandle, target_id: &str) -> Option<String> {
+    let state = app.state::<AppState>();
+    let engine = state.engine.lock().unwrap();
+    engine
+        .snapshot
+        .as_ref()?
+        .targets
+        .get(target_id)
+        .map(|target| target.state.clone())
+}
+
+fn set_platform_check(
+    app: &AppHandle,
+    generation: u64,
+    target_id: &str,
+    check: Option<engine::PlatformCheck>,
+) {
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    if !is_current_live(eng.live, eng.start_gen, generation) {
+        return;
+    }
+    let Some(snap) = eng.snapshot.as_mut() else {
+        return;
+    };
+    let Some(target) = snap.targets.get_mut(target_id) else {
+        return;
+    };
+    if target.platform == check {
+        return;
+    }
+    target.platform = check;
+    let out = snap.clone();
+    drop(eng);
+    emit(app, &out);
+}
+
+/// Platform autostop is off so broadcasts survive reconnects; a live that ends without the stop
+/// button, by an error or an aborted start, must still end what it opened.
+fn close_auto_broadcasts_later(app: &AppHandle, generation: u64) {
+    let activity = app
+        .state::<AppState>()
+        .engine
+        .lock()
+        .unwrap()
+        .begin_pending_activity();
+    let app = app.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let _activity = activity;
+        close_auto_broadcasts(&app, generation, true);
+    });
 }
 
 fn set_target_reconnecting(app: &AppHandle, target_id: &str) {
@@ -1433,12 +1642,14 @@ pub(crate) fn close_auto_broadcasts(app: &AppHandle, generation: u64, notify_use
 // Failed or cancelled setup must release the session and clean partially started sidecars.
 struct StartGuard<'a> {
     app: &'a AppHandle,
+    generation: u64,
     armed: bool,
 }
 impl Drop for StartGuard<'_> {
     fn drop(&mut self) {
         if self.armed {
             kill_engine(self.app);
+            close_auto_broadcasts_later(self.app, self.generation);
         }
     }
 }
@@ -1549,6 +1760,7 @@ async fn start_engine_inner(
     };
     let mut start_guard = StartGuard {
         app: &app,
+        generation: my_gen,
         armed: true,
     };
 
@@ -1754,34 +1966,76 @@ async fn start_engine_inner(
     log::info!("engine: starting MediaMTX ingest and FFmpeg fan-out");
 
     let app_m = app.clone();
+    let yml_m = yml.clone();
     tauri::async_runtime::spawn(async move {
-        while let Some(ev) = mtx_rx.recv().await {
-            match ev {
-                CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
-                    let raw = String::from_utf8_lossy(&b);
-                    let line = raw.to_lowercase();
-                    // Retain publisher lifecycle failures without frame-grab noise.
-                    if line.contains("publish")
-                        || line.contains("available")
-                        || line.contains("online")
-                        || line.contains("destroyed")
-                        || line.contains("queue")
-                        || line.contains("too slow")
-                        || line.contains("timed out")
-                        || line.contains("err")
-                    {
-                        log::warn!("mediamtx: {}", raw.trim());
+        // OBS reconnects to a restarted ingest server on its own, and so do the outputs, so a
+        // crash mid-live costs a few seconds instead of the whole live.
+        let mut budget = RestartBudget::new(MEDIAMTX_RESTARTS, MEDIAMTX_QUIET_MS);
+        'supervise: loop {
+            while let Some(ev) = mtx_rx.recv().await {
+                match ev {
+                    CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
+                        let raw = String::from_utf8_lossy(&b);
+                        let line = raw.to_lowercase();
+                        // Retain publisher lifecycle failures without frame-grab noise.
+                        if line.contains("publish")
+                            || line.contains("available")
+                            || line.contains("online")
+                            || line.contains("destroyed")
+                            || line.contains("queue")
+                            || line.contains("too slow")
+                            || line.contains("timed out")
+                            || line.contains("err")
+                        {
+                            log::warn!("mediamtx: {}", raw.trim());
+                        }
+                        if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
+                            set_engine_error(
+                                &app_m,
+                                EngineFailure::IngestPortInUse { port },
+                                my_gen,
+                            );
+                        }
                     }
-                    if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
-                        set_engine_error(&app_m, EngineFailure::IngestPortInUse { port }, my_gen);
-                    }
+                    CommandEvent::Terminated(_) => break,
+                    _ => {}
                 }
-                // Unexpected exit is terminal even without a recognized error line.
-                CommandEvent::Terminated(_) => {
+            }
+            // A port conflict or a stop already ended the live; there is nothing to restart.
+            loop {
+                if !live_is_current(&app_m, my_gen) {
+                    break 'supervise;
+                }
+                let Some(wait_ms) = budget.next_delay(now_ms() as u64) else {
                     set_engine_error(&app_m, EngineFailure::MediamtxExited, my_gen);
-                    break;
+                    break 'supervise;
+                };
+                if budget.episode_started() {
+                    capture_native_error(
+                        &app_m,
+                        "mediamtx_died",
+                        "mediamtx",
+                        true,
+                        Some("restarting".into()),
+                    );
                 }
-                _ => {}
+                log::warn!("engine: MediaMTX exited mid-live; restarting in {wait_ms} ms");
+                tokio::time::sleep(std::time::Duration::from_millis(wait_ms)).await;
+                match restart_mediamtx(&app_m, &yml_m, my_gen) {
+                    Ok(Some(events)) => {
+                        mtx_rx = events;
+                        log::info!("engine: MediaMTX restarted");
+                        notify(
+                            &app_m,
+                            &Msg::NotifyIngestRestartedTitle.now(),
+                            &Msg::NotifyIngestRestartedBody.now(),
+                        );
+                        crate::deck::notice(&app_m, crate::deck::DeckNotice::IngestRestarted);
+                        continue 'supervise;
+                    }
+                    Ok(None) => break 'supervise,
+                    Err(error) => log::warn!("engine: MediaMTX restart failed: {error}"),
+                }
             }
         }
     });
@@ -1936,6 +2190,8 @@ async fn start_engine_inner(
             drop(eng);
             log::info!("engine: startup cancelled after setup; aborting before supervisors");
             start_guard.armed = false;
+            // A stop during provisioning ran before the broadcast existed.
+            close_auto_broadcasts_later(&app, my_gen);
             return Err(START_CANCELLED.into());
         }
     }
@@ -2292,6 +2548,11 @@ async fn start_engine_inner(
             }
         }
     });
+
+    let platform_checks = platform_check_plan(&enabled, &keymap, &provisioned);
+    if !platform_checks.is_empty() {
+        spawn_platform_checks(app.clone(), my_gen, running.clone(), platform_checks);
+    }
 
     start_guard.armed = false;
     Ok(())

@@ -9,7 +9,7 @@ use tauri::AppHandle;
 
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, ChatProvider, Connection,
-    LoginOptions, Moderation, Outbox, OwnCredentials, StreamKeyGrant,
+    LoginOptions, Moderation, Outbox, OwnCredentials, PlatformReading, StreamKeyGrant,
 };
 use crate::auth::{
     bootstrap_client_id, bootstrap_enabled, keep_client_id, own_creds, AccountChannel, OauthConfig,
@@ -151,6 +151,15 @@ impl AccountProvider for Kick {
 
     fn forget_account_channel(&self) {
         *account::KICK_ACCOUNT_CHANNEL.lock().unwrap() = None;
+    }
+
+    fn live_status(
+        &self,
+        app: &AppHandle,
+        _channel: &AccountChannel,
+        _stream_key: Option<&str>,
+    ) -> Option<Result<PlatformReading, String>> {
+        Some(account::kick_live_status(app))
     }
 
     fn set_stream_info(

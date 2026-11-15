@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { MapPin, MessageSquareReply, RotateCcw } from "lucide-react";
-import { useI18n } from "../lib/i18n";
+import { MapPin, MessageSquareReply, RefreshCw, RotateCcw } from "lucide-react";
+import { useI18n, type MessageKey } from "../lib/i18n";
 import { ALERT_KIND_META, alertDetail } from "../lib/alertText";
 import { markFeedback } from "../lib/markMoment";
 import type { AlertKind, DeckCombo, PlatformMark } from "../lib/types";
@@ -21,6 +21,7 @@ import {
   viewport,
   type DeckAlert,
   type DeckChat,
+  type DeckNotice,
   type DeckState,
 } from "./model";
 import {
@@ -50,8 +51,16 @@ import {
 import { useDeckPrefs } from "./prefs";
 import { buzz, platformLabel, Toasts, useToasts, type ToastKind } from "./ui";
 
+const NOTICE_COPY: Record<DeckNotice, { title: MessageKey; body: MessageKey }> =
+  {
+    ingestRestarted: {
+      title: "deck.notice.ingestRestarted.title",
+      body: "deck.notice.ingestRestarted.body",
+    },
+  };
+
 export type DeckEvent = { seq: number } & (
-  { alert: DeckAlert } | { mention: DeckChat }
+  { alert: DeckAlert } | { mention: DeckChat } | { notice: DeckNotice }
 );
 
 export interface Conn {
@@ -568,6 +577,17 @@ export function Shell({
                   },
                 }
               : undefined,
+      };
+    } else if ("notice" in next) {
+      const copy = NOTICE_COPY[next.notice];
+      banner = {
+        id: "event",
+        tone: "brass",
+        polite: true,
+        icon: <RefreshCw className="ic" aria-hidden />,
+        title: t(copy.title),
+        body: t(copy.body),
+        dismissible: true,
       };
     } else {
       if (!prefsRef.current.notify.mentions) return;

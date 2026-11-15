@@ -771,6 +771,9 @@ export const pt = {
   "deck.event.mention": "{user} te marcou no chat · {platform}",
   "deck.event.thank": "Agradecer no chat",
   "deck.event.thanks": "Valeu demais, {user}! 💛",
+  "deck.notice.ingestRestarted.body":
+    "Ele caiu e a Corneta subiu de novo sozinha. O OBS reconecta em alguns segundos.",
+  "deck.notice.ingestRestarted.title": "O servidor de ingestão voltou",
   "deck.expired.lede":
     "Ninguém permitiu no PC a tempo. Por segurança, o pedido vale 2 minutos.",
   "deck.expired.title": "O pedido expirou",
@@ -1961,6 +1964,23 @@ export const pt = {
   "golive.target.openChannel.title": "Abrir o canal na plataforma",
   "golive.target.pause": "Pausar",
   "golive.target.pause.title": "Pausar esta plataforma",
+  "golive.target.platform.confirmed":
+    "{platform} confirmou que você está no ar",
+  "golive.target.platform.issue":
+    "{platform} confirmou a live, mas avisa: {issue}",
+  "golive.target.platform.notLive":
+    "{platform} ainda não mostra sua live. Confira a chave e o canal.",
+  "golive.target.platform.topic.audio": "áudio fora do recomendado",
+  "golive.target.platform.topic.bitrateHigh": "bitrate acima do recomendado",
+  "golive.target.platform.topic.bitrateLow": "bitrate abaixo do recomendado",
+  "golive.target.platform.topic.frameRate": "FPS fora do recomendado",
+  "golive.target.platform.topic.keyframes":
+    "intervalo de quadros-chave fora do recomendado (use 2 s)",
+  "golive.target.platform.topic.other": "configuração fora do recomendado",
+  "golive.target.platform.topic.resolution": "resolução fora do recomendado",
+  "golive.target.platform.topic.signal": "o sinal está fraco",
+  "golive.target.platform.topic.slowUpload":
+    "o vídeo está chegando devagar; sua conexão pode estar no limite",
   "golive.target.resume": "Retomar",
   "golive.target.resume.title": "Retomar esta plataforma",
   "golive.target.retry": "Tentar de novo",

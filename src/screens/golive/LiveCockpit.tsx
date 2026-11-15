@@ -2,6 +2,8 @@ import { memo, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, m } from "framer-motion";
 import {
+  AlertTriangle,
+  BadgeCheck,
   ChevronRight,
   ExternalLink,
   MessageSquare,
@@ -12,12 +14,16 @@ import {
 } from "lucide-react";
 import { api } from "../../lib/api";
 import { useStore } from "../../lib/store";
-import { PLATFORMS } from "../../lib/platforms";
+import { PLATFORMS, platformName } from "../../lib/platforms";
 import { resolveSendTargets } from "../../lib/chatSend";
+import {
+  describePlatformCheck,
+  type PlatformIssueTopic,
+} from "../../lib/platformCheck";
 import { toast } from "../../lib/toast";
 import { cn, errMsg, fmtUptime, openExternal } from "../../lib/utils";
-import { useI18n, useT } from "../../lib/i18n";
-import type { Target } from "../../lib/types";
+import { useI18n, useT, type MessageKey } from "../../lib/i18n";
+import type { PlatformCheck, PlatformId, Target } from "../../lib/types";
 import type { Screen } from "../../components/Sidebar";
 import type { ChatView } from "../../components/ChatFeed";
 import { LiveChatFeed } from "../chat/LiveFeeds";
@@ -110,6 +116,7 @@ const LiveTargetRow = memo(function LiveTargetRow({
         fps: metrics?.fps,
         droppedFrames: metrics?.droppedFrames,
         uptimeSec: metrics?.uptimeSec,
+        platform: metrics?.platform,
       };
     }),
   );
@@ -127,6 +134,12 @@ const LiveTargetRow = memo(function LiveTargetRow({
       <div className="min-w-28 flex-1">
         <div className="font-display font-bold">{target.name}</div>
         <StatePill state={st.state ?? "idle"} />
+        {flowing && st.platform && (
+          <PlatformCheckNote
+            check={st.platform}
+            platformId={target.platformId}
+          />
+        )}
         {st.message && (
           <div className="mt-0.5 text-xs text-bad">{st.message}</div>
         )}
@@ -210,6 +223,50 @@ const LiveTargetRow = memo(function LiveTargetRow({
     </Card>
   );
 });
+
+const TOPIC_KEY: Record<PlatformIssueTopic, MessageKey> = {
+  audio: "golive.target.platform.topic.audio",
+  bitrateHigh: "golive.target.platform.topic.bitrateHigh",
+  bitrateLow: "golive.target.platform.topic.bitrateLow",
+  frameRate: "golive.target.platform.topic.frameRate",
+  keyframes: "golive.target.platform.topic.keyframes",
+  other: "golive.target.platform.topic.other",
+  resolution: "golive.target.platform.topic.resolution",
+  signal: "golive.target.platform.topic.signal",
+  slowUpload: "golive.target.platform.topic.slowUpload",
+};
+
+/** The platform's own word on the live: confirmed, confirmed with a warning, or not showing it. */
+function PlatformCheckNote({
+  check,
+  platformId,
+}: {
+  check: PlatformCheck;
+  platformId: PlatformId;
+}) {
+  const t = useT();
+  const line = describePlatformCheck(check);
+  const platform = platformName(platformId, t);
+  if (line.kind === "confirmed") {
+    return (
+      <div className="mt-0.5 flex items-center gap-1 text-xs text-ok">
+        <BadgeCheck className="size-3.5 shrink-0" aria-hidden />
+        {t("golive.target.platform.confirmed", { platform })}
+      </div>
+    );
+  }
+  return (
+    <div className="mt-0.5 flex items-start gap-1 text-xs text-warn">
+      <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+      {line.kind === "notLive"
+        ? t("golive.target.platform.notLive", { platform })
+        : t("golive.target.platform.issue", {
+            platform,
+            issue: t(TOPIC_KEY[line.topic]),
+          })}
+    </div>
+  );
+}
 
 function LiveChatPanel({ onNavigate }: { onNavigate?: (s: Screen) => void }) {
   const t = useT();

@@ -173,6 +173,42 @@ pub trait AutoBroadcast: Sync {
     fn close_failure(&self) -> (String, String);
 }
 
+/// How a platform grades the ingest it receives, when it grades it at all.
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PlatformHealth {
+    Good,
+    Ok,
+    Bad,
+    NoData,
+}
+
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum IssueSeverity {
+    Info,
+    Warning,
+    Error,
+}
+
+/// One problem the platform found in the ingest, such as a bitrate below its recommendation.
+#[derive(serde::Serialize, Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformIssue {
+    /// The platform's own issue token; the UI maps the ones it knows and words the rest generically.
+    pub kind: String,
+    pub severity: IssueSeverity,
+}
+
+/// What a platform reports about the account's live right now.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct PlatformReading {
+    /// The platform is receiving the live, not only accepting the connection.
+    pub live: bool,
+    pub health: Option<PlatformHealth>,
+    pub issues: Vec<PlatformIssue>,
+}
+
 /// What a platform did with a moment marked during the live.
 #[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -224,6 +260,21 @@ pub trait AccountProvider: Sync {
     /// Marks the running live on the platform's own recording. Blocking; None when the platform cannot.
     fn mark_moment(&self, _app: &AppHandle, _label: &str) -> Option<MarkOutcome> {
         None
+    }
+    /// The platform's own view of this account's live, to confirm a destination is really on air.
+    /// Blocking; None when the platform cannot tell. A platform with several ingests per account
+    /// picks the destination's by `stream_key`, which is compared on this computer and never sent.
+    fn live_status(
+        &self,
+        _app: &AppHandle,
+        _channel: &AccountChannel,
+        _stream_key: Option<&str>,
+    ) -> Option<Result<PlatformReading, String>> {
+        None
+    }
+    /// How often `live_status` may run once its verdict is known.
+    fn live_status_interval_ms(&self) -> u64 {
+        30_000
     }
     /// Ok(Some) carries a warning; the title went through but something else did not.
     fn set_stream_info(

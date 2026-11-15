@@ -105,6 +105,7 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
             dropped_frames: 3,
             uptime_sec: 12.0,
             message: None,
+            platform: None,
         },
     );
     crate::engine::EngineSnapshot {

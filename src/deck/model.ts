@@ -91,6 +91,9 @@ export interface DeckAlert {
   tier?: string | null;
 }
 
+/** Engine events the PC announces by code; the phone words them in its own language. */
+export type DeckNotice = "ingestRestarted";
+
 export type ServerMessage =
   | ({ type: "state" } & DeckState)
   | { type: "pairing"; code: string; pc: string }
@@ -108,6 +111,7 @@ export type ServerMessage =
   | { type: "chat-history"; messages: DeckChat[] }
   | { type: "chat-delete"; event: Record<string, unknown> }
   | { type: "alert"; alert: DeckAlert }
+  | { type: "notice"; notice: DeckNotice }
   | {
       type: "result";
       id: string;

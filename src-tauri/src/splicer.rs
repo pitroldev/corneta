@@ -15,6 +15,7 @@ use tauri::{AppHandle, Manager};
 
 use crate::compositor::{CompositorOpts, Slate};
 use crate::engine;
+use crate::engine_policy::RestartBudget;
 use crate::telemetry::AppError;
 use crate::AppState;
 
@@ -30,6 +31,9 @@ fn capture_splicer_error(app: &AppHandle, code: &str) {
 }
 
 const SLATE_FPS: u32 = 30;
+/// Publisher restarts back off up to this wait and never give up while the live runs.
+const PUBLISHER_MAX_WAIT_MS: u64 = 4_000;
+const PUBLISHER_QUIET_MS: u64 = 60_000;
 /// Balance transient-stall tolerance against visible freezes before switching to the slate.
 const HOLD_MS: u64 = 600;
 const RESPAWN_MS: u64 = 1500;
@@ -1151,7 +1155,7 @@ fn setup_and_pump(
         .take()
         .expect("output ffmpeg has no stdin pipe");
     // A blocked stdin write cannot observe cancellation; the watchdog kills the publisher.
-    let gen_done = Arc::new(AtomicBool::new(false));
+    let mut gen_done = Arc::new(AtomicBool::new(false));
     spawn_output_watchdog(
         running.clone(),
         gen_done.clone(),
@@ -1199,6 +1203,10 @@ fn setup_and_pump(
     let mut primed = false;
     let mut video_ok = true;
     let mut audio_ok = true;
+    let pump_started = Instant::now();
+    let mut publisher_budget = RestartBudget::new(u32::MAX, PUBLISHER_QUIET_MS);
+    let mut publisher_down_since: Option<Instant> = None;
+    let mut publisher_wait_ms = 0u64;
 
     // Discard pre-IDR tags; copying may begin only at a real IDR.
     pending.clear();
@@ -1308,9 +1316,42 @@ fn setup_and_pump(
         }
         slate_on.store(showing_slate, Ordering::Relaxed);
 
-        if !write_ops(&mut out_stdin, &ops) {
-            log::error!("splicer: output ffmpeg exited (broken pipe); stopping");
-            break;
+        // Destinations wait on `_program`, so a dead publisher must come back for the live to.
+        if publisher_down_since.is_none() && !write_ops(&mut out_stdin, &ops) {
+            log::warn!("splicer: output ffmpeg exited (broken pipe); restarting the publisher");
+            gen_done.store(true, Ordering::Relaxed);
+            kill(&mut out_child);
+            publisher_wait_ms = publisher_budget
+                .next_delay(pump_started.elapsed().as_millis() as u64)
+                .unwrap_or(PUBLISHER_MAX_WAIT_MS);
+            if publisher_budget.episode_started() {
+                capture_splicer_error(app, "splicer_output_died");
+            }
+            publisher_down_since = Some(Instant::now());
+        }
+        if publisher_down_since
+            .is_some_and(|since| since.elapsed() >= Duration::from_millis(publisher_wait_ms))
+        {
+            match restart_publisher(&ffmpeg, &program, &avcc, &asc, clock.out_dts, running) {
+                Some((child, stdin, done)) => {
+                    out_child = child;
+                    out_stdin = stdin;
+                    gen_done = done;
+                    publisher_down_since = None;
+                    // A new publish must open on a keyframe: run the slate from its IDR until OBS sends one.
+                    if state == State::Copy {
+                        state = State::Slate;
+                    }
+                    slate_epoch = None;
+                    log::info!("splicer: publisher restarted");
+                }
+                None => {
+                    publisher_wait_ms = publisher_budget
+                        .next_delay(pump_started.elapsed().as_millis() as u64)
+                        .unwrap_or(PUBLISHER_MAX_WAIT_MS);
+                    publisher_down_since = Some(Instant::now());
+                }
+            }
         }
 
         if !input_alive
@@ -1541,6 +1582,43 @@ fn fail_setup(
     kill(in_child);
     drain_and_join(rx, Some(reader));
     SetupOutcome::Fallback(Box::new(opts))
+}
+
+/// A replacement `_program` publisher primed with the stream headers, or None when it cannot start.
+fn restart_publisher(
+    ffmpeg: &std::path::Path,
+    program: &str,
+    avcc: &AvcC,
+    asc: &Asc,
+    headers_ts: u32,
+    running: &Arc<AtomicBool>,
+) -> Option<(Child, std::process::ChildStdin, Arc<AtomicBool>)> {
+    let mut child = match spawn_output(ffmpeg, program) {
+        Ok(child) => child,
+        Err(e) => {
+            log::warn!("splicer: publisher restart failed: {e}");
+            return None;
+        }
+    };
+    let Some(mut stdin) = child.stdin.take() else {
+        kill(&mut child);
+        return None;
+    };
+    let done = Arc::new(AtomicBool::new(false));
+    spawn_output_watchdog(
+        running.clone(),
+        done.clone(),
+        crate::job::Killer::new(&child),
+    );
+    if write_preamble(&mut stdin).is_err()
+        || write_tag(&mut stdin, 9, headers_ts, &seqhdr_video(avcc)).is_err()
+        || write_tag(&mut stdin, 8, headers_ts, &asc.bytes).is_err()
+    {
+        done.store(true, Ordering::Relaxed);
+        kill(&mut child);
+        return None;
+    }
+    Some((child, stdin, done))
 }
 
 fn spawn_output_watchdog(

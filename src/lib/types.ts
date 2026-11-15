@@ -476,6 +476,22 @@ export interface TargetStatus {
   droppedFrames: number;
   uptimeSec: number;
   message?: string;
+  /** What the platform itself reports about this destination's live, when it can be asked. */
+  platform?: PlatformCheck;
+}
+
+export type PlatformHealth = "good" | "ok" | "bad" | "noData";
+
+export interface PlatformIssue {
+  /** The platform's own issue token, such as YouTube's configuration issue types. */
+  kind: string;
+  severity: "info" | "warning" | "error";
+}
+
+export interface PlatformCheck {
+  state: "confirmed" | "notLive";
+  health?: PlatformHealth;
+  issues?: PlatformIssue[];
 }
 
 export interface ObsStats {

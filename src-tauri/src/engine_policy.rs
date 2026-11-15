@@ -1,5 +1,6 @@
-use crate::engine::{EngineSnapshot, TargetStatus};
+use crate::engine::{EngineSnapshot, PlatformCheck, PlatformCheckState, TargetStatus};
 use crate::i18n::{Locale, Msg};
+use crate::platforms::provider::PlatformReading;
 use std::path::Path;
 
 pub(crate) fn fmt_mbps(kbps: u32) -> String {
@@ -363,13 +364,94 @@ pub(crate) fn mediamtx_port_conflict(line: &str, fallback_port: u16) -> Option<u
     Some(port.unwrap_or(fallback_port))
 }
 
-/// A child's failure ends the live only while that live is still the one the child was started for.
-pub(crate) fn failure_ends_live(
-    live: bool,
-    current_generation: u64,
-    child_generation: u64,
+/// Restarts a crashed helper with growing waits; a quiet stretch since the last crash earns it back.
+#[derive(Debug, Clone)]
+pub(crate) struct RestartBudget {
+    max_attempts: u32,
+    quiet_ms: u64,
+    attempts: u32,
+    last_failure_ms: Option<u64>,
+}
+
+impl RestartBudget {
+    pub(crate) const fn new(max_attempts: u32, quiet_ms: u64) -> Self {
+        Self {
+            max_attempts,
+            quiet_ms,
+            attempts: 0,
+            last_failure_ms: None,
+        }
+    }
+
+    /// The wait before restarting after a crash at `now_ms`, or None once the budget is spent.
+    pub(crate) fn next_delay(&mut self, now_ms: u64) -> Option<u64> {
+        if self
+            .last_failure_ms
+            .is_some_and(|last| now_ms.saturating_sub(last) >= self.quiet_ms)
+        {
+            self.attempts = 0;
+        }
+        self.last_failure_ms = Some(now_ms);
+        if self.attempts >= self.max_attempts {
+            return None;
+        }
+        let delay = 500u64 << self.attempts.min(3);
+        self.attempts += 1;
+        Some(delay)
+    }
+
+    /// True for the first crash of an episode, so each episode is reported once.
+    pub(crate) fn episode_started(&self) -> bool {
+        self.attempts == 1
+    }
+}
+
+/// Platforms take a few seconds to list a new live, so an earlier "not live" is not news.
+pub(crate) const PLATFORM_CONFIRM_GRACE_MS: u64 = 45_000;
+const PLATFORM_FIRST_CHECK_MS: u64 = 20_000;
+const PLATFORM_UNSETTLED_CHECK_MS: u64 = 40_000;
+
+/// What the destination row shows for a platform reading, or None while it is too early to tell.
+pub(crate) fn platform_check(reading: &PlatformReading, flowing_ms: u64) -> Option<PlatformCheck> {
+    let state = if reading.live {
+        PlatformCheckState::Confirmed
+    } else if flowing_ms >= PLATFORM_CONFIRM_GRACE_MS {
+        PlatformCheckState::NotLive
+    } else {
+        return None;
+    };
+    Some(PlatformCheck {
+        state,
+        health: reading.health,
+        issues: reading.issues.clone(),
+    })
+}
+
+/// Whether to ask the platform again, counting only the time the destination has been flowing.
+/// Until a verdict is shown it asks sooner; afterwards it keeps the platform's own interval, which
+/// spares platforms whose API calls cost quota.
+pub(crate) fn platform_check_due(
+    flowing_ms: u64,
+    last_check_flowing_ms: Option<u64>,
+    settled: bool,
+    interval_ms: u64,
 ) -> bool {
-    live && current_generation == child_generation
+    match last_check_flowing_ms {
+        None => flowing_ms >= PLATFORM_FIRST_CHECK_MS,
+        Some(last) => {
+            let every = if settled {
+                interval_ms
+            } else {
+                interval_ms.min(PLATFORM_UNSETTLED_CHECK_MS)
+            };
+            flowing_ms.saturating_sub(last) >= every
+        }
+    }
+}
+
+/// Work started for one live, such as a child's failure, may act only while that live still runs.
+pub(crate) fn is_current_live(live: bool, current_generation: u64, generation: u64) -> bool {
+    live && current_generation == generation
 }
 
 pub(crate) fn is_loopback_host(host: &str) -> bool {
@@ -416,6 +498,7 @@ mod tests {
             dropped_frames: 0,
             uptime_sec: 0.0,
             message: None,
+            platform: None,
         }
     }
     fn snap(state: &str, targets: Vec<TargetStatus>) -> EngineSnapshot {
@@ -938,11 +1021,73 @@ mod tests {
     }
 
     #[test]
+    fn restart_waits_grow_until_the_budget_is_spent_and_a_quiet_stretch_resets_it() {
+        let mut budget = RestartBudget::new(3, 120_000);
+        assert_eq!(budget.next_delay(0), Some(500));
+        assert!(budget.episode_started());
+        assert_eq!(budget.next_delay(10_000), Some(1_000));
+        assert!(!budget.episode_started());
+        assert_eq!(budget.next_delay(20_000), Some(2_000));
+        assert_eq!(budget.next_delay(30_000), None);
+        // A crash long after the last one starts a new episode.
+        assert_eq!(budget.next_delay(200_000), Some(500));
+        assert!(budget.episode_started());
+
+        let mut unlimited = RestartBudget::new(u32::MAX, 60_000);
+        let waits: Vec<_> = (0..6).map(|i| unlimited.next_delay(i * 1_000)).collect();
+        assert_eq!(
+            waits,
+            [500, 1_000, 2_000, 4_000, 4_000, 4_000].map(Some).to_vec()
+        );
+    }
+
+    #[test]
+    fn a_platform_reading_becomes_a_verdict_only_when_it_means_something() {
+        use crate::platforms::provider::{IssueSeverity, PlatformHealth, PlatformIssue};
+        let issue = PlatformIssue {
+            kind: "bitrateLow".into(),
+            severity: IssueSeverity::Warning,
+        };
+        let live = PlatformReading {
+            live: true,
+            health: Some(PlatformHealth::Ok),
+            issues: vec![issue.clone()],
+        };
+        let check = platform_check(&live, 5_000).unwrap();
+        assert_eq!(check.state, PlatformCheckState::Confirmed);
+        assert_eq!(check.health, Some(PlatformHealth::Ok));
+        assert_eq!(check.issues, vec![issue]);
+
+        let offline = PlatformReading::default();
+        assert_eq!(
+            platform_check(&offline, PLATFORM_CONFIRM_GRACE_MS - 1),
+            None
+        );
+        assert_eq!(
+            platform_check(&offline, PLATFORM_CONFIRM_GRACE_MS).map(|c| c.state),
+            Some(PlatformCheckState::NotLive)
+        );
+    }
+
+    #[test]
+    fn platform_checks_start_after_a_warm_up_and_slow_down_once_settled() {
+        assert!(!platform_check_due(19_999, None, false, 300_000));
+        assert!(platform_check_due(20_000, None, false, 300_000));
+        // Before a verdict, a quota-priced platform is asked again after 40 s, not 5 min.
+        assert!(!platform_check_due(59_999, Some(20_000), false, 300_000));
+        assert!(platform_check_due(60_000, Some(20_000), false, 300_000));
+        assert!(!platform_check_due(359_999, Some(60_000), true, 300_000));
+        assert!(platform_check_due(360_000, Some(60_000), true, 300_000));
+        // Free platforms keep their own shorter interval.
+        assert!(platform_check_due(50_000, Some(20_000), true, 30_000));
+    }
+
+    #[test]
     fn only_the_current_live_is_ended_by_a_child_failure() {
-        assert!(failure_ends_live(true, 5, 5));
+        assert!(is_current_live(true, 5, 5));
         // Stop followed by an immediate start: the old MediaMTX exits during the new live.
-        assert!(!failure_ends_live(true, 6, 5));
-        assert!(!failure_ends_live(false, 5, 5));
+        assert!(!is_current_live(true, 6, 5));
+        assert!(!is_current_live(false, 5, 5));
     }
 
     #[test]

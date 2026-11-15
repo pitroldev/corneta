@@ -229,6 +229,9 @@ export function DeckApp() {
         case "alert":
           setEvent({ seq: ++eventSeq.current, alert: message.alert });
           return;
+        case "notice":
+          setEvent({ seq: ++eventSeq.current, notice: message.notice });
+          return;
       }
     },
     [finish, go],

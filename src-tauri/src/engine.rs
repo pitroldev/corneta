@@ -1,4 +1,5 @@
 use crate::config::{AppConfig, Reframe, Target, VideoPreset};
+use crate::platforms::provider::{PlatformHealth, PlatformIssue};
 pub use crate::platforms::{copy_limits, recommended_preset, CopyLimits};
 use serde::Serialize;
 use std::collections::HashMap;
@@ -638,6 +639,26 @@ pub struct TargetStatus {
     pub uptime_sec: f64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// What the platform itself reports about this destination's live, when it can be asked.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub platform: Option<PlatformCheck>,
+}
+
+#[derive(Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum PlatformCheckState {
+    Confirmed,
+    NotLive,
+}
+
+#[derive(Serialize, Clone, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PlatformCheck {
+    pub state: PlatformCheckState,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub health: Option<PlatformHealth>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub issues: Vec<PlatformIssue>,
 }
 
 #[derive(Serialize, Clone, Debug)]
@@ -722,6 +743,7 @@ impl EngineSnapshot {
                     dropped_frames: 0,
                     uptime_sec: 0.0,
                     message: None,
+                    platform: None,
                 },
             );
         }

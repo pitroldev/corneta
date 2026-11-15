@@ -987,6 +987,26 @@ pub fn chat_deleted(app: &AppHandle, event: &Value) {
     }
 }
 
+/// Engine events the phone announces with its own copy, so it never shows desktop-language text.
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum DeckNotice {
+    IngestRestarted,
+}
+
+fn notice_message(notice: DeckNotice) -> Value {
+    json!({ "type": "notice", "notice": notice })
+}
+
+pub fn notice(app: &AppHandle, notice: DeckNotice) {
+    let Some(hub) = hub(app) else {
+        return;
+    };
+    if hub.authed.load(Ordering::Relaxed) > 0 {
+        hub.broadcast(&notice_message(notice));
+    }
+}
+
 pub fn alert(app: &AppHandle, alert: &crate::chat::Alert) {
     let Some(hub) = hub(app) else {
         return;
@@ -1006,6 +1026,14 @@ pub fn alert(app: &AppHandle, alert: &crate::chat::Alert) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn engine_notices_reach_the_phone_as_a_closed_code() {
+        assert_eq!(
+            notice_message(DeckNotice::IngestRestarted),
+            json!({ "type": "notice", "notice": "ingestRestarted" })
+        );
+    }
 
     #[test]
     fn moderation_matches_the_same_lines_as_the_overlay() {

@@ -12,7 +12,7 @@ use tauri::AppHandle;
 
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, ChatProvider, ChatSession,
-    Connection, LoginOptions, MarkOutcome, Moderation, Outbox, StreamKeyGrant,
+    Connection, LoginOptions, MarkOutcome, Moderation, Outbox, PlatformReading, StreamKeyGrant,
 };
 use crate::auth::{bootstrap_client_id, keep_client_id, AccountChannel, OauthConfig};
 use crate::chat::{source_label, Outgoing};
@@ -152,6 +152,15 @@ impl AccountProvider for Twitch {
                 aliases: Vec::new(),
                 name: String::new(),
             })
+    }
+
+    fn live_status(
+        &self,
+        app: &AppHandle,
+        channel: &AccountChannel,
+        _stream_key: Option<&str>,
+    ) -> Option<Result<PlatformReading, String>> {
+        Some(account::twitch_live_status(app, &channel.value))
     }
 
     fn set_stream_info(

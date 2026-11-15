@@ -16,7 +16,7 @@ use crate::auth::{
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::{LoginOptions, StreamKeyGrant};
+use crate::platforms::provider::{LoginOptions, PlatformReading, StreamKeyGrant};
 use crate::AppState;
 
 const KICK_SCOPES: &str =
@@ -168,6 +168,22 @@ pub(crate) fn kick_account_channel(app: &AppHandle) -> Option<AccountChannel> {
     let channel = parse_kick_account_channel(&serde_json::from_str(&body).ok()?)?;
     *KICK_ACCOUNT_CHANNEL.lock().unwrap() = Some(channel.clone());
     Some(channel)
+}
+
+/// The authorized channel's stream state; the same response also carries the stream key, never kept.
+pub(crate) fn parse_kick_live(v: &Value) -> Option<PlatformReading> {
+    let live = v.pointer("/data/0/stream/is_live")?.as_bool()?;
+    Some(PlatformReading {
+        live,
+        ..Default::default()
+    })
+}
+
+pub(crate) fn kick_live_status(app: &AppHandle) -> Result<PlatformReading, String> {
+    let body = kick_api(app, "GET", "https://api.kick.com/public/v1/channels", None)?;
+    let value: Value =
+        serde_json::from_str(&body).map_err(|_| "kick: invalid channels response".to_string())?;
+    parse_kick_live(&value).ok_or_else(|| "kick: channel without stream state".into())
 }
 
 /// Kick takes whole minutes, from one minute to a week.
@@ -678,6 +694,18 @@ fn kick_category_id(app: &AppHandle, name: &str) -> Option<i64> {
 mod tests {
     use super::*;
     use crate::auth::MAX_TIMEOUT_SECONDS;
+
+    #[test]
+    fn the_channel_stream_flag_confirms_the_live() {
+        let channel = |is_live: bool| json!({ "data": [{ "slug": "corneta", "stream": { "is_live": is_live, "viewer_count": 3 } }] });
+        assert!(parse_kick_live(&channel(true)).unwrap().live);
+        assert!(!parse_kick_live(&channel(false)).unwrap().live);
+        assert_eq!(parse_kick_live(&json!({ "data": [] })), None);
+        assert_eq!(
+            parse_kick_live(&json!({ "data": [{ "slug": "corneta" }] })),
+            None
+        );
+    }
 
     #[test]
     fn kick_official_needs_the_broker() {

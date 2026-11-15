@@ -351,6 +351,7 @@ export function mockApi(): CornetaApi {
   let timer: ReturnType<typeof setInterval> | null = null;
   let rec: { id: string; lines: string[] } | null = null;
   const pausedTargets = new Set<string>();
+  const targetPlatforms = new Map<string, string>();
 
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
@@ -500,6 +501,17 @@ export function mockApi(): CornetaApi {
           st.droppedFrames += Math.round(Math.random() * 3);
       }
       st.uptimeSec = snapshot.startedAt ? (now - snapshot.startedAt) / 1000 : 0;
+      // Like the native checks, platforms answer once the live has run for a while.
+      if (st.state === "live" && st.uptimeSec >= 20 && !st.platform) {
+        st.platform =
+          targetPlatforms.get(st.targetId) === "youtube"
+            ? {
+                state: "confirmed",
+                health: "ok",
+                issues: [{ kind: "gopSizeLong", severity: "warning" }],
+              }
+            : { state: "confirmed", health: "good" };
+      }
     }
     snapshot.cpu = Math.round((30 + Math.random() * 40) * 10) / 10;
     snapshot.gpu = Math.round((20 + Math.random() * 30) * 10) / 10;
@@ -595,8 +607,10 @@ export function mockApi(): CornetaApi {
     async start(_operationId) {
       const cfg = loadConfig();
       pausedTargets.clear();
+      targetPlatforms.clear();
       const targets: Record<string, TargetStatus> = {};
       for (const t of cfg.targets.filter((x) => x.enabled)) {
+        targetPlatforms.set(t.id, t.platformId);
         const target =
           t.encoding.preset?.videoBitrateKbps ??
           PLATFORMS[t.platformId].recommended.videoBitrateKbps;

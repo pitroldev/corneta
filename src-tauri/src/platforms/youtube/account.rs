@@ -11,6 +11,8 @@ use crate::i18n::{self, Locale, Msg};
 use crate::keys;
 use crate::AppState;
 
+use crate::platforms::provider::{IssueSeverity, PlatformHealth, PlatformIssue, PlatformReading};
+
 use super::broadcast as youtube_broadcast;
 use super::broadcast::{Error as BroadcastError, Recovery as YoutubeRecovery, RemoteState};
 use super::error::GoogleError;
@@ -231,6 +233,79 @@ pub(crate) fn youtube_account_channel(app: &AppHandle) -> Option<AccountChannel>
     let channel = parse_youtube_account_channel(&serde_json::from_str(&body).ok()?)?;
     *YT_ACCOUNT_CHANNEL.lock().unwrap() = Some(channel.clone());
     Some(channel)
+}
+
+/// The account's ingest stream that uses this key, with YouTube's own grade of what it receives.
+pub(crate) fn parse_youtube_stream_health(v: &Value, stream_key: &str) -> Option<PlatformReading> {
+    let stream = v.get("items")?.as_array()?.iter().find(|stream| {
+        stream
+            .pointer("/cdn/ingestionInfo/streamName")
+            .and_then(Value::as_str)
+            == Some(stream_key)
+    })?;
+    let status = stream.get("status")?;
+    let health = match status
+        .pointer("/healthStatus/status")
+        .and_then(Value::as_str)
+    {
+        Some("good") => Some(PlatformHealth::Good),
+        Some("ok") => Some(PlatformHealth::Ok),
+        Some("bad") => Some(PlatformHealth::Bad),
+        Some("noData") => Some(PlatformHealth::NoData),
+        _ => None,
+    };
+    let issues = status
+        .pointer("/healthStatus/configurationIssues")
+        .and_then(Value::as_array)
+        .map(|issues| {
+            issues
+                .iter()
+                .filter_map(|issue| {
+                    let kind = issue.get("type")?.as_str()?;
+                    if kind.is_empty()
+                        || kind.len() > 40
+                        || !kind.chars().all(|c| c.is_ascii_alphanumeric())
+                    {
+                        return None;
+                    }
+                    let severity = match issue.get("severity")?.as_str()? {
+                        "info" => IssueSeverity::Info,
+                        "warning" => IssueSeverity::Warning,
+                        "error" => IssueSeverity::Error,
+                        _ => return None,
+                    };
+                    Some(PlatformIssue {
+                        kind: kind.to_string(),
+                        severity,
+                    })
+                })
+                .take(5)
+                .collect()
+        })
+        .unwrap_or_default();
+    Some(PlatformReading {
+        live: status.get("streamStatus").and_then(Value::as_str) == Some("active"),
+        health,
+        issues,
+    })
+}
+
+/// One `liveStreams.list` call, one quota unit; the response is never logged because it lists keys.
+pub(crate) fn youtube_live_status(
+    app: &AppHandle,
+    stream_key: &str,
+) -> Result<PlatformReading, String> {
+    let token = youtube_token(app).ok_or("youtube: signed out")?;
+    let body = google_json(
+        "GET",
+        "https://www.googleapis.com/youtube/v3/liveStreams?part=status,cdn&mine=true&maxResults=50",
+        &token,
+        None,
+    )?;
+    let value: Value = serde_json::from_str(&body)
+        .map_err(|_| "youtube: invalid liveStreams response".to_string())?;
+    parse_youtube_stream_health(&value, stream_key)
+        .ok_or_else(|| "youtube: no stream uses this key".into())
 }
 
 pub(crate) fn youtube_login_start(app: AppHandle) {
@@ -1146,6 +1221,39 @@ pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_destination_stream_carries_youtube_health_and_known_issues() {
+        let streams = json!({ "items": [
+            { "cdn": { "ingestionInfo": { "streamName": "other-key" } },
+              "status": { "streamStatus": "active", "healthStatus": { "status": "good" } } },
+            { "cdn": { "ingestionInfo": { "streamName": "this-key" } },
+              "status": { "streamStatus": "active", "healthStatus": {
+                  "status": "bad",
+                  "configurationIssues": [
+                      { "type": "bitrateLow", "severity": "warning", "description": "free text" },
+                      { "type": "bad token!", "severity": "error" },
+                      { "type": "gopSizeLong", "severity": "loud" }
+                  ] } } }
+        ] });
+        let reading = parse_youtube_stream_health(&streams, "this-key").unwrap();
+        assert!(reading.live);
+        assert_eq!(reading.health, Some(PlatformHealth::Bad));
+        assert_eq!(
+            reading.issues,
+            vec![PlatformIssue {
+                kind: "bitrateLow".into(),
+                severity: IssueSeverity::Warning
+            }]
+        );
+        assert_eq!(parse_youtube_stream_health(&streams, "missing-key"), None);
+
+        let waiting = json!({ "items": [{ "cdn": { "ingestionInfo": { "streamName": "k" } },
+            "status": { "streamStatus": "ready", "healthStatus": { "status": "noData" } } }] });
+        let reading = parse_youtube_stream_health(&waiting, "k").unwrap();
+        assert!(!reading.live);
+        assert_eq!(reading.health, Some(PlatformHealth::NoData));
+    }
 
     #[test]
     fn youtube_broadcast_body_carries_the_chosen_audience() {

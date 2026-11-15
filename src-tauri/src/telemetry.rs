@@ -1537,6 +1537,7 @@ fn normalize_error_code(value: &str) -> &str {
         | "vault_key_vanished"
         | "splicer_task_failed"
         | "splicer_setup_fallback"
+        | "splicer_output_died"
         | "youtube_auto_provision_failed"
         | "oauth_broker_failed"
         | "oauth_refresh_failed"

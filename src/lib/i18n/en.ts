@@ -778,6 +778,9 @@ export const en: Dict = {
   "deck.event.mention": "{user} mentioned you in chat · {platform}",
   "deck.event.thank": "Thank them in chat",
   "deck.event.thanks": "Thank you so much, {user}! 💛",
+  "deck.notice.ingestRestarted.body":
+    "It went down and Corneta brought it back on its own. OBS reconnects in a few seconds.",
+  "deck.notice.ingestRestarted.title": "The ingest server is back",
   "deck.expired.lede":
     "Nobody allowed it on the PC in time. For safety, the request lasts 2 minutes.",
   "deck.expired.title": "The request expired",
@@ -1972,6 +1975,25 @@ export const en: Dict = {
   "golive.target.openChannel.title": "Open your channel on the platform",
   "golive.target.pause": "Pause",
   "golive.target.pause.title": "Pause this platform",
+  "golive.target.platform.confirmed": "{platform} confirms you're live",
+  "golive.target.platform.issue":
+    "{platform} confirms you're live but warns: {issue}",
+  "golive.target.platform.notLive":
+    "{platform} doesn't show you live yet. Check the key and the channel.",
+  "golive.target.platform.topic.audio": "audio outside its recommendation",
+  "golive.target.platform.topic.bitrateHigh":
+    "bitrate above its recommendation",
+  "golive.target.platform.topic.bitrateLow": "bitrate below its recommendation",
+  "golive.target.platform.topic.frameRate":
+    "frame rate outside its recommendation",
+  "golive.target.platform.topic.keyframes":
+    "keyframe interval outside its recommendation (use 2 s)",
+  "golive.target.platform.topic.other": "settings outside its recommendation",
+  "golive.target.platform.topic.resolution":
+    "resolution outside its recommendation",
+  "golive.target.platform.topic.signal": "the signal is weak",
+  "golive.target.platform.topic.slowUpload":
+    "video is arriving slowly; your connection may be at its limit",
   "golive.target.resume": "Resume",
   "golive.target.resume.title": "Resume this platform",
   "golive.target.retry": "Try again",

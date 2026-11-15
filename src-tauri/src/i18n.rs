@@ -339,6 +339,12 @@ messages! {
         pt: "não consegui capturar o frame (sinal instável?)",
         en: "Couldn't grab the frame — signal acting up?";
 
+    NotifyIngestRestartedTitle = "rust.notify.ingestRestarted.title" =>
+        pt: "O servidor de ingestão voltou",
+        en: "The ingest server is back";
+    NotifyIngestRestartedBody = "rust.notify.ingestRestarted.body" =>
+        pt: "Ele caiu no meio da live e a Corneta subiu de novo sozinha. O OBS e as plataformas reconectam em alguns segundos.",
+        en: "It went down mid-stream and Corneta brought it back on its own. OBS and the platforms reconnect in a few seconds.";
     NotifyTargetDownTitle = "rust.notify.targetDown.title" =>
         pt: "Plataforma caiu",
         en: "A platform went down";

@@ -12,7 +12,7 @@ use crate::auth::{
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::{MarkOutcome, StreamKeyGrant};
+use crate::platforms::provider::{MarkOutcome, PlatformReading, StreamKeyGrant};
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast channel:read:stream_key moderator:read:followers";
@@ -325,6 +325,29 @@ pub(crate) fn twitch_client_id(app: &AppHandle) -> String {
     oauth(app).twitch_client_id
 }
 
+/// Helix lists the channel's stream only while Twitch is broadcasting it.
+pub(crate) fn parse_twitch_live(v: &Value) -> Option<PlatformReading> {
+    let streams = v.get("data")?.as_array()?;
+    let live = streams
+        .iter()
+        .any(|stream| stream.get("type").and_then(Value::as_str) == Some("live"));
+    Some(PlatformReading {
+        live,
+        ..Default::default()
+    })
+}
+
+pub(crate) fn twitch_live_status(app: &AppHandle, login: &str) -> Result<PlatformReading, String> {
+    if login.is_empty() || !login.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
+        return Err("twitch: invalid login".into());
+    }
+    let token = twitch_token(app).ok_or("twitch: signed out")?;
+    let url = format!("https://api.twitch.tv/helix/streams?user_login={login}");
+    let response =
+        helix(&token, &twitch_client_id(app), &url).ok_or("twitch: streams request failed")?;
+    parse_twitch_live(&response).ok_or_else(|| "twitch: unexpected streams response".into())
+}
+
 /// Resolves channel logins to user IDs in one Helix call; logins Twitch could not issue are skipped.
 pub(crate) fn twitch_user_ids(
     token: &str,
@@ -569,6 +592,19 @@ fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn helix_streams_confirm_only_a_live_broadcast() {
+        let live = json!({ "data": [{ "type": "live", "viewer_count": 12 }] });
+        assert!(parse_twitch_live(&live).unwrap().live);
+        assert!(!parse_twitch_live(&json!({ "data": [] })).unwrap().live);
+        assert!(
+            !parse_twitch_live(&json!({ "data": [{ "type": "" }] }))
+                .unwrap()
+                .live
+        );
+        assert_eq!(parse_twitch_live(&json!({ "error": "Unauthorized" })), None);
+    }
 
     #[test]
     fn a_refused_marker_tells_a_live_without_vods_from_a_stale_login() {

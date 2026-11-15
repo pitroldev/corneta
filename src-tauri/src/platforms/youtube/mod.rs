@@ -12,7 +12,7 @@ use tauri::AppHandle;
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, AutoBroadcast,
     AutoBroadcastFailure, ChatProvider, Connection, LoginOptions, Moderation, Outbox,
-    OwnCredentials, ProvisionedIngest,
+    OwnCredentials, PlatformReading, ProvisionedIngest,
 };
 use crate::auth::{
     bootstrap_client_id, bootstrap_enabled, keep_client_id, own_creds, AccountChannel, OauthConfig,
@@ -170,6 +170,20 @@ impl AccountProvider for Youtube {
 
     fn forget_account_channel(&self) {
         *account::YT_ACCOUNT_CHANNEL.lock().unwrap() = None;
+    }
+
+    fn live_status(
+        &self,
+        app: &AppHandle,
+        _channel: &AccountChannel,
+        stream_key: Option<&str>,
+    ) -> Option<Result<PlatformReading, String>> {
+        stream_key.map(|key| account::youtube_live_status(app, key))
+    }
+
+    // Each check spends a unit of the daily quota every user of the official client shares.
+    fn live_status_interval_ms(&self) -> u64 {
+        300_000
     }
 
     fn set_stream_info(

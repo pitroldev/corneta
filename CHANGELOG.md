@@ -8,6 +8,15 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Added
+
+- During a live, each destination whose account is signed in shows whether the platform itself confirms the live. YouTube also passes on its own grade of the stream, such as a keyframe interval outside its recommendation.
+
+### Fixed
+
+- If the ingest server or the BE RIGHT BACK publisher crashes mid-stream, Corneta restarts it on its own and the live carries on: viewers see the BE RIGHT BACK screen for a few seconds while OBS reconnects, and the PC and the paired phone say the ingest server is back. After three ingest server crashes within two minutes, the live still ends with an error.
+- When a live ends because of an error, or a start is cancelled after the automatic YouTube broadcast was opened, Corneta now ends that broadcast instead of leaving it on air without video.
+
 ## [0.13.3] - 2026-11-15
 
 ### Added
