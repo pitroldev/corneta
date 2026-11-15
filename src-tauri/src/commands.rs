@@ -2,9 +2,10 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, classify_target_line, is_brb_slate_path, is_loopback_host,
-    mediamtx_port_conflict, parse_ingest_hostport, parse_kv, parse_mediamtx_paths, quality_of,
-    safe_ffmpeg_diagnostic, target_error_update, tray_tooltip, TargetErrorUpdate, TargetLine,
+    brb_slate_is_video, classify_target_line, failure_ends_live, is_brb_slate_path,
+    is_loopback_host, mediamtx_port_conflict, parse_ingest_hostport, parse_kv,
+    parse_mediamtx_paths, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
+    TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -1219,10 +1220,15 @@ fn first_unavailable_port(addresses: &[(&str, u16)]) -> Option<u16> {
 
 // Preserve track_caller through capture_engine_error for distinct failure fingerprints.
 #[track_caller]
-fn set_engine_error(app: &AppHandle, failure: EngineFailure) {
-    // Expected child exits during shutdown must not create terminal errors.
-    if !app.state::<AppState>().engine.lock().unwrap().live {
-        log::debug!("engine: ignoring {failure} after shutdown");
+fn set_engine_error(app: &AppHandle, failure: EngineFailure, generation: u64) {
+    // Child exits after shutdown, or from the live a quick restart replaced, must not end this one.
+    let current = {
+        let state = app.state::<AppState>();
+        let engine = state.engine.lock().unwrap();
+        failure_ends_live(engine.live, engine.start_gen, generation)
+    };
+    if !current {
+        log::debug!("engine: ignoring {failure} from a stopped live");
         return;
     }
     log::error!("engine: {failure}");
@@ -1767,12 +1773,12 @@ async fn start_engine_inner(
                         log::warn!("mediamtx: {}", raw.trim());
                     }
                     if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
-                        set_engine_error(&app_m, EngineFailure::IngestPortInUse { port });
+                        set_engine_error(&app_m, EngineFailure::IngestPortInUse { port }, my_gen);
                     }
                 }
                 // Unexpected exit is terminal even without a recognized error line.
                 CommandEvent::Terminated(_) => {
-                    set_engine_error(&app_m, EngineFailure::MediamtxExited);
+                    set_engine_error(&app_m, EngineFailure::MediamtxExited, my_gen);
                     break;
                 }
                 _ => {}
@@ -2095,7 +2101,7 @@ async fn start_engine_inner(
                     Ok(v) => v,
                     Err(e) => {
                         log::error!("FFmpeg sidecar unavailable: {e}");
-                        set_engine_error(&app_t, EngineFailure::FfmpegUnavailable);
+                        set_engine_error(&app_t, EngineFailure::FfmpegUnavailable, my_gen);
                         break;
                     }
                 };

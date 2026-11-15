@@ -363,6 +363,15 @@ pub(crate) fn mediamtx_port_conflict(line: &str, fallback_port: u16) -> Option<u
     Some(port.unwrap_or(fallback_port))
 }
 
+/// A child's failure ends the live only while that live is still the one the child was started for.
+pub(crate) fn failure_ends_live(
+    live: bool,
+    current_generation: u64,
+    child_generation: u64,
+) -> bool {
+    live && current_generation == child_generation
+}
+
 pub(crate) fn is_loopback_host(host: &str) -> bool {
     host.eq_ignore_ascii_case("localhost")
         || host
@@ -926,6 +935,14 @@ mod tests {
         ] {
             assert_eq!(mediamtx_port_conflict(unrelated, 1935), None, "{unrelated}");
         }
+    }
+
+    #[test]
+    fn only_the_current_live_is_ended_by_a_child_failure() {
+        assert!(failure_ends_live(true, 5, 5));
+        // Stop followed by an immediate start: the old MediaMTX exits during the new live.
+        assert!(!failure_ends_live(true, 6, 5));
+        assert!(!failure_ends_live(false, 5, 5));
     }
 
     #[test]
