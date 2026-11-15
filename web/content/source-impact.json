@@ -28,8 +28,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -62,6 +62,12 @@
       "reason": "compositor.rs only started sharing the FFmpeg path with the black screen alert; the BE RIGHT BACK screen and signal recovery work the same."
     },
     {
+      "article": "en/guides/operations/obs-closed-during-stream.mdx",
+      "source": "src-tauri/src/splicer.rs",
+      "sourceBlob": "21871719d79d42566ff1fae8ba95af1a6ae86868",
+      "reason": "splicer.rs only restarts a crashed BE RIGHT BACK publisher; the protection the article describes still works the same way."
+    },
+    {
       "article": "en/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
@@ -76,8 +82,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -88,8 +94,8 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -154,26 +160,32 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+    },
+    {
+      "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
+      "source": "src-tauri/src/telemetry.rs",
+      "sourceBlob": "72edf5572120696f6708f7741bae21aa00c40bbb",
+      "reason": "telemetry.rs only added the splicer_output_died error code; the diagnostic contents the article lists did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -184,8 +196,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "8a626104288b78105916e5bd30f98eb7699e7f38",
-      "reason": "The dictionary changes add alert-token and Microsoft Store update labels and update a documentation pointer; OBS setup labels and the documented workflow are unchanged."
+      "sourceBlob": "3c91a5466c2fbcaa0b627c9c2ba3f6f856b452be",
+      "reason": "pt.ts only added the platform confirmation and phone notice copy; the OBS setup messages the article quotes did not change."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -208,14 +220,14 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d4cec7ec4e58b5ffb56944776cf43e04b13bc526",
-      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port, a loopback-host check and a generation check for child failures; the states the article explains did not change."
+      "sourceBlob": "e0093e1411c51c08c04c15f391bb074d66f43c00",
+      "reason": "engine_policy.rs only gained restart waits and the platform confirmation rules; the states the article explains did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -256,8 +268,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -298,8 +310,8 @@
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "c291d26e80c13ce5f4fbd2490521418eec48af47",
-      "reason": "The splicer processes join a job object and the watchdog kills a stuck output by handle, without taskkill; BE RIGHT BACK, what the protection covers and the cited test did not change."
+      "sourceBlob": "21871719d79d42566ff1fae8ba95af1a6ae86868",
+      "reason": "splicer.rs only restarts a crashed BE RIGHT BACK publisher; the protection the article describes still works the same way."
     },
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
@@ -316,8 +328,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -328,8 +340,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -448,8 +460,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -466,20 +478,26 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "b8f047b6b2fa8fc4d29fec8ebb9f88a9b1b079a4",
-      "reason": "commands.rs only checks the local ports before the ingest server starts, names a blocked port in the ingest-server crash message, ignores failures from a live that already ended and stops reporting a closed OBS as a crash; what the article describes did not change."
+      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
+      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+    },
+    {
+      "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
+      "source": "src-tauri/src/telemetry.rs",
+      "sourceBlob": "72edf5572120696f6708f7741bae21aa00c40bbb",
+      "reason": "telemetry.rs only added the splicer_output_died error code; the diagnostic contents the article lists did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -502,8 +520,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "8a626104288b78105916e5bd30f98eb7699e7f38",
-      "reason": "The dictionary changes add alert-token and Microsoft Store update labels and update a documentation pointer; OBS setup labels and the documented workflow are unchanged."
+      "sourceBlob": "3c91a5466c2fbcaa0b627c9c2ba3f6f856b452be",
+      "reason": "pt.ts only added the platform confirmation and phone notice copy; the OBS setup messages the article quotes did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -526,14 +544,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "4f69b66a95478d00eada72ed990a1f744d15c3e2",
-      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener and named the API port constant; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
+      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d4cec7ec4e58b5ffb56944776cf43e04b13bc526",
-      "reason": "engine_policy.rs only gained a language-independent match for a blocked local port, a loopback-host check and a generation check for child failures; the states the article explains did not change."
+      "sourceBlob": "e0093e1411c51c08c04c15f391bb074d66f43c00",
+      "reason": "engine_policy.rs only gained restart waits and the platform confirmation rules; the states the article explains did not change."
     }
   ]
 }
