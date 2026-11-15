@@ -28,8 +28,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -76,8 +76,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -88,8 +88,8 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; encoder discovery and the capabilities described here are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -123,6 +123,12 @@
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
+      "source": "src/components/ChatFeed.tsx",
+      "sourceBlob": "5ea536358445ba5dfb26b4e8a28d0e17bec174f9",
+      "reason": "ChatFeed.tsx only measures message heights on the next frame; the chat setup and feed controls the article describes did not change."
+    },
+    {
+      "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
       "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
       "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
@@ -148,32 +154,32 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "engine.rs only gained the black screen alert field in the live state; metrics, copy, re-encoding and reconnection did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; upload measurement and the workflow described here are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; diagnostic export fields, redaction and the documented workflow are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
+      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
+      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -196,20 +202,20 @@
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
+      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
+      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
-      "reason": "Only the privacy guard status left the engine snapshot; the states the article explains did not change."
+      "sourceBlob": "5844495a22dfe5fc0f7fa179ae1b0c40369c4920",
+      "reason": "engine_policy.rs only gained the Windows wording for a blocked local port; the states the article explains did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -250,8 +256,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -310,8 +316,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -322,8 +328,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; encoder discovery and the capabilities described here are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -400,8 +406,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/components/ChatFeed.tsx",
-      "sourceBlob": "8b1c2f8a0b6f29bc4f8c733d1890a2db4ca65378",
-      "reason": "The feed started showing GIFs, replies, highlights and platform notice lines; what the article describes is still correct, but it is worth revising to include the new features."
+      "sourceBlob": "5ea536358445ba5dfb26b4e8a28d0e17bec174f9",
+      "reason": "ChatFeed.tsx only measures message heights on the next frame; the chat setup and feed controls the article describes did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -442,8 +448,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "98745b998cfe550f27cde41d32065d861e9b5180",
-      "reason": "engine.rs only gained the black screen alert field in the live state; metrics, copy, re-encoding and reconnection did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -460,20 +466,20 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; upload measurement and the workflow described here are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "99835f79295690488cc8c3baee32af9d029bf86d",
-      "reason": "The source only translated FFmpeg fallback diagnostics and added Store-specific startup-task handling; diagnostic export fields, redaction and the documented workflow are unchanged."
+      "sourceBlob": "2362b9822ce1cf63c5a74aea092d21754a1074e9",
+      "reason": "commands.rs only names the blocked port in the ingest-server crash message and stops reporting a closed OBS as a crash; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -484,8 +490,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
+      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
+      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -514,20 +520,20 @@
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b901f6af496dfbbec06703f5883ae16ececc850e",
-      "reason": "It gained a separate obs-websocket connection used only by deck mode for scenes and the mic; the app's OBS connection and automatic setup did not change."
+      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
+      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "09af75316a5df237f353733fbe1ba1626149584e",
-      "reason": "engine.rs only lost the privacy guard delay, forced resolution and status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "7d6165339406bdefa0bdb63e33cb4fa57bbc9a7d",
+      "reason": "engine.rs only turned off MediaMTX's unused MoQ listener; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "c5b259bdf3f5e7d2754adbd23d05e695844c57d1",
-      "reason": "Only the privacy guard status left the engine snapshot; the states the article explains did not change."
+      "sourceBlob": "5844495a22dfe5fc0f7fa179ae1b0c40369c4920",
+      "reason": "engine_policy.rs only gained the Windows wording for a blocked local port; the states the article explains did not change."
     }
   ]
 }
