@@ -343,6 +343,7 @@ export type TelemetryEventMap = {
       | "obs"
       | "quality"
       | "done"
+      | "rehearsal"
       | "golive"
       | "chat_reports";
   };
@@ -562,6 +563,7 @@ const ENUMS: Record<string, ReadonlySet<string>> = {
     "obs",
     "quality",
     "done",
+    "rehearsal",
     "golive",
     "chat_reports",
   ]),

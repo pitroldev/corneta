@@ -81,7 +81,6 @@ fn quiet_command(program: &str) -> std::process::Command {
 }
 
 pub(crate) const OBS_WS_HOST: &str = "127.0.0.1";
-pub(crate) const OBS_WS_PORT: u16 = 4455;
 
 /// Stable IPC cancellation code; the frontend suppresses its error toast.
 pub const START_CANCELLED: &str = "corneta:start-cancelled";
@@ -131,6 +130,7 @@ fn capture_engine_error(
     let state = app.state::<AppState>();
     let mut engine = state.engine.lock().unwrap();
     engine.telemetry_last_error_id = Some(error_id.clone());
+    engine.last_error_code = Some(code.to_string());
     engine.telemetry_last_error_operation_id = operation_id;
     error_id
 }
@@ -186,6 +186,94 @@ fn capture_target_transition(
 /// Tauri sidecars only; std::process children also require wait() to be reaped.
 pub(crate) fn kill_sidecar(child: tauri_plugin_shell::process::CommandChild) {
     let _ = child.kill();
+}
+
+/// Local facts about OBS (process, settings file); it opens no connection.
+#[tauri::command]
+pub async fn obs_environment() -> crate::obs_env::ObsEnvironment {
+    tauri::async_runtime::spawn_blocking(crate::obs_env::environment)
+        .await
+        .unwrap_or_default()
+}
+
+#[tauri::command]
+pub fn open_obs() -> Result<(), String> {
+    crate::obs_env::open()
+}
+
+/// Moves the local ingest to a port nothing else is using, for when another program holds it.
+#[tauri::command]
+pub fn pick_ingest_port(app: AppHandle) -> Result<AppConfig, String> {
+    let current = config::load(&app).ingest.port;
+    let port = free_ingest_port(current).ok_or_else(|| Msg::EngineNoFreePort.now())?;
+    save_native_config(&app, move |cfg| {
+        cfg.ingest.port = port.into();
+        // What was pasted into OBS by hand names the old port.
+        cfg.settings.obs_manual = false;
+    })
+}
+
+#[tauri::command]
+pub async fn run_rehearsal(app: AppHandle) -> Result<crate::rehearsal::RehearsalReport, String> {
+    crate::rehearsal::run(app).await
+}
+
+#[tauri::command]
+pub fn cancel_rehearsal() {
+    crate::rehearsal::cancel();
+}
+
+/// Starts the ingest server alone, for a rehearsal: the same port checks and readiness wait as a
+/// live, without anything a live reports or records.
+pub(crate) async fn start_rehearsal_ingest(
+    app: &AppHandle,
+    config: &AppConfig,
+) -> Result<
+    (
+        tauri::async_runtime::Receiver<CommandEvent>,
+        tauri_plugin_shell::process::CommandChild,
+    ),
+    String,
+> {
+    let ingest_port = u16::try_from(config.ingest.port).unwrap_or(1935);
+    let mut listen_addresses = vec![("127.0.0.1", engine::MEDIAMTX_API_PORT)];
+    if is_loopback_host(&config.ingest.host) {
+        listen_addresses.insert(0, (config.ingest.host.as_str(), ingest_port));
+    }
+    let mut blocked = first_unavailable_port(&listen_addresses);
+    for _ in 0..10 {
+        if blocked.is_none() {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(150)).await;
+        blocked = first_unavailable_port(&listen_addresses);
+    }
+    if let Some(port) = blocked {
+        return Err(Msg::EngineIngestPortInUse { port }.now());
+    }
+    let yml = mediamtx_config_path(app)?;
+    std::fs::write(&yml, engine::mediamtx_config(config))
+        .map_err(|error| format!("MediaMTX config: {error}"))?;
+    let (mut events, child) = app
+        .shell()
+        .sidecar("mediamtx")
+        .map_err(|_| Msg::EngineMissingSidecar.now())?
+        .args([yml.to_string_lossy().to_string()])
+        .spawn()
+        .map_err(|_| Msg::EngineMediamtxNoStart.now())?;
+    crate::job::adopt_pid(child.pid());
+    if let Err(failure) = wait_mediamtx_ready(
+        &mut events,
+        ingest_port,
+        MEDIAMTX_READY_TIMEOUT,
+        mediamtx_api_answers,
+    )
+    .await
+    {
+        kill_sidecar(child);
+        return Err(failure.message().now());
+    }
+    Ok((events, child))
 }
 
 #[tauri::command]
@@ -702,9 +790,9 @@ pub async fn obs_video_check(app: AppHandle) -> Result<ObsVideoCheck, crate::obs
     let config = get_config(app.clone());
     let limits = engine::strictest_copy_limits(&config);
     let backup = obs_video_backup(&app)?;
-    let password = config.settings.obs_password;
+    let password = crate::obs_env::password(&config.settings.obs_password);
     let current = tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+        crate::obs::read_video(OBS_WS_HOST, crate::obs_env::port(), &password)
     })
     .await
     .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
@@ -723,17 +811,23 @@ pub async fn obs_video_apply(
 ) -> Result<crate::obs::ObsVideo, crate::obs::ObsFailure> {
     let config = get_config(app.clone());
     let backup = obs_video_backup(&app)?;
-    let password = config.settings.obs_password.clone();
+    let password = crate::obs_env::password(&config.settings.obs_password);
     let Some(limits) = engine::strictest_copy_limits(&config) else {
         return tauri::async_runtime::spawn_blocking(move || {
-            crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+            crate::obs::read_video(OBS_WS_HOST, crate::obs_env::port(), &password)
         })
         .await
         .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
         .map_err(crate::obs::ObsFailure::from);
     };
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::apply_fit(OBS_WS_HOST, OBS_WS_PORT, &password, &limits, &backup)
+        crate::obs::apply_fit(
+            OBS_WS_HOST,
+            crate::obs_env::port(),
+            &password,
+            &limits,
+            &backup,
+        )
     })
     .await
     .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
@@ -743,9 +837,9 @@ pub async fn obs_video_apply(
 #[tauri::command]
 pub async fn obs_video_undo(app: AppHandle) -> Result<(), crate::obs::ObsFailure> {
     let backup = obs_video_backup(&app)?;
-    let password = get_config(app).settings.obs_password;
+    let password = crate::obs_env::password(&get_config(app).settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::undo_fit(OBS_WS_HOST, OBS_WS_PORT, &password, &backup)
+        crate::obs::undo_fit(OBS_WS_HOST, crate::obs_env::port(), &password, &backup)
     })
     .await
     .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
@@ -757,9 +851,9 @@ async fn pin_smart_choices(config: &mut AppConfig) {
     if config.mode != "hybrid" {
         return;
     }
-    let password = config.settings.obs_password.clone();
+    let password = crate::obs_env::password(&config.settings.obs_password);
     let read = tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::read_video(OBS_WS_HOST, OBS_WS_PORT, &password)
+        crate::obs::read_video(OBS_WS_HOST, crate::obs_env::port(), &password)
     });
     // A hung OBS must not hold the live back.
     let Ok(Ok(Ok(video))) = tokio::time::timeout(std::time::Duration::from_secs(2), read).await
@@ -786,9 +880,15 @@ pub async fn obs_autoconfigure(app: AppHandle) -> Result<(), crate::obs::ObsFail
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
     );
     let key = cfg.ingest.key.clone();
-    let password = cfg.settings.obs_password.clone();
+    let password = crate::obs_env::password(&cfg.settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::autoconfigure(OBS_WS_HOST, OBS_WS_PORT, &password, &server, &key)
+        crate::obs::autoconfigure(
+            OBS_WS_HOST,
+            crate::obs_env::port(),
+            &password,
+            &server,
+            &key,
+        )
     })
     .await
     .map_err(|e| crate::obs::ObsFailure::exchange(format!("join: {e}")))?
@@ -1299,6 +1399,33 @@ fn first_unavailable_port(addresses: &[(&str, u16)]) -> Option<u16> {
     )
 }
 
+/// The code the UI reads for a taken port that is not the ingest's.
+const LOCAL_PORT_IN_USE: &str = "local_port_in_use";
+
+/// The UI offers to move the ingest port, which frees nothing when another local port is the taken
+/// one, so that case gets its own code in the error snapshot.
+fn mark_port_failure(app: &AppHandle, taken: u16) {
+    if u32::from(taken) == config::load(app).ingest.port {
+        return;
+    }
+    let state = app.state::<AppState>();
+    state.engine.lock().unwrap().last_error_code = Some(LOCAL_PORT_IN_USE.into());
+}
+
+/// Ports tried before an arbitrary free one, so the address pasted into OBS stays recognizable.
+const INGEST_PORT_ALTERNATIVES: [u16; 4] = [1936, 1937, 1938, 1939];
+
+fn free_ingest_port(current: u32) -> Option<u16> {
+    INGEST_PORT_ALTERNATIVES
+        .into_iter()
+        .filter(|port| u32::from(*port) != current)
+        .find(|port| first_unavailable_port(&[("127.0.0.1", *port)]).is_none())
+        .or_else(|| {
+            let listener = std::net::TcpListener::bind(("127.0.0.1", 0)).ok()?;
+            Some(listener.local_addr().ok()?.port())
+        })
+}
+
 // Preserve track_caller through capture_engine_error for distinct failure fingerprints.
 #[track_caller]
 fn set_engine_error(app: &AppHandle, failure: EngineFailure, generation: u64) {
@@ -1316,6 +1443,9 @@ fn set_engine_error(app: &AppHandle, failure: EngineFailure, generation: u64) {
         true,
         Some(msg.clone()),
     );
+    if let EngineFailure::IngestPortInUse { port } = failure {
+        mark_port_failure(app, port);
+    }
     log::error!("engine: error_id={error_id}");
     stop_engine_internal(app, Some(msg), "error");
     close_auto_broadcasts_later(app, generation);
@@ -1796,12 +1926,19 @@ pub async fn start_engine(
     match result {
         Err(error) if error != START_CANCELLED => {
             // Reuse a stage-specific error ID when one was already reported.
-            let existing_error_id = {
+            let (existing_error_id, error_code) = {
                 let state = app.state::<AppState>();
                 let engine = state.engine.lock().unwrap();
-                (engine.telemetry_last_error_operation_id.as_deref() == Some(operation_id.as_str()))
-                    .then(|| engine.telemetry_last_error_id.clone())
-                    .flatten()
+                if engine.telemetry_last_error_operation_id.as_deref()
+                    == Some(operation_id.as_str())
+                {
+                    (
+                        engine.telemetry_last_error_id.clone(),
+                        engine.last_error_code.clone(),
+                    )
+                } else {
+                    (None, None)
+                }
             };
             let error_id = existing_error_id.unwrap_or_else(|| {
                 app.state::<AppState>().telemetry.capture_error(
@@ -1820,6 +1957,7 @@ pub async fn start_engine(
                 snapshot.message = Some(error.clone());
                 snapshot.operation_id = Some(operation_id.clone());
                 snapshot.error_id = Some(error_id.clone());
+                snapshot.error_code = error_code;
                 engine.snapshot = Some(snapshot.clone());
                 snapshot
             };
@@ -1848,6 +1986,7 @@ async fn start_engine_inner(
         eng.operation_id = Some(operation_id.clone());
         eng.telemetry_reconnect_count = 0;
         eng.telemetry_last_error_id = None;
+        eng.last_error_code = None;
         eng.telemetry_last_error_operation_id = None;
         (eng.start_gen, eng.begin_pending_activity())
     };
@@ -1929,6 +2068,7 @@ async fn start_engine_inner(
             true,
             Some(message.clone()),
         );
+        mark_port_failure(&app, port);
         return Err(message);
     }
     let yml = mediamtx_config_path(&app).inspect_err(|error| {
@@ -2721,12 +2861,18 @@ async fn start_engine_inner(
 
     let app_o = app.clone();
     let run_o = running.clone();
-    let obs_pw = config.settings.obs_password.clone();
+    let obs_pw = crate::obs_env::password(&config.settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
         while run_o.load(Ordering::Relaxed) {
-            crate::obs::poll_stats(OBS_WS_HOST, OBS_WS_PORT, &obs_pw, &run_o, |stats| {
-                update_obs_stats(&app_o, stats);
-            });
+            crate::obs::poll_stats(
+                OBS_WS_HOST,
+                crate::obs_env::port(),
+                &obs_pw,
+                &run_o,
+                |stats| {
+                    update_obs_stats(&app_o, stats);
+                },
+            );
             for _ in 0..25 {
                 if !run_o.load(Ordering::Relaxed) {
                     break;
@@ -3202,6 +3348,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
             .is_some_and(|snapshot| snapshot.state == "live");
         let operation_id = eng.operation_id.clone();
         let last_error_id = eng.telemetry_last_error_id.clone();
+        let last_error_code = eng.last_error_code.clone();
         let duration = now_ms().saturating_sub(eng.started_ms);
         let reconnect_count = eng.telemetry_reconnect_count;
         let target_transitions: Vec<_> = eng
@@ -3226,6 +3373,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
                 s.state = "error".into();
                 s.message = Some(msg.clone());
                 s.error_id = last_error_id;
+                s.error_code = last_error_code;
                 s
             }
             None => EngineSnapshot::stopped(),
@@ -3674,9 +3822,9 @@ pub async fn open_chat_window(app: AppHandle) -> Result<(), String> {
 
 #[tauri::command]
 pub async fn obs_set_stream(app: AppHandle, start: bool) -> Result<(), String> {
-    let password = get_config(app.clone()).settings.obs_password;
+    let password = crate::obs_env::password(&get_config(app.clone()).settings.obs_password);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::set_stream(OBS_WS_HOST, OBS_WS_PORT, &password, start)
+        crate::obs::set_stream(OBS_WS_HOST, crate::obs_env::port(), &password, start)
     })
     .await;
     match result {
@@ -3868,9 +4016,9 @@ pub async fn obs_check(app: AppHandle) -> Result<crate::obs::ObsCheck, String> {
         "{}://{}:{}/{}",
         cfg.ingest.protocol, cfg.ingest.host, cfg.ingest.port, cfg.ingest.app
     );
-    let password = cfg.settings.obs_password;
+    let password = crate::obs_env::password(&cfg.settings.obs_password);
     let result = tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::check(OBS_WS_HOST, OBS_WS_PORT, &password, &server)
+        crate::obs::check(OBS_WS_HOST, crate::obs_env::port(), &password, &server)
     })
     .await;
     let check = match result {
@@ -3912,11 +4060,11 @@ pub async fn mesa_obs_add_source(
     width: u32,
     height: u32,
 ) -> Result<(), String> {
-    let password = get_config(app).settings.obs_password;
+    let password = crate::obs_env::password(&get_config(app).settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
         crate::obs::add_or_update_browser_source(
             OBS_WS_HOST,
-            OBS_WS_PORT,
+            crate::obs_env::port(),
             &password,
             MESA_OBS_SOURCE,
             &url,
@@ -3930,9 +4078,14 @@ pub async fn mesa_obs_add_source(
 
 #[tauri::command]
 pub async fn mesa_obs_remove_source(app: AppHandle) -> Result<(), String> {
-    let password = get_config(app).settings.obs_password;
+    let password = crate::obs_env::password(&get_config(app).settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
-        crate::obs::remove_input(OBS_WS_HOST, OBS_WS_PORT, &password, MESA_OBS_SOURCE)
+        crate::obs::remove_input(
+            OBS_WS_HOST,
+            crate::obs_env::port(),
+            &password,
+            MESA_OBS_SOURCE,
+        )
     })
     .await
     .map_err(|e| format!("join: {e}"))?
@@ -4020,11 +4173,11 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
 
 #[tauri::command]
 pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), String> {
-    let password = get_config(app).settings.obs_password;
+    let password = crate::obs_env::password(&get_config(app).settings.obs_password);
     tauri::async_runtime::spawn_blocking(move || {
         crate::obs::add_or_update_browser_source(
             OBS_WS_HOST,
-            OBS_WS_PORT,
+            crate::obs_env::port(),
             &password,
             OVERLAY_OBS_SOURCE,
             &url,
@@ -4233,8 +4386,15 @@ pub fn import_config(app: AppHandle) -> Result<bool, String> {
 
 #[cfg(test)]
 mod engine_failure_tests {
-    use super::{first_unavailable_port, EngineFailure};
+    use super::{first_unavailable_port, free_ingest_port, EngineFailure};
     use crate::i18n::{Locale, Msg};
+
+    #[test]
+    fn the_ingest_moves_to_a_port_that_is_free_and_not_the_current_one() {
+        let port = free_ingest_port(1936).expect("a free port");
+        assert_ne!(port, 1936);
+        assert_eq!(first_unavailable_port(&[("127.0.0.1", port)]), None);
+    }
 
     #[test]
     fn a_taken_local_port_is_found_before_mediamtx_starts() {

@@ -1,44 +1,47 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, m, type Variants } from "framer-motion";
-import {
-  ArrowLeft,
-  ArrowRight,
-  Check,
-  Gauge,
-  Plug,
-  Smartphone,
-  Sparkles,
-  Tv2,
-} from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, Wifi } from "lucide-react";
 import { useStore } from "../../lib/store";
+import { bandFit, estimate } from "../../lib/estimates";
+import { encoderLabel } from "../../lib/encoder";
 import { obsConfigured } from "../../lib/readiness";
+import { rehearsalVerdict } from "../../lib/rehearsal";
+import { useEncoder } from "../../lib/useEncoder";
 import { useReadiness } from "../../lib/useReadiness";
 import { cn } from "../../lib/utils";
 import { useI18n, type MessageKey } from "../../lib/i18n";
 import { Mascot, SoundWaves } from "../decor";
 import { LegalAcceptNote } from "../legal";
+import { useStartRehearsal } from "../Rehearsal";
 import { Button } from "../ui";
-import { useDeckStatus } from "../deck/pairing";
-import { DeckStep } from "./DeckStep";
 import {
-  DoneStep,
   ObsStep,
   PlatformsStep,
-  QualityStep,
+  RehearsalStep,
   WelcomeStep,
   type ConsentDraft,
 } from "./steps";
 
-export type SetupStep =
-  "welcome" | "platforms" | "obs" | "quality" | "deck" | "done";
+export type SetupStep = "welcome" | "platforms" | "obs" | "rehearsal";
 
-const STEPS: { id: SetupStep; labelKey: MessageKey; icon: typeof Tv2 }[] = [
-  { id: "welcome", labelKey: "components.setup.rail.welcome", icon: Sparkles },
-  { id: "platforms", labelKey: "components.setup.rail.platforms", icon: Tv2 },
-  { id: "obs", labelKey: "components.setup.rail.obs", icon: Plug },
-  { id: "quality", labelKey: "components.setup.rail.quality", icon: Gauge },
-  { id: "deck", labelKey: "components.setup.rail.deck", icon: Smartphone },
-  { id: "done", labelKey: "components.setup.rail.done", icon: Check },
+/** The cover is not a step: the rail only lists what ends with the stream reaching a platform. */
+const STEPS: SetupStep[] = ["welcome", "platforms", "obs", "rehearsal"];
+const RAIL: { id: SetupStep; labelKey: MessageKey; subKey: MessageKey }[] = [
+  {
+    id: "platforms",
+    labelKey: "components.setup.rail.platforms",
+    subKey: "components.setup.rail.platforms.sub",
+  },
+  {
+    id: "obs",
+    labelKey: "components.setup.rail.obs",
+    subKey: "components.setup.rail.obs.sub",
+  },
+  {
+    id: "rehearsal",
+    labelKey: "components.setup.rail.rehearsal",
+    subKey: "components.setup.rail.rehearsal.sub",
+  },
 ];
 
 // Variants read the direction through AnimatePresence's custom prop, so the step leaving after
@@ -58,8 +61,8 @@ const STEP_MOTION: Variants = {
 };
 
 /**
- * Full-window first-run setup: every step finishes something real (connected platform, OBS pointed
- * at Corneta, measured upload) instead of describing it. Any step can be left for later.
+ * Full-window first-run setup in three steps that end with a private rehearsal, so the first real
+ * live is not the first test. Any step can be left for later.
  */
 export function SetupWizard({
   consent,
@@ -71,30 +74,49 @@ export function SetupWizard({
   consent: ConsentDraft | null;
   onConsent: (next: ConsentDraft) => void;
   onStepCompleted: (step: SetupStep) => void;
-  /** `chat` asks to continue into chat setup instead of the Live screen. */
-  onFinish: (next: "golive" | "chat") => void;
+  onFinish: () => void;
   onSkip: () => void;
 }) {
-  const { t, tp } = useI18n();
+  const { t, tp, fmt } = useI18n();
   const [index, setIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [visited, setVisited] = useState<Set<SetupStep>>(
     () => new Set(["welcome"]),
   );
   const titleRef = useRef<HTMLHeadingElement>(null);
-  const step = STEPS[index].id;
+  const step = STEPS[index];
   const r = useReadiness();
+  const config = useStore((s) => s.config!);
   const obs = useStore((s) => s.obs);
   const uploadMbps = useStore((s) => s.uploadMbps);
-  const deck = useDeckStatus();
+  const runUploadTest = useStore((s) => s.runUploadTest);
+  const refreshObsEnv = useStore((s) => s.refreshObsEnv);
+  const rehearsal = useStore((s) => s.rehearsal);
+  const rehearsing = useStore((s) => s.rehearsing);
+  const startRehearsal = useStartRehearsal();
+  const encoder = useEncoder();
+  const verdict =
+    rehearsal?.phase === "done" ? rehearsalVerdict(rehearsal) : null;
+  const rehearsalPassed = verdict === "passed" || verdict === "passedWithNotes";
+
+  // The upload is measured while the platforms are being connected, so it is never a step.
+  const measured = useRef(false);
+  useEffect(() => {
+    if (measured.current || uploadMbps != null) return;
+    measured.current = true;
+    runUploadTest().catch(() => {});
+  }, [runUploadTest, uploadMbps]);
+
+  // Read ahead of the OBS step, so it opens already knowing which program is on this PC.
+  useEffect(() => {
+    void refreshObsEnv();
+  }, [refreshObsEnv]);
 
   const done: Record<SetupStep, boolean> = {
-    welcome: visited.has("platforms"),
+    welcome: true,
     platforms: r.ready.length > 0,
-    obs: obsConfigured(obs),
-    quality: uploadMbps != null && visited.has("deck"),
-    deck: (deck?.devices.length ?? 0) > 0,
-    done: false,
+    obs: obsConfigured(obs, config.settings.obsManual, encoder.app),
+    rehearsal: rehearsal?.phase === "done" && rehearsal.signalArrived,
   };
 
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -109,38 +131,27 @@ export function SetupWizard({
   }, []);
 
   const go = (next: number) => {
-    if (next < 0 || next >= STEPS.length || next === index) return;
+    if (rehearsing || next < 0 || next >= STEPS.length || next === index)
+      return;
     setDirection(next > index ? 1 : -1);
     setIndex(next);
-    setVisited((prev) => new Set(prev).add(STEPS[next].id));
+    setVisited((prev) => new Set(prev).add(STEPS[next]));
   };
   const advance = () => {
     onStepCompleted(step);
     go(index + 1);
   };
+  const finish = () => {
+    onStepCompleted("rehearsal");
+    onFinish();
+  };
 
-  const primary: { label: string; disabled?: boolean; action: () => void } =
-    step === "welcome"
-      ? { label: t("components.setup.cta.start"), action: advance }
-      : step === "done"
-        ? {
-            label: t("components.setup.cta.finish"),
-            action: () => onFinish("golive"),
-          }
-        : step === "platforms"
-          ? {
-              label: t("components.setup.cta.next"),
-              disabled: r.ready.length === 0,
-              action: advance,
-            }
-          : step === "obs"
-            ? {
-                label: t("components.setup.cta.next"),
-                disabled: !obsConfigured(obs),
-                action: advance,
-              }
-            : { label: t("components.setup.cta.next"), action: advance };
-  const canDefer = step === "platforms" || step === "obs";
+  // Only the platforms that are ready count: the starter ones a user never connected would
+  // otherwise raise a false alarm about the upload.
+  const neededKbps = r.ready.length
+    ? estimate({ ...config, targets: r.ready }).uploadKbps
+    : 0;
+  const fit = r.ready.length ? bandFit(neededKbps, uploadMbps) : "ok";
 
   return (
     <div className="flex h-full">
@@ -160,19 +171,20 @@ export function SetupWizard({
           </div>
         </div>
         <ol className="relative flex flex-col gap-1">
-          {STEPS.map((s, i) => {
-            const current = i === index;
-            const complete = done[s.id];
-            const skipped = !complete && visited.has(s.id) && i < index;
+          {RAIL.map((item, i) => {
+            const at = i + 1;
+            const current = at === index;
+            const complete = done[item.id] && visited.has(item.id);
+            const skipped = !complete && visited.has(item.id) && at < index;
             return (
-              <li key={s.id}>
+              <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => go(i)}
+                  onClick={() => go(at)}
                   aria-current={current ? "step" : undefined}
                   data-on-brass=""
                   className={cn(
-                    "relative flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left font-display text-base font-bold transition-colors",
+                    "relative flex w-full items-center gap-3 rounded-md px-3 py-2 text-left font-display text-base font-bold leading-tight transition-colors",
                     current
                       ? "bg-brass-ink/12"
                       : "opacity-70 hover:bg-brass-ink/8 hover:opacity-100",
@@ -214,23 +226,56 @@ export function SetupWizard({
                           <Check className="size-4" strokeWidth={3.2} />
                         </m.span>
                       ) : (
-                        <m.span key="n">{i + 1}</m.span>
+                        <m.span key="n">{at}</m.span>
                       )}
                     </AnimatePresence>
                   </span>
-                  {t(s.labelKey)}
+                  <span>
+                    {item.id === "obs" && encoder.app !== "obs"
+                      ? encoderLabel(encoder.app, t)
+                      : t(item.labelKey)}
+                    <span className="block font-sans text-xs font-semibold">
+                      {t(item.subKey)}
+                    </span>
+                  </span>
                 </button>
               </li>
             );
           })}
         </ol>
         <div className="relative mt-auto text-sm font-semibold">
+          {uploadMbps != null && (
+            <p
+              className="mb-4 flex gap-2.5 rounded-md bg-brass-ink/10 px-3 py-2.5 text-xs leading-snug"
+              aria-live="polite"
+            >
+              <Wifi className="mt-0.5 size-4 shrink-0" />
+              <span>
+                <span className="block font-display text-sm font-extrabold">
+                  {t("components.setup.rail.net.title", {
+                    mbps: fmt.num(uploadMbps),
+                  })}
+                </span>
+                {r.ready.length === 0
+                  ? t("components.setup.rail.net.measured")
+                  : t(
+                      fit === "ok"
+                        ? "components.setup.rail.net.ok"
+                        : fit === "warn"
+                          ? "components.setup.rail.net.warn"
+                          : "components.setup.rail.net.bad",
+                      { mbps: fmt.dec(neededKbps / 1000, 1) },
+                    )}
+              </span>
+            </p>
+          )}
           <p className="opacity-80">{t("components.setup.rail.time")}</p>
           <button
             type="button"
             onClick={onSkip}
+            disabled={rehearsing}
             data-on-brass=""
-            className="mt-2 font-bold underline decoration-2 underline-offset-2 opacity-80 hover:opacity-100"
+            className="mt-1 inline-flex min-h-6 items-center font-bold underline decoration-2 underline-offset-2 opacity-80 hover:opacity-100 disabled:opacity-40"
           >
             {t("components.setup.rail.skip")}
           </button>
@@ -262,10 +307,11 @@ export function SetupWizard({
               )}
               {step === "platforms" && <PlatformsStep titleRef={titleRef} />}
               {step === "obs" && <ObsStep titleRef={titleRef} />}
-              {step === "quality" && <QualityStep titleRef={titleRef} />}
-              {step === "deck" && <DeckStep titleRef={titleRef} />}
-              {step === "done" && (
-                <DoneStep titleRef={titleRef} onChat={() => onFinish("chat")} />
+              {step === "rehearsal" && (
+                <RehearsalStep
+                  titleRef={titleRef}
+                  onFixObs={() => go(STEPS.indexOf("obs"))}
+                />
               )}
             </m.div>
           </AnimatePresence>
@@ -274,7 +320,11 @@ export function SetupWizard({
         <footer className="border-t border-border-soft bg-bg">
           <div className="mx-auto flex max-w-3xl items-center gap-2 px-10 py-4">
             {index > 0 ? (
-              <Button variant="ghost" onClick={() => go(index - 1)}>
+              <Button
+                variant="ghost"
+                onClick={() => go(index - 1)}
+                disabled={rehearsing}
+              >
                 <ArrowLeft className="size-4" />{" "}
                 {t("components.setup.cta.back")}
               </Button>
@@ -282,17 +332,24 @@ export function SetupWizard({
               // Starting setup accepts the terms, so the notice sits next to the button that does it.
               <LegalAcceptNote className="max-w-sm text-left text-xs" />
             )}
-            {canDefer && (
-              <Button
-                variant="ghost"
-                onClick={() => {
-                  onStepCompleted(step);
-                  go(index + 1);
-                }}
-              >
+            {(step === "platforms" || step === "obs") && (
+              <Button variant="ghost" onClick={advance}>
                 {t("components.setup.cta.later")}
               </Button>
             )}
+            {/* The way forward stays in the footer, where the other steps keep it, so a long
+                result never pushes it below the fold. */}
+            {step === "rehearsal" &&
+              !rehearsing &&
+              (rehearsalPassed ? (
+                <Button variant="ghost" onClick={startRehearsal}>
+                  {t("components.rehearsal.again")}
+                </Button>
+              ) : (
+                <Button variant="ghost" onClick={finish}>
+                  {t("components.setup.rehearsal.skip")}
+                </Button>
+              ))}
             <span className="flex-1" />
             {step === "platforms" && (
               <span className="mr-2 text-sm text-ink-muted" aria-live="polite">
@@ -301,14 +358,47 @@ export function SetupWizard({
                   : tp("components.setup.platforms.count", r.ready.length)}
               </span>
             )}
-            <Button
-              variant="primary"
-              size="lg"
-              disabled={primary.disabled}
-              onClick={primary.action}
-            >
-              {primary.label} <ArrowRight className="size-5" />
-            </Button>
+            {step === "welcome" && (
+              <Button variant="primary" size="lg" onClick={advance}>
+                {t("components.setup.cta.start")}{" "}
+                <ArrowRight className="size-5" />
+              </Button>
+            )}
+            {step === "platforms" && (
+              <Button
+                variant="primary"
+                size="lg"
+                disabled={r.ready.length === 0}
+                onClick={advance}
+              >
+                {t("components.setup.cta.next")}{" "}
+                <ArrowRight className="size-5" />
+              </Button>
+            )}
+            {step === "obs" && (
+              <Button
+                variant="primary"
+                size="lg"
+                disabled={
+                  !obsConfigured(obs, config.settings.obsManual, encoder.app)
+                }
+                onClick={advance}
+              >
+                {t("components.setup.cta.rehearsal")}{" "}
+                <ArrowRight className="size-5" />
+              </Button>
+            )}
+            {step === "rehearsal" && (
+              <Button
+                variant="primary"
+                size="lg"
+                disabled={!rehearsalPassed || rehearsing}
+                onClick={finish}
+              >
+                {t("components.setup.cta.finish")}{" "}
+                <ArrowRight className="size-5" />
+              </Button>
+            )}
           </div>
         </footer>
       </section>

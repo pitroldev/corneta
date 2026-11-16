@@ -685,6 +685,9 @@ pub struct EngineSnapshot {
     /// Set only for a native failure already recorded and redacted.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error_id: Option<String>,
+    /// Stable code of that failure, so the UI can offer the fix that fits the cause.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error_code: Option<String>,
     pub targets: HashMap<String, TargetStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -722,6 +725,7 @@ impl EngineSnapshot {
             ingest_live: false,
             operation_id: None,
             error_id: None,
+            error_code: None,
             targets: HashMap::new(),
             message: None,
             cpu: None,
@@ -772,6 +776,7 @@ impl EngineSnapshot {
             ingest_live: false,
             operation_id: None,
             error_id: None,
+            error_code: None,
             targets,
             message: None,
             cpu: None,
@@ -889,6 +894,8 @@ pub struct EngineRuntime {
     pub mediamtx: Option<tauri_plugin_shell::process::CommandChild>,
     /// Claim under the engine mutex before startup work; release on stop/fatal error to prevent double starts.
     pub live: bool,
+    /// Set while a rehearsal holds the `live` claim, so a refused start can say why.
+    pub rehearsing: bool,
     /// Hold from updater download through restart; startup checks the same engine mutex.
     pub update_in_progress: bool,
     /// Background work can outlive `live`; reserve under the mutex before exposing stopped state.
@@ -927,6 +934,8 @@ pub struct EngineRuntime {
     pub telemetry_start_requested_ms: u128,
     /// Reference the existing setup error without capturing the exception twice.
     pub telemetry_last_error_id: Option<String>,
+    /// What the error snapshot tells the UI; narrower than the telemetry code for a taken port.
+    pub last_error_code: Option<String>,
     /// Bind the last error to its operation so stale diagnostics cannot attach to a new start.
     pub telemetry_last_error_operation_id: Option<String>,
 }

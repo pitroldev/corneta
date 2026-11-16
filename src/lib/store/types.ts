@@ -14,6 +14,8 @@ import type {
   EngineSnapshot,
   IngestConfig,
   ObsCheck,
+  ObsEnvironment,
+  RehearsalReport,
   PlatformId,
   Target,
   Viewers,
@@ -94,6 +96,19 @@ export interface State {
   obs: ObsCheck | "loading" | null;
   /** Use a short cache; force bypasses cached results. */
   runObsCheck: (force?: boolean) => Promise<void>;
+  /** `null` until the first read, or when the backend cannot tell. */
+  obsEnv: ObsEnvironment | null;
+  refreshObsEnv: () => Promise<ObsEnvironment | null>;
+  /** Latest progress of a rehearsal, kept after it ends so the result stays on screen. */
+  rehearsal: RehearsalReport | null;
+  rehearsing: boolean;
+  runRehearsal: () => Promise<RehearsalReport>;
+  cancelRehearsal: () => Promise<void>;
+  clearRehearsal: () => void;
+  /** Moves the local ingest to a free port, for when another program holds the usual one. */
+  moveIngestPort: () => Promise<void>;
+  /** Fresh OBS check for the setup poll: no loading state and no usage event. */
+  pollObs: () => Promise<void>;
   /** Explicit checks propagate save and connection failures. */
   checkObs: (force?: boolean) => Promise<ObsCheck>;
   configureObs: () => Promise<void>;

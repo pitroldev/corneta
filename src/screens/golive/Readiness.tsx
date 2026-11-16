@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
 import { m } from "framer-motion";
 import {
   AlertTriangle,
@@ -23,6 +23,9 @@ import {
   obsConfigured,
   youtubeAutoTargetId,
 } from "../../lib/readiness";
+import { PasteFields } from "../../components/ObsSetup";
+import { byHandTitleKey, encoderLabel } from "../../lib/encoder";
+import { useEncoder } from "../../lib/useEncoder";
 import { useReadiness, useReadinessContext } from "../../lib/useReadiness";
 import { cn } from "../../lib/utils";
 import { rich, useI18n, useT, type I18n } from "../../lib/i18n";
@@ -33,6 +36,7 @@ import { QualityModeCards, modeTitleKey } from "../../components/QualityModes";
 import { QuickConnect } from "../../components/platforms/TargetConnect";
 import type { Screen } from "../../components/Sidebar";
 import { CheckRow } from "./parts";
+import { obsLights } from "../../lib/obsLights";
 
 export type ReadinessPanel = "platforms" | "obs" | "internet" | "safety";
 type Tone = "ok" | "warn" | "bad" | "neutral" | "loading";
@@ -69,6 +73,7 @@ export function ReadinessTiles({
   const { t, tp, fmt } = useI18n();
   const config = useStore((s) => s.config!);
   const obs = useStore((s) => s.obs);
+  const encoder = useEncoder();
   const uploadMbps = useStore((s) => s.uploadMbps);
   const r = useReadiness();
   const safety = useSafetyItems();
@@ -112,15 +117,22 @@ export function ReadinessTiles({
           value: t("golive.tile.obs.checking"),
           sub: t("golive.tile.obs.checkingSub"),
         }
-      : obsConfigured(obs)
+      : obsConfigured(obs, config.settings.obsManual, encoder.app)
         ? {
             tone: "ok",
-            value: t("golive.tile.obs.ok"),
-            sub: obs.width
-              ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)} fps`
-              : t("golive.tile.obs.okSub"),
+            value: t(
+              obs.reachable && encoder.app === "obs"
+                ? "golive.tile.obs.ok"
+                : "golive.tile.obs.manual",
+            ),
+            sub:
+              !obs.reachable || encoder.app !== "obs"
+                ? t("golive.tile.obs.manualSub")
+                : obs.width
+                  ? `${obs.width}×${obs.height} · ${Math.round(obs.fps)} fps`
+                  : t("golive.tile.obs.okSub"),
           }
-        : obs.reachable
+        : obs.reachable && encoder.app === "obs"
           ? {
               tone: "warn",
               value: t("golive.tile.obs.notPointing"),
@@ -128,9 +140,10 @@ export function ReadinessTiles({
             }
           : {
               tone: "bad",
-              value: obs.authFailed
-                ? t("golive.tile.obs.auth")
-                : t("golive.tile.obs.missing"),
+              value:
+                obs.authFailed && encoder.app === "obs"
+                  ? t("golive.tile.obs.auth")
+                  : t("golive.tile.obs.missing"),
               sub: t("golive.tile.obs.fixSub"),
             };
 
@@ -156,8 +169,10 @@ export function ReadinessTiles({
         };
 
   const armed = safety.filter((x) => x.on);
+  // The check means the recommended nets are on, not merely that one of them is.
+  const recommended = safety.filter((x) => x.key !== "blackScreen");
   const safetyTile: TileProps = {
-    tone: armed.length > 0 ? "ok" : "neutral",
+    tone: recommended.every((x) => x.on) ? "ok" : "neutral",
     value: t("golive.tile.safety.count", {
       on: armed.length,
       total: safety.length,
@@ -173,7 +188,14 @@ export function ReadinessTiles({
 
   const tiles: [ReadinessPanel, typeof Tv2, string, TileProps][] = [
     ["platforms", Tv2, t("golive.tile.platforms.label"), platforms],
-    ["obs", Plug, t("golive.tile.obs.label"), obsTile],
+    [
+      "obs",
+      Plug,
+      encoder.app === "obs"
+        ? t("golive.tile.obs.label")
+        : encoderLabel(encoder.app, t),
+      obsTile,
+    ],
     ["internet", Wifi, t("golive.tile.internet.label"), internet],
     ["safety", Shield, t("golive.tile.safety.label"), safetyTile],
   ];
@@ -249,7 +271,10 @@ function Tile({
         {value}
       </span>
       <span className="flex items-center gap-1 text-xs text-ink-muted">
-        <span className="min-w-0 truncate">{sub}</span>
+        {/* A plain hyphen lets a name such as "Auto-bitrate" break in half on this narrow tile. */}
+        <span className="line-clamp-2 min-w-0">
+          {sub.replaceAll("-", "\u2011")}
+        </span>
         <ChevronRight className="ml-auto size-3.5 shrink-0 text-ink-faint opacity-0 transition-opacity group-hover:opacity-100" />
       </span>
     </button>
@@ -277,6 +302,7 @@ export function ReadinessDrawer({
   testing: boolean;
 }) {
   const t = useT();
+  const encoder = useEncoder();
   const setSettingsTab = useStore((s) => s.setSettingsTab);
   const go = (s: Screen) => {
     onClose();
@@ -302,8 +328,14 @@ export function ReadinessDrawer({
       ),
     },
     obs: {
-      title: t("golive.drawer.obs.title"),
-      subtitle: t("golive.drawer.obs.subtitle"),
+      title:
+        encoder.app === "obs"
+          ? t("golive.drawer.obs.title")
+          : t("golive.drawer.encoder.title", { app: encoder.name }),
+      subtitle:
+        encoder.app === "obs"
+          ? t("golive.drawer.obs.subtitle")
+          : t("golive.drawer.encoder.subtitle"),
       icon: <Plug className="size-5" />,
     },
     internet: {
@@ -467,13 +499,27 @@ function ObsPanel({
   const config = useStore((s) => s.config!);
   const obs = useStore((s) => s.obs);
   const encoders = useStore((s) => s.encoders);
-  const ok = obsConfigured(obs);
+  const env = useStore((s) => s.obsEnv);
+  const refreshObsEnv = useStore((s) => s.refreshObsEnv);
+  const encoder = useEncoder();
+  // The process list and OBS's own settings name the cause; re-read them with every check.
+  useEffect(() => {
+    void refreshObsEnv();
+  }, [refreshObsEnv, obs]);
+  const lights = obsLights(env, obs);
+  const ok = obsConfigured(obs, config.settings.obsManual, encoder.app);
   const checking = obs === null || obs === "loading";
   return (
     <div className="flex flex-col gap-4">
       <div className="rounded-lg bg-surface-2 p-3.5">
         <div className="flex flex-col gap-1.5">
-          {checking ? (
+          {encoder.app !== "obs" ? (
+            <CheckRow
+              label={t(byHandTitleKey(encoder.app, ok))}
+              ok={ok}
+              warn={!ok}
+            />
+          ) : checking ? (
             <span className="flex items-center gap-2 text-sm text-ink-muted">
               <Loader2 className="size-4 animate-spin" />
               {t("golive.tile.obs.checking")}
@@ -482,20 +528,32 @@ function ObsPanel({
             <>
               <CheckRow
                 label={t(
-                  obs.reachable
-                    ? "golive.checkup.obsConnected"
-                    : "golive.checkup.obsNotConnected",
+                  lights.open === "ok"
+                    ? "components.obsLights.open.ok"
+                    : lights.action === "install"
+                      ? "components.obsLights.open.missing.title"
+                      : lights.open === "todo"
+                        ? "components.obsLights.open.closed.title"
+                        : "components.obsLights.open.checking",
                 )}
-                ok={obs.reachable}
-                warn={!obs.reachable}
-                detail={
-                  obs.reachable
-                    ? undefined
-                    : obs.authFailed
-                      ? t("golive.rescue.authFailed")
-                      : t("golive.checkup.obsConnected.fix")
-                }
+                ok={lights.open === "ok"}
+                warn={lights.open !== "ok"}
               />
+              {lights.open === "ok" && (
+                <CheckRow
+                  label={t(
+                    lights.remote === "ok"
+                      ? "components.obsLights.remote.ok"
+                      : lights.action === "enableRemote"
+                        ? "components.obsLights.remote.off.title"
+                        : lights.action === "password"
+                          ? "components.obsLights.remote.password.title"
+                          : "components.obsLights.remote.retry.title",
+                  )}
+                  ok={lights.remote === "ok"}
+                  warn={lights.remote !== "ok"}
+                />
+              )}
               {obs.reachable && (
                 <CheckRow
                   label={t("golive.checkup.obsPointing")}
@@ -525,83 +583,96 @@ function ObsPanel({
             size="sm"
             onClick={onSetupObs}
           >
-            <Zap className="size-4" /> {t("golive.obs.fixForMe")}
+            <Zap className="size-4" />{" "}
+            {t(
+              encoder.app === "obs"
+                ? "golive.obs.fixForMe"
+                : "golive.obs.openSetup",
+            )}
           </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onRecheck}
-            loading={obs === "loading"}
-            disabled={obs === "loading"}
+          {encoder.app === "obs" && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onRecheck}
+              loading={obs === "loading"}
+              disabled={obs === "loading"}
+            >
+              {obs !== "loading" && <RefreshCw className="size-4" />}
+              {t("golive.obs.check")}
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {encoder.app !== "obs" ? (
+        <PasteFields app={encoder.app} stacked />
+      ) : (
+        <>
+          <div>
+            <h4 className="mb-1 font-display text-base font-extrabold">
+              {t("golive.drawer.obs.manual")}
+            </h4>
+            <p className="mb-2.5 text-xs text-ink-faint">
+              {rich(t, "golive.obs.hint", {
+                caminho: (
+                  <strong className="text-ink-muted">
+                    {t("golive.obs.hint.path")}
+                  </strong>
+                ),
+              })}
+            </p>
+            <div className="flex flex-col gap-2">
+              <CopyField
+                label={t("golive.obs.field.server")}
+                value={obsIngestUrl(config.ingest)}
+                stacked
+              />
+              <CopyField
+                label={t("golive.obs.field.key")}
+                value={config.ingest.key}
+                mono
+                stacked
+              />
+            </div>
+            <p className="mt-2 text-xs text-ink-faint">
+              {t("golive.obs.key.note")}
+            </p>
+          </div>
+
+          {config.targets.some(
+            (target) =>
+              target.enabled && effectiveAction(config.mode, target) === "copy",
+          ) && (
+            <p className="rounded-lg bg-surface-2 p-3 text-xs text-ink-muted">
+              {rich(t, "golive.checkup.tip", {
+                caminho: (
+                  <strong className="text-ink">
+                    {t("golive.checkup.tip.path")}
+                  </strong>
+                ),
+                taxa: (
+                  <strong className="text-ink">
+                    {t("golive.checkup.tip.rateControl")}
+                  </strong>
+                ),
+                keyframe: (
+                  <strong className="text-ink">
+                    {t("golive.checkup.tip.keyframe")}
+                  </strong>
+                ),
+              })}
+            </p>
+          )}
+          <button
+            type="button"
+            onClick={onGuide}
+            className="flex items-center gap-1.5 self-start text-xs font-bold text-brass hover:underline"
           >
-            {obs !== "loading" && <RefreshCw className="size-4" />}
-            {t("golive.obs.check")}
-          </Button>
-        </div>
-      </div>
-
-      <div>
-        <h4 className="mb-1 font-display text-base font-extrabold">
-          {t("golive.drawer.obs.manual")}
-        </h4>
-        <p className="mb-2.5 text-xs text-ink-faint">
-          {rich(t, "golive.obs.hint", {
-            caminho: (
-              <strong className="text-ink-muted">
-                {t("golive.obs.hint.path")}
-              </strong>
-            ),
-          })}
-        </p>
-        <div className="flex flex-col gap-2">
-          <CopyField
-            label={t("golive.obs.field.server")}
-            value={obsIngestUrl(config.ingest)}
-            stacked
-          />
-          <CopyField
-            label={t("golive.obs.field.key")}
-            value={config.ingest.key}
-            mono
-            stacked
-          />
-        </div>
-        <p className="mt-2 text-xs text-ink-faint">
-          {t("golive.obs.key.note")}
-        </p>
-      </div>
-
-      {config.targets.some(
-        (target) =>
-          target.enabled && effectiveAction(config.mode, target) === "copy",
-      ) && (
-        <p className="rounded-lg bg-surface-2 p-3 text-xs text-ink-muted">
-          {rich(t, "golive.checkup.tip", {
-            caminho: (
-              <strong className="text-ink">
-                {t("golive.checkup.tip.path")}
-              </strong>
-            ),
-            taxa: (
-              <strong className="text-ink">
-                {t("golive.checkup.tip.rateControl")}
-              </strong>
-            ),
-            keyframe: (
-              <strong className="text-ink">
-                {t("golive.checkup.tip.keyframe")}
-              </strong>
-            ),
-          })}
-        </p>
+            <Gauge className="size-3.5" /> {t("golive.obs.qualityGuide")}
+          </button>
+        </>
       )}
-      <button
-        type="button"
-        onClick={onGuide}
-        className="flex items-center gap-1.5 self-start text-xs font-bold text-brass hover:underline"
-      >
-        <Gauge className="size-3.5" /> {t("golive.obs.qualityGuide")}
-      </button>
     </div>
   );
 }

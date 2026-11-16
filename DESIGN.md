@@ -94,14 +94,14 @@ components:
     height: "40px"
   button-tomato:
     backgroundColor: "{colors.tomato}"
-    textColor: "#ffffff"
+    textColor: "{colors.night}"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
     padding: "0 16px"
     height: "40px"
   button-tomato-hover:
     backgroundColor: "{colors.tomato-strong}"
-    textColor: "#ffffff"
+    textColor: "{colors.night}"
     typography: "{typography.action}"
     rounded: "{rounded.md}"
     padding: "0 16px"
@@ -289,7 +289,7 @@ Borders are firm, usually 2px on fields, options and empty states; structural di
 
 - **Shape:** medium dry corners (7px); heights of 32, 40 and 56px for `sm`, `md` and `lg`.
 - **Primary:** brass block, dark ink, Baloo 2 bold and a dry brass shadow; hover lights up the brass.
-- **Tomato:** emphatic call-out in tomato, white text and a dry night shadow.
+- **Tomato:** emphatic call-out in tomato, dark ink text and a dry night shadow.
 - **Ghost / Outline / Subtle:** ghost is text only, with a fill on hover; outline uses a 2px stroke; subtle rests on `surface-2`.
 - **Danger:** failure color on a translucent layer with a semantic border; confirmation changes the label instead of relying on color alone.
 - **Active / Disabled:** actions with a shadow shift 4px and lose the shadow when pressed; disabled ones sit at 40% with no interaction or shadow.
@@ -328,7 +328,15 @@ On-demand detail opens in a 26rem side drawer, with a brass icon header, scrolla
 
 ### First-run Setup
 
-First-time setup fills the window below the title bar: a brass step track on the left and one step at a time on the right. Each step finishes something real (platform connected, OBS pointed at Corneta, upload measured) instead of only explaining, and any step can be left for later — the dashboard shows what is still missing.
+First-time setup fills the window below the title bar: a brass step track on the left and one step at a time on the right. It has three steps, each named by what it finishes: platforms connected, OBS pointed at Corneta, and a rehearsal that sends the picture to the platforms without an audience. The upload is measured in the background and reported on the track, not asked about. Any step can be left for later — the dashboard shows what is still missing.
+
+Every step lists its items as full-width rows: a platform with its one action in a fixed column on the right, an OBS light, a rehearsal result. Steps do not use side-by-side grids — at the default 1080×800 window half of the content column is about 340px, too narrow for a sign-in button or a key field without wrapping. The way forward always sits in the footer, with back and the way to leave on the left and the step's main action on the right, so a long result never pushes it below the fold.
+
+The OBS step never says only that OBS was not found. Three lights (OBS open, remote control on, stream pointed at Corneta) turn on by themselves as the user acts, and only the first pending one carries an instruction and a button. The rehearsal ends in a verdict with the frame that arrived from OBS and one line per platform; a failure names its cause and the way out.
+
+OBS is the only program Corneta can set up and start by itself, so the step opens with a three-way picker: OBS Studio, Streamlabs, another app. Detection only pre-selects (Streamlabs when it is on the PC and OBS is not); the streamer's answer is saved and wins from then on. The step title, the track label, the Live tile and its drawer take the name of the chosen program. Outside OBS the step is one panel with the two fields to paste, shown at once; lights that only OBS can turn on are never shown for another program, and copy about starting the stream names the program in use.
+
+Optional extras stay out of the first run. The phone panel is offered once on the Live screen after the first live ends.
 
 ### Report Story
 

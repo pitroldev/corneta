@@ -651,6 +651,7 @@ mod tests {
             ingest_live: state == "live",
             operation_id: None,
             error_id: None,
+            error_code: None,
             targets: map,
             message: None,
             cpu: None,

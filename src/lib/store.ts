@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api, IS_TAURI, START_CANCELLED } from "./api";
+import { encoderApp } from "./encoder";
 import * as cfgOps from "./configOps";
 import { createChatSlice } from "./store/chat";
 import { createNavigationSlice } from "./store/navigation";
@@ -465,6 +466,55 @@ export const useStore = create<State>((set, get) => {
         .checkObs(force)
         .catch(() => {});
     },
+    obsEnv: null,
+    async refreshObsEnv() {
+      try {
+        const obsEnv = await api.obsEnvironment();
+        set({ obsEnv });
+        return obsEnv;
+      } catch {
+        set({ obsEnv: null });
+        return null;
+      }
+    },
+    rehearsal: null,
+    rehearsing: false,
+    async runRehearsal() {
+      if (get().rehearsing) throw new Error("rehearsal_running");
+      // The rehearsal reads the settings file, like a live.
+      await flushSave();
+      set({ rehearsing: true, rehearsal: null });
+      const unsubscribe = api.subscribeRehearsal((rehearsal) =>
+        set({ rehearsal }),
+      );
+      try {
+        const rehearsal = await api.runRehearsal();
+        set({ rehearsal });
+        return rehearsal;
+      } finally {
+        unsubscribe();
+        set({ rehearsing: false });
+      }
+    },
+    async cancelRehearsal() {
+      await api.cancelRehearsal();
+    },
+    clearRehearsal() {
+      if (!get().rehearsing) set({ rehearsal: null });
+    },
+    async moveIngestPort() {
+      await flushSave();
+      const config = await api.pickIngestPort();
+      confirmSaved(config);
+      set({ config });
+    },
+    async pollObs() {
+      try {
+        set({ obs: await obs.check(true) });
+      } catch {
+        /* The next poll retries; an explicit check reports the failure. */
+      }
+    },
     async configureObs() {
       await obs.configure();
       set({ obs: null });
@@ -532,7 +582,18 @@ export const useStore = create<State>((set, get) => {
         if (liveOperation?.id === operation.id) liveOperation = null;
         throw error;
       }
-      if (get().config?.settings.autoStartObs) {
+      const liveSettings = get().config?.settings;
+      const obsState = get().obs;
+      // Only OBS can be started for the user, and one pasted by hand that the WebSocket cannot
+      // reach would only report a failure on every live.
+      const userStarts =
+        !liveSettings ||
+        encoderApp(liveSettings, get().obsEnv) !== "obs" ||
+        (liveSettings.obsManual &&
+          obsState !== null &&
+          obsState !== "loading" &&
+          !obsState.reachable);
+      if (liveSettings?.autoStartObs && !userStarts) {
         try {
           await api.obsSetStream(true);
           return "obs-ok";

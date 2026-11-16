@@ -69,6 +69,18 @@ pub struct Destination {
     /// Stands in for destination ids the catalog no longer knows.
     #[serde(default)]
     fallback: bool,
+    /// The platform's own test mode, which receives a stream without showing it on the channel.
+    #[serde(default)]
+    pub rehearsal: Option<RehearsalKey>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RehearsalKey {
+    /// Query parameter appended to the stream key.
+    pub test_flag: String,
+    /// Ingest domains where that parameter is honoured.
+    pub hosts: Vec<String>,
 }
 
 #[derive(Deserialize)]
@@ -96,6 +108,11 @@ fn fallback() -> &'static Destination {
 
 pub fn destination(id: &str) -> Option<&'static Destination> {
     catalog().iter().find(|d| d.id == id)
+}
+
+#[cfg(test)]
+pub fn destinations() -> &'static [Destination] {
+    catalog()
 }
 
 pub fn is_destination(id: &str) -> bool {

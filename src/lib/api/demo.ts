@@ -3,6 +3,7 @@ import { resolveLocale } from "../i18n/locale";
 import type { I18n, MessageKey } from "../i18n";
 import { PLATFORMS } from "../platforms";
 import { effectiveAction } from "../estimates";
+import { youtubeAutoTargetId } from "../readiness";
 import {
   EMPTY_TELEMETRY_STATUS,
   TELEMETRY_NOTICE_VERSION,
@@ -25,12 +26,48 @@ import type {
   SessionMeta,
   TargetStatus,
   Viewers,
+  RehearsalReport,
 } from "../types";
 import { CornetaApi } from "./types";
 
 export function mockApi(): CornetaApi {
   const CONFIG_KEY = "corneta.config";
   const VAULT_KEY = "corneta.vault";
+  const DEMO_OBS_KEY = "corneta.demo.obs";
+  const DEMO_START_KEY = "corneta.demo.start";
+  const rehearsalListeners = new Set<(report: RehearsalReport) => void>();
+  let rehearsalCancelled = false;
+  // Colour bars stand in for the frame a real rehearsal grabs from OBS.
+  const DEMO_FRAME =
+    "data:image/svg+xml;utf8," +
+    encodeURIComponent(
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 7 4" preserveAspectRatio="none">' +
+        ["c9c9c9", "c9c91a", "1ac9c9", "1ac91a", "c91ac9", "c91a1a", "1a1ac9"]
+          .map(
+            (fill, x) =>
+              `<rect x="${x}" width="1" height="4" fill="#${fill}"/>`,
+          )
+          .join("") +
+        "</svg>",
+    );
+  type DemoObsScenario =
+    | "ready"
+    | "notPointed"
+    | "remoteOff"
+    | "closed"
+    | "notInstalled"
+    | "streamlabs";
+  /** Lets screenshots and tests show the OBS states the always-connected fake hides. */
+  const demoObsScenario = (): DemoObsScenario => {
+    const stored = localStorage.getItem(DEMO_OBS_KEY);
+    return stored === "notPointed" ||
+      stored === "remoteOff" ||
+      stored === "closed" ||
+      stored === "notInstalled" ||
+      stored === "streamlabs"
+      ? stored
+      : "ready";
+  };
   const TELEMETRY_KEY = "corneta.telemetry.v1";
 
   const loadVault = (): Record<string, string> => {
@@ -613,6 +650,22 @@ export function mockApi(): CornetaApi {
     async setAutostart() {},
     async start(_operationId) {
       const cfg = loadConfig();
+      // Contributor scenario: the first start fails the way a taken ingest port does.
+      if (localStorage.getItem(DEMO_START_KEY) === "portInUse") {
+        const message =
+          resolveLocale(cfg.settings.language) === "pt-BR"
+            ? `O servidor de ingestão caiu: a porta ${cfg.ingest.port} está ocupada por outro programa ou reservada pelo Windows. Feche o que estiver usando essa porta e tenta de novo.`
+            : `The ingest server crashed: port ${cfg.ingest.port} is taken by another program or reserved by Windows. Close whatever's using it and try again.`;
+        snapshot = {
+          state: "error",
+          startedAt: null,
+          targets: {},
+          message,
+          errorCode: "ingest_port_in_use",
+        };
+        emit();
+        throw new Error(message);
+      }
       pausedTargets.clear();
       reencodedAt.clear();
       targetPlatforms.clear();
@@ -1060,7 +1113,15 @@ export function mockApi(): CornetaApi {
     },
     async openChatWindow() {},
     async accountChatChannels() {
-      return [];
+      const accounts = loadAccounts();
+      return (Object.keys(accounts) as DemoAccount[])
+        .filter((who) => accounts[who])
+        .map((who) => ({
+          platform: who,
+          value: "seucanal",
+          name: "Seu Canal",
+          aliases: [],
+        }));
     },
     async chatSend(text) {
       // The native app localizes its own author name and marks the message as its own.
@@ -1224,15 +1285,153 @@ export function mockApi(): CornetaApi {
       return () => {};
     },
     async obsCheck() {
+      const scenario = demoObsScenario();
+      if (scenario !== "ready" && scenario !== "notPointed")
+        return {
+          reachable: false,
+          pointingAtCorneta: false,
+          width: 0,
+          height: 0,
+          fps: 0,
+          errorCode: "connectionFailed" as const,
+        };
       return {
         reachable: true,
-        pointingAtCorneta: true,
+        pointingAtCorneta: scenario === "ready",
         width: 1920,
         height: 1080,
         fps: 60,
       };
     },
-    async obsAutoconfigure() {},
+    async obsEnvironment() {
+      const scenario = demoObsScenario();
+      return {
+        installed: scenario !== "notInstalled" && scenario !== "streamlabs",
+        running:
+          scenario !== "closed" &&
+          scenario !== "notInstalled" &&
+          scenario !== "streamlabs",
+        streamlabs: scenario === "streamlabs",
+        websocketEnabled: scenario !== "remoteOff",
+        websocketPort: 4455,
+        authRequired: true,
+      };
+    },
+    async openObs() {
+      if (demoObsScenario() === "closed")
+        localStorage.setItem(DEMO_OBS_KEY, "remoteOff");
+    },
+    async pickIngestPort() {
+      localStorage.removeItem(DEMO_START_KEY);
+      const cfg = loadConfig();
+      cfg.ingest.port = 1936;
+      localStorage.setItem(CONFIG_KEY, JSON.stringify(cfg));
+      return cfg;
+    },
+    async runRehearsal() {
+      const config = loadConfig();
+      const scenario = demoObsScenario();
+      const signal = scenario === "ready" || scenario === "notPointed";
+      const privateTargetId = youtubeAutoTargetId(config.targets, {
+        youtubeAuto: config.settings.youtubeAutoLive,
+      });
+      rehearsalCancelled = false;
+      const vault = loadVault();
+      const base = (): RehearsalReport => ({
+        phase: "starting",
+        obsStarted: signal,
+        signalArrived: false,
+        hasAudio: false,
+        secondsLeft: 8,
+        targets: config.targets
+          .filter((target) => target.enabled && target.ingestUrl)
+          .map((target) => {
+            const preset = PLATFORMS[target.platformId];
+            // Same rule as the engine: a test mode needs the target's key.
+            const route =
+              target.id === privateTargetId
+                ? ("privateBroadcast" as const)
+                : preset?.rehearsal && vault[target.id]
+                  ? ("bandwidthTest" as const)
+                  : null;
+            return {
+              targetId: target.id,
+              platformId: target.platformId,
+              name: target.name || preset?.name || target.platformId,
+              route,
+              outcome: route ? ("pending" as const) : ("skipped" as const),
+              ...(route
+                ? {}
+                : {
+                    skip: preset?.rehearsal
+                      ? ("noKey" as const)
+                      : ("noTestMode" as const),
+                  }),
+            };
+          }),
+        cancelled: false,
+      });
+      let report = base();
+      const step = async (ms: number, patch: Partial<RehearsalReport>) => {
+        await new Promise((resolve) => setTimeout(resolve, ms));
+        report = { ...report, ...patch };
+        for (const cb of rehearsalListeners) cb(report);
+      };
+      await step(300, { phase: "waitingObs" });
+      if (!signal || rehearsalCancelled) {
+        await step(signal ? 100 : 2500, {
+          phase: "done",
+          secondsLeft: 0,
+          cancelled: rehearsalCancelled,
+          targets: report.targets.map((target) =>
+            target.route ? { ...target, outcome: "failed" as const } : target,
+          ),
+        });
+        return report;
+      }
+      await step(1200, {
+        phase: "sending",
+        signalArrived: true,
+        hasAudio: true,
+        secondsLeft: 6,
+      });
+      await step(2000, {
+        secondsLeft: 4,
+        targets: report.targets.map((target) =>
+          target.route === "bandwidthTest"
+            ? { ...target, outcome: "received" as const }
+            : target,
+        ),
+      });
+      await step(2500, {
+        phase: "done",
+        secondsLeft: 0,
+        signalKbps: 6000,
+        cancelled: rehearsalCancelled,
+        thumbnail: DEMO_FRAME,
+        targets: report.targets.map((target) =>
+          target.route === "privateBroadcast"
+            ? {
+                ...target,
+                outcome: "warned" as const,
+                issues: [{ kind: "gopSizeLong", severity: "warning" as const }],
+              }
+            : target,
+        ),
+      });
+      return report;
+    },
+    async cancelRehearsal() {
+      rehearsalCancelled = true;
+    },
+    subscribeRehearsal(cb) {
+      rehearsalListeners.add(cb);
+      return () => rehearsalListeners.delete(cb);
+    },
+    async obsAutoconfigure() {
+      if (demoObsScenario() === "notPointed")
+        localStorage.removeItem(DEMO_OBS_KEY);
+    },
     async obsVideoCheck() {
       return {
         current: {

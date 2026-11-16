@@ -18,6 +18,8 @@ import type {
   EncoderInfo,
   EngineSnapshot,
   ObsCheck,
+  ObsEnvironment,
+  RehearsalReport,
   ObsVideo,
   ObsVideoCheck,
   DeckDesktopRequest,
@@ -232,6 +234,15 @@ export interface CornetaApi {
     cb: (e: { kind: string; detail?: string | null }) => void,
   ): () => void;
   obsCheck(): Promise<ObsCheck>;
+  /** Process and settings-file facts about OBS; opens no connection. */
+  obsEnvironment(): Promise<ObsEnvironment>;
+  openObs(): Promise<void>;
+  /** Moves the local ingest to a free port and returns the saved settings. */
+  pickIngestPort(): Promise<AppConfig>;
+  /** Runs a private rehearsal to the end; progress arrives through `subscribeRehearsal`. */
+  runRehearsal(): Promise<RehearsalReport>;
+  cancelRehearsal(): Promise<void>;
+  subscribeRehearsal(cb: (report: RehearsalReport) => void): () => void;
   obsAutoconfigure(): Promise<void>;
   obsVideoCheck(): Promise<ObsVideoCheck>;
   obsVideoApply(): Promise<ObsVideo>;

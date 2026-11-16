@@ -169,10 +169,15 @@ export function ChatScreen() {
     [],
   );
   const channelsTabOpen = showConfig && configTab === "canais";
+  const sourceCount = useStore(
+    (state) => state.config?.settings.chatSources?.length ?? 0,
+  );
   // A login or logout changes which account channels can be suggested.
   const loginStates = ACCOUNT_PLATFORMS.map((p) => chatLogin[p].state).join();
+  // The empty chat offers the signed-in accounts' channels, so they load before any setup too.
+  const needsAccountChannels = channelsTabOpen || sourceCount === 0;
   useEffect(() => {
-    if (!channelsTabOpen) return;
+    if (!needsAccountChannels) return;
     let cancelled = false;
     api.accountChatChannels().then(
       (channels) => {
@@ -183,7 +188,7 @@ export function ChatScreen() {
     return () => {
       cancelled = true;
     };
-  }, [channelsTabOpen, loginStates]);
+  }, [needsAccountChannels, loginStates]);
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
@@ -346,6 +351,31 @@ export function ChatScreen() {
       setShowConfig(true);
       return;
     }
+    setConnecting(true);
+    try {
+      await connectChat(t);
+    } catch {
+      toast.error(t("chat.error.connect"));
+    } finally {
+      setConnecting(false);
+    }
+  };
+  // The accounts signed in for the platforms already name the channels, so the empty chat offers
+  // them in one click instead of sending the user to the channel settings.
+  const offerAccounts = !configured && accountSuggestions.length > 0;
+  const connectAccounts = async () => {
+    setSettings({
+      chatSources: [
+        ...sources,
+        ...accountSuggestions.map((channel) => ({
+          id: uid("src"),
+          platform: channel.platform,
+          value: channel.value,
+          name: channel.name,
+          enabled: true,
+        })),
+      ],
+    });
     setConnecting(true);
     try {
       await connectChat(t);
@@ -528,7 +558,7 @@ export function ChatScreen() {
                       modes={chatSide[chatSideKey(st.platform, source)]?.modes}
                     />
                     {st.status !== "connected" ? (
-                      <span className="text-[10px] font-semibold uppercase tracking-wide text-ink-faint">
+                      <span className="text-[11px] font-semibold uppercase tracking-wide text-ink-faint">
                         {statusLabel(t, st.status)}
                       </span>
                     ) : (
@@ -990,10 +1020,48 @@ export function ChatScreen() {
             canReply={canReply}
             onReply={startReply}
             disconnectedHint={
-              configured ? t("chat.feed.hint.ready") : t("chat.feed.hint.setup")
+              configured
+                ? t("chat.feed.hint.ready")
+                : offerAccounts
+                  ? t("chat.feed.hint.accounts")
+                  : t("chat.feed.hint.setup")
             }
             emptyAction={
-              configured ? (
+              offerAccounts ? (
+                <div className="flex flex-col items-center gap-3">
+                  <ul className="w-72 rounded-lg bg-surface-2 px-3 text-left">
+                    {accountSuggestions.map((channel) => (
+                      <li
+                        key={`${channel.platform}:${channel.value}`}
+                        className="flex items-center gap-2.5 border-b border-border-soft py-2.5 last:border-0"
+                      >
+                        <PlatformGlyph id={channel.platform} size={26} />
+                        <span className="min-w-0 flex-1 truncate text-sm font-semibold">
+                          {channel.name || channel.value}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Button
+                    variant="primary"
+                    loading={connecting}
+                    onClick={() => void connectAccounts()}
+                  >
+                    {!connecting && <Wifi className="size-4" />}{" "}
+                    {t("chat.feed.accounts.connect")}
+                  </Button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setConfigTab("canais");
+                      setShowConfig(true);
+                    }}
+                    className="inline-flex min-h-6 items-center text-xs font-bold text-brass hover:underline"
+                  >
+                    {t("chat.feed.accounts.other")}
+                  </button>
+                </div>
+              ) : configured ? (
                 <Button
                   variant="primary"
                   size="sm"

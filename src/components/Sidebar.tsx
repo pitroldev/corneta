@@ -195,7 +195,7 @@ export function Sidebar({
 
   return (
     <aside className="flex w-64 shrink-0 flex-col border-r border-border-soft bg-panel p-4">
-      <div className="mb-5 flex items-center gap-3 px-1 pt-1">
+      <div className="mb-5 flex items-center gap-3 px-1 pt-1 [@media(max-height:680px)]:mb-3">
         <div className="brand-tile grid size-11 place-items-center rounded-lg bg-brass text-brass-ink">
           <Mascot className="size-6" />
         </div>
@@ -211,14 +211,20 @@ export function Sidebar({
 
       <LiveStatus onOpen={() => onNavigate("golive")} />
 
-      <nav className="mt-5 flex flex-col gap-1" aria-label={t("sidebar.aria")}>
+      <nav
+        className="mt-5 flex flex-col gap-1 [@media(max-height:680px)]:mt-3"
+        aria-label={t("sidebar.aria")}
+      >
         <GroupLabel>{t("sidebar.group.live")}</GroupLabel>
         {LIVE_NAV.map(item)}
-        <GroupLabel className="mt-4">{t("sidebar.group.prepare")}</GroupLabel>
+        <GroupLabel className="mt-4 [@media(max-height:680px)]:mt-2">
+          {t("sidebar.group.prepare")}
+        </GroupLabel>
         {PREPARE_NAV.map(item)}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-1 pt-4">
+      {/* At the 600 px minimum height the footer only fits with the tighter spacing above. */}
+      <div className="mt-auto flex flex-col gap-1 pt-4 [@media(max-height:680px)]:pt-1">
         {footer("settings", Settings)}
         {footer("about", Info)}
       </div>

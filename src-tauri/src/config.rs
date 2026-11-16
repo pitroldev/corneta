@@ -210,6 +210,12 @@ pub struct Settings {
     pub obs_password: String,
     #[serde(default = "default_true")]
     pub auto_start_obs: bool,
+    /// The user confirmed pasting the server and key into OBS by hand.
+    #[serde(default)]
+    pub obs_manual: bool,
+    /// The program the user said they stream with; `None` until they answer.
+    #[serde(default)]
+    pub encoder_app: Option<String>,
     #[serde(default = "default_live_shortcut")]
     pub live_shortcut: String,
     /// Empty until chosen: an update must not grab global keys the user never asked for.
@@ -457,6 +463,8 @@ impl Default for Settings {
             autostart: false,
             obs_password: String::new(),
             auto_start_obs: true,
+            obs_manual: false,
+            encoder_app: None,
             live_shortcut: default_live_shortcut(),
             mark_moment_shortcut: String::new(),
             brb_shortcut: String::new(),
@@ -476,7 +484,7 @@ impl Default for Settings {
             chat_both_layout: default_both_layout(),
             chat_both_alerts_first: false,
             chat_both_split: default_both_split(),
-            brb_enabled: false,
+            brb_enabled: true,
             brb_slate_kind: default_brb_slate_kind(),
             auto_bitrate: true,
             loudness_normalize: false,

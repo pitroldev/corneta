@@ -838,6 +838,7 @@ dependencies = [
  "webview2-com",
  "windows",
  "windows-future",
+ "winreg",
 ]
 
 [[package]]

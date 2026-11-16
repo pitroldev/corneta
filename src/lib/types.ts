@@ -48,6 +48,8 @@ export interface PlatformPreset {
   setupRank?: number;
   /** Part of a brand-new configuration. */
   starter?: boolean;
+  /** The platform's own test mode: receives a stream without showing it on the channel. */
+  rehearsal?: { testFlag: string; hosts: string[] };
   /** The ingest URL varies by account or region, so the field stays editable. */
   regionalIngest?: boolean;
   /** Custom ingests may need OBS-style publisher metadata and a separate playpath. */
@@ -106,6 +108,13 @@ export interface AppSettings {
   /** Empty means OBS WebSocket authentication is disabled. */
   obsPassword: string;
   autoStartObs: boolean;
+  /**
+   * The user says the server and key were pasted into OBS by hand. It only counts while the
+   * WebSocket cannot answer; when it can, what OBS reports wins.
+   */
+  obsManual: boolean;
+  /** The program the streamer said they use; `null` until they answer, so detection decides. */
+  encoderApp: EncoderApp | null;
   liveShortcut: string;
   /** Empty until chosen: an update must not grab global keys the user never asked for. */
   markMomentShortcut: string;
@@ -222,6 +231,21 @@ export interface ObsCheck {
   height: number;
   fps: number;
   error?: string;
+}
+
+/** What Corneta reads about OBS on this PC without connecting to it. */
+/** The program that sends the picture to Corneta. Only OBS can be set up and started for the user. */
+export type EncoderApp = "obs" | "streamlabs" | "other";
+
+export interface ObsEnvironment {
+  installed: boolean;
+  running: boolean;
+  /** `null` when OBS's settings could not be read. */
+  websocketEnabled: boolean | null;
+  websocketPort: number | null;
+  authRequired: boolean | null;
+  /** Streamlabs Desktop is on this PC: it has no WebSocket server, so it is set up by hand. */
+  streamlabs: boolean;
 }
 
 export type { ChatPlatform } from "../platforms/types";
@@ -494,6 +518,38 @@ export interface PlatformIssue {
   severity: "info" | "warning" | "error";
 }
 
+export type RehearsalOutcome =
+  "pending" | "received" | "warned" | "refused" | "failed" | "skipped";
+
+export interface RehearsalTarget {
+  targetId: string;
+  platformId: string;
+  name: string;
+  /** How the platform can receive without showing anything; `null` when it cannot. */
+  route: "bandwidthTest" | "privateBroadcast" | null;
+  outcome: RehearsalOutcome;
+  issues?: PlatformIssue[];
+  /** Localized reason for a refusal or failure. */
+  detail?: string;
+  /** Why a skipped platform was left out: no key for its test mode yet, or no test mode. */
+  skip?: "noKey" | "noTestMode";
+}
+
+/** Progress and result of a private run of the whole chain. */
+export interface RehearsalReport {
+  phase: "starting" | "waitingObs" | "sending" | "done";
+  /** Corneta pressed play in OBS itself. */
+  obsStarted: boolean;
+  signalArrived: boolean;
+  hasAudio: boolean;
+  signalKbps?: number;
+  secondsLeft: number;
+  targets: RehearsalTarget[];
+  /** A frame of what arrived, as a data URL. */
+  thumbnail?: string;
+  cancelled: boolean;
+}
+
 export interface PlatformCheck {
   state: "confirmed" | "notLive";
   health?: PlatformHealth;
@@ -520,6 +576,8 @@ export interface EngineSnapshot {
   operationId?: string;
   /** Opaque native failure UUID for a correlated diagnostic event. */
   errorId?: string;
+  /** Stable code of the failure behind `message`, when the engine knows it. */
+  errorCode?: string;
   /** Observed CPU and GPU usage percentages. */
   cpu?: number;
   gpu?: number;

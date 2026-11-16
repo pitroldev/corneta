@@ -312,6 +312,8 @@ export const pt = {
   "chat.alerts.verb.reward": "resgatou",
   "chat.alerts.verb.streak": "tá numa sequência",
   "chat.alerts.verb.upgrade": "continuou a inscrição de presente",
+  "chat.feed.accounts.connect": "Ligar o chat",
+  "chat.feed.accounts.other": "Adicionar outro canal",
   "chat.feed.empty.disconnected.body":
     "Adicione um canal (Twitch, Kick, YouTube ou Cinefy experimental) e clique em Conectar pra puxar o chat.",
   "chat.feed.empty.disconnected.title": "Chat desconectado",
@@ -334,6 +336,8 @@ export const pt = {
   "chat.feed.highlight.pinned": "Fixada",
   "chat.feed.highlight.redeemed": "Resgate de pontos",
   "chat.feed.highlight.returning": "Voltou pro chat",
+  "chat.feed.hint.accounts":
+    "Você já entrou nessas contas. Eu puxo o chat delas e junto tudo aqui.",
   "chat.feed.openLink": "Abrir no navegador: {url}",
   "chat.feed.reply": "respondendo {author}",
   "chat.feed.shared": "Veio do chat compartilhado",
@@ -506,25 +510,147 @@ export const pt = {
   "components.connect.youtubeReady":
     "YouTube automático ligado: eu crio a transmissão quando você der BORA AO VIVO.",
   "components.drawer.close": "Fechar",
+  "components.encoder.byHand.body":
+    "Nele eu não consigo configurar nem dar o play. Você cola dois campos uma vez e inicia a transmissão por lá.",
+  "components.encoder.byHand.detected":
+    "Achei o Streamlabs neste PC e já deixei ele marcado.",
+  "components.encoder.byHand.other.done": "Programa apontado à mão",
+  "components.encoder.byHand.other.title": "Aponta o seu programa pra Corneta",
+  "components.encoder.byHand.streamlabs.done": "Streamlabs apontado à mão",
+  "components.encoder.byHand.streamlabs.title":
+    "Aponta o Streamlabs pra Corneta",
+  "components.encoder.label": "Programa de transmissão",
+  "components.encoder.obs.name": "OBS Studio",
+  "components.encoder.obs.sub": "configuro e dou o play",
+  "components.encoder.other.inSentence": "seu programa",
+  "components.encoder.other.label": "Programa",
+  "components.encoder.other.name": "Outro programa",
+  "components.encoder.other.sub": "XSplit, vMix e outros",
+  "components.encoder.streamlabs.name": "Streamlabs",
+  "components.encoder.streamlabs.sub": "você cola dois campos",
+  "components.obsLights.menu.edit": "Editar",
+  "components.obsLights.menu.enable": "Ativar servidor WebSocket",
+  "components.obsLights.menu.file": "Arquivo",
+  "components.obsLights.menu.tools": "Ferramentas",
+  "components.obsLights.menu.view": "Exibir",
+  "components.obsLights.menu.websocket": "Configurações do servidor WebSocket",
+  "components.obsLights.menu.wizard": "Assistente de configuração automática",
+  "components.obsLights.open.checking": "Procurando o OBS neste PC…",
+  "components.obsLights.open.closed.body":
+    "Abre ele que eu sigo daqui sozinha.",
+  "components.obsLights.open.closed.cta": "Abrir o OBS",
+  "components.obsLights.open.closed.title": "O OBS tá fechado",
+  "components.obsLights.open.failed":
+    "Não consegui abrir o OBS. Abre ele pelo menu Iniciar.",
+  "components.obsLights.open.missing.body":
+    "A Corneta recebe a imagem do OBS. Instala ele e volta aqui, que eu percebo sozinha.",
+  "components.obsLights.open.missing.cta": "Baixar o OBS",
+  "components.obsLights.open.missing.title": "Não achei o OBS neste PC",
+  "components.obsLights.open.ok": "OBS aberto",
+  "components.obsLights.pointed.again": "Configurar de novo",
+  "components.obsLights.pointed.title": "Transmissão apontada pra Corneta",
+  "components.obsLights.pointed.todo.body":
+    "Eu mudo três campos no OBS (serviço, servidor e chave) e confiro o vídeo.",
+  "components.obsLights.pointed.todo.title":
+    "Falta apontar a transmissão pra cá",
+  "components.obsLights.pointed.waiting.body": "Eu aponto e confiro o vídeo.",
+  "components.obsLights.remote.checking.body": "Conferindo…",
+  "components.obsLights.remote.off.body":
+    "É por ele que eu aponto a transmissão e dou o play na hora da live. No OBS ele se chama WebSocket e vem desligado de fábrica.",
+  "components.obsLights.remote.off.steps":
+    "No OBS: **Ferramentas → Configurações do servidor WebSocket** e marque **Ativar servidor WebSocket**. Esta luz acende sozinha.",
+  "components.obsLights.remote.off.title":
+    "O controle remoto do OBS tá desligado",
+  "components.obsLights.remote.ok": "Controle remoto ligado",
+  "components.obsLights.remote.password.title":
+    "O OBS pediu uma senha que eu não consegui ler",
+  "components.obsLights.remote.retry.body":
+    "Ele pode estar terminando de abrir. Se continuar assim, um firewall pode estar barrando a porta {port}.",
+  "components.obsLights.remote.retry.title": "O OBS ainda não respondeu",
+  "components.obsLights.remote.waiting.body": "Confiro assim que o OBS abrir.",
+  "components.obsLights.remote.waiting.title": "Controle remoto do OBS",
   "components.obsSetup.connecting.body":
     "Conectando pelo WebSocket do OBS e apontando a transmissão pra cá.",
   "components.obsSetup.connecting.title": "Procurando o OBS…",
   "components.obsSetup.cta": "Configurar o OBS pra mim",
-  "components.obsSetup.error.body":
-    "Confere as dicas abaixo e tenta de novo — ou configura na mão.",
-  "components.obsSetup.idle.body":
-    "Deixa o OBS aberto. Eu conecto, aponto a transmissão pra cá e confiro o vídeo — sem mexer em menu técnico.",
-  "components.obsSetup.idle.title": "OBS aberto? Bora.",
   "components.obsSetup.ok.connected": "Conectei no OBS",
   "components.obsSetup.ok.pointed": "Apontei a transmissão do OBS pra Corneta",
   "components.obsSetup.ok.video": "Vídeo do OBS: {video}",
   "components.obsSetup.ok.videoChecking": "Conferindo o vídeo do OBS…",
-  "components.obsSetup.websocket.toggle": "Não achou o OBS? Ligue o WebSocket",
+  "components.rehearsal.again": "Ensaiar de novo",
+  "components.rehearsal.cause.dialog": "O OBS abriu um aviso na tela dele",
+  "components.rehearsal.cause.dialog.body":
+    "Dá uma olhada na janela do OBS e confirma o que ele pedir. Se o play não foi, clica em Iniciar transmissão.",
+  "components.rehearsal.cause.elsewhere":
+    "O OBS tá transmitindo pra outro lugar",
+  "components.rehearsal.cause.elsewhere.body":
+    "A transmissão dele pode não estar mais apontada pra Corneta.",
+  "components.rehearsal.cause.elsewhere.cta": "Conferir o OBS",
+  "components.rehearsal.frame.alt": "Imagem que chegou do OBS durante o ensaio",
+  "components.rehearsal.intro.platforms":
+    "Plataformas com modo de teste ou transmissão privada recebem de verdade, sem aparecer pra ninguém.",
+  "components.rehearsal.intro.rest":
+    "As outras ficam pra primeira live, e eu aviso quais são.",
+  "components.rehearsal.intro.signal":
+    "Eu dou o play no OBS e confiro se a imagem e o som chegam na Corneta.",
+  "components.rehearsal.intro.signal.byHand":
+    "Você inicia a transmissão no {app}, e eu confiro se a imagem e o som chegam na Corneta.",
+  "components.rehearsal.privateVideo":
+    "Ficou um vídeo privado deste ensaio no seu YouTube. Dá pra apagar no YouTube Studio.",
+  "components.rehearsal.running": "Ensaio rodando · faltam uns {seconds} s",
+  "components.rehearsal.signal.kbps": "Chegando a uns {kbps} kbps.",
+  "components.rehearsal.signal.missing": "A imagem do OBS não chegou",
+  "components.rehearsal.signal.ok": "Imagem e som do OBS chegando",
+  "components.rehearsal.signal.pressPlay": "Dá o play no OBS",
+  "components.rehearsal.signal.pressPlay.body":
+    "Não consegui apertar por você. Clica em Iniciar transmissão no OBS que eu sigo daqui.",
+  "components.rehearsal.signal.pressPlay.byHand":
+    "Inicia a transmissão no {app}",
+  "components.rehearsal.signal.pressPlay.byHand.body":
+    "Clica no botão de entrar ao vivo dele que eu sigo daqui.",
+  "components.rehearsal.signal.silent": "A imagem chegou, mas sem som",
+  "components.rehearsal.signal.waiting":
+    "Dei o play no OBS. Esperando a imagem…",
+  "components.rehearsal.start": "Começar o ensaio",
+  "components.rehearsal.startFailed": "Não consegui começar o ensaio: {erro}",
+  "components.rehearsal.starting": "Ligando o servidor da Corneta…",
+  "components.rehearsal.stop": "Parar o ensaio",
+  "components.rehearsal.target.failed": "Não recebeu a transmissão.",
+  "components.rehearsal.target.pending": "Testando…",
+  "components.rehearsal.target.receivedPrivate":
+    "Recebeu numa transmissão privada.",
+  "components.rehearsal.target.receivedTest":
+    "Recebeu em modo de teste. Não aparece no canal.",
+  "components.rehearsal.target.refused": "Recusou a chave ou a conta.",
+  "components.rehearsal.target.skipped":
+    "Não tem modo de teste. Fica pra primeira live.",
+  "components.rehearsal.target.skippedNoKey":
+    "Ainda sem chave. Conecta a conta ou cola a chave pra ela entrar.",
+  "components.rehearsal.target.warned": "Recebeu, mas avisou: {issue}.",
+  "components.rehearsal.target.warned.fix":
+    "Na live, o botão Corrigir agora resolve em um clique.",
+  "components.rehearsal.verdict.cancelled.lead": "Parei tudo e nada foi ao ar.",
+  "components.rehearsal.verdict.cancelled.title": "Ensaio interrompido",
+  "components.rehearsal.verdict.failed.lead":
+    "A imagem do OBS chegou na Corneta, mas uma plataforma não aceitou. Nada apareceu pra ninguém.",
+  "components.rehearsal.verdict.failed.title":
+    "Quase. Uma plataforma não recebeu.",
+  "components.rehearsal.verdict.noSignal.lead":
+    "Esperei 15 segundos pela imagem. As plataformas nem foram chamadas: nada foi ao ar.",
+  "components.rehearsal.verdict.noSignal.title":
+    "Quase. A imagem do OBS não chegou.",
+  "components.rehearsal.verdict.notes.lead":
+    "O ensaio levou sua imagem até as plataformas. Tem um ajuste anotado abaixo.",
+  "components.rehearsal.verdict.notes.title": "Passou, com um ajuste.",
+  "components.rehearsal.verdict.passed.lead":
+    "O ensaio levou sua imagem até as plataformas, e ninguém viu.",
+  "components.rehearsal.verdict.passed.title": "Passou. Pode entrar no ar.",
   "components.setup.aria": "Configuração inicial da Corneta",
   "components.setup.cta.back": "Voltar",
   "components.setup.cta.finish": "Ir pro painel",
   "components.setup.cta.later": "Fazer depois",
   "components.setup.cta.next": "Continuar",
+  "components.setup.cta.rehearsal": "Continuar pro ensaio",
   "components.setup.cta.start": "Começar",
   "components.setup.deck.alerts.body":
     "Tela preta, mic mudo, raid ou alguém te marcando: um toque resolve.",
@@ -558,28 +684,13 @@ export const pt = {
   "components.setup.deck.watch.body":
     "Chat de todas as plataformas, espectadores e bitrate, em pé, deitado ou no tablet.",
   "components.setup.deck.watch.title": "Chat e saúde na palma da mão",
-  "components.setup.done.chat": "Juntar o chat das plataformas",
-  "components.setup.done.chatHint": "opcional",
-  "components.setup.done.deck": "Celular",
-  "components.setup.done.kicker": "Pronto",
-  "components.setup.done.later": "Ficou pra depois",
-  "components.setup.done.lead":
-    "Agora é dar um título e apertar BORA AO VIVO no painel.",
-  "components.setup.done.leadLater":
-    "O que ficou pra depois aparece no painel, com o botão pra resolver.",
-  "components.setup.done.obs": "OBS",
-  "components.setup.done.platforms": "Plataformas",
-  "components.setup.done.quality": "Qualidade",
-  "components.setup.done.safety": "Proteções",
-  "components.setup.done.shortcut":
-    "começa e para a live de qualquer lugar, até com jogo em tela cheia.",
-  "components.setup.done.title": "Tudo pronto pra primeira live!",
-  "components.setup.done.titleLater": "Quase lá!",
-  "components.setup.obs.already":
-    "O OBS já tá apontando pra cá ({video}). Se quiser, confere de novo.",
   "components.setup.obs.lead":
-    "A Corneta recebe a imagem do OBS e manda pra cada plataforma. Você continua montando as cenas no OBS como sempre.",
+    "Eu confiro o que falta e resolvo o que der. Você só acompanha as três luzes.",
+  "components.setup.obs.lead.byHand":
+    "É dele que vem a imagem da live. Você aponta ele pra Corneta uma vez e pronto.",
   "components.setup.obs.title": "Agora o OBS",
+  "components.setup.obs.title.other": "Agora o seu programa",
+  "components.setup.obs.title.streamlabs": "Agora o Streamlabs",
   "components.setup.platforms.count.one": "{count} pronta",
   "components.setup.platforms.count.other": "{count} prontas",
   "components.setup.platforms.lead":
@@ -587,7 +698,7 @@ export const pt = {
   "components.setup.platforms.more":
     "TikTok, X ou um RTMP seu ficam em Plataformas → Adicionar.",
   "components.setup.platforms.needOne": "Conecte pelo menos uma",
-  "components.setup.platforms.notNow": "Agora não",
+  "components.setup.platforms.notNow": "Não usar {platform}",
   "components.setup.platforms.ready": "Pronta pra transmitir.",
   "components.setup.platforms.readyAuto":
     "YouTube automático: eu crio a transmissão no BORA AO VIVO.",
@@ -596,41 +707,32 @@ export const pt = {
   "components.setup.privacy.note":
     "Dá pra mudar quando quiser em Configurações.",
   "components.setup.privacy.title": "Sua privacidade",
-  "components.setup.quality.failed":
-    "Não consegui medir agora — dá pra tentar de novo.",
-  "components.setup.quality.fit.bad":
-    "No modo {mode}, a live usa uns {mbps} Mbps — mais do que o seu upload aguenta. Escolha um modo mais leve.",
-  "components.setup.quality.fit.ok":
-    "No modo {mode}, a live usa uns {mbps} Mbps — cabe com folga.",
-  "components.setup.quality.fit.warn":
-    "No modo {mode}, a live usa uns {mbps} Mbps — cabe, mas sem folga.",
-  "components.setup.quality.lead":
-    "Cada plataforma usa o upload da sua internet. Vou medir pra escolher a qualidade que cabe.",
-  "components.setup.quality.modes": "Qualidade",
-  "components.setup.quality.recommended": "Recomendado",
-  "components.setup.quality.retest": "Medir de novo",
-  "components.setup.quality.safety": "Redes de segurança",
-  "components.setup.quality.testing": "Medindo o seu upload…",
-  "components.setup.quality.title": "Sua internet aguenta?",
-  "components.setup.quality.untested": "Ainda não medi o seu upload.",
-  "components.setup.rail.deck": "Celular",
-  "components.setup.rail.done": "Pronto",
+  "components.setup.rail.net.bad":
+    "A live pede uns {mbps} Mbps, mais do que a sua internet sobe.",
+  "components.setup.rail.net.measured": "Medi enquanto você conectava.",
+  "components.setup.rail.net.ok": "A live usa uns {mbps} Mbps. Cabe com folga.",
+  "components.setup.rail.net.title": "{mbps} Mbps de upload",
+  "components.setup.rail.net.warn":
+    "A live usa uns {mbps} Mbps. Cabe, mas fica justo.",
   "components.setup.rail.obs": "OBS",
+  "components.setup.rail.obs.sub": "de onde a imagem vem",
   "components.setup.rail.platforms": "Plataformas",
-  "components.setup.rail.quality": "Internet e qualidade",
+  "components.setup.rail.platforms.sub": "onde a live aparece",
+  "components.setup.rail.rehearsal": "Ensaio",
+  "components.setup.rail.rehearsal.sub": "a prova, sem plateia",
   "components.setup.rail.skip": "Pular a configuração",
   "components.setup.rail.subtitle": "configuração inicial",
   "components.setup.rail.time":
-    "Dá pra pular qualquer passo e terminar depois.",
-  "components.setup.rail.welcome": "Boas-vindas",
-  "components.setup.step": "Passo {n} de {total}",
-  "components.setup.welcome.kicker": "Boas-vindas",
+    "Uns 3 minutos. Dá pra parar e terminar depois.",
+  "components.setup.rehearsal.lead":
+    "Ligo tudo por uns 30 segundos pra provar que a live chega nas plataformas. Ninguém vê.",
+  "components.setup.rehearsal.skip": "Pular o ensaio",
+  "components.setup.rehearsal.title": "Ensaio geral, sem plateia",
   "components.setup.welcome.lead":
     "Você manda uma live do OBS e a Corneta espalha pra Twitch, YouTube, Kick e Facebook ao mesmo tempo. Vamos deixar tudo pronto agora.",
+  "components.setup.welcome.promise":
+    "São três passos, e você termina com um **ensaio de verdade**: a live chega nas plataformas, sem ninguém ver.",
   "components.setup.welcome.title": "Opa! Bora cornetar?",
-  "components.setup.welcome.todo.internet": "Medir sua internet",
-  "components.setup.welcome.todo.obs": "Ligar o OBS sozinha",
-  "components.setup.welcome.todo.platforms": "Conectar suas plataformas",
   "deck.again":
     "Pra parear de novo, gere um QR novo no PC em {where} e escaneie com a câmera.",
   "deck.alert.black.action": "Trocar cena",
@@ -1143,6 +1245,12 @@ export const pt = {
   "deck.welcome.wifiBody":
     "O celular fala direto com o PC, sem passar pela internet.",
   "deck.where": "Configurações → Geral → Modo deck",
+  "encoding.wizard.manual.confirm": "Já colei no OBS",
+  "encoding.wizard.manual.confirm.other": "Já colei no meu programa",
+  "encoding.wizard.manual.confirm.streamlabs": "Já colei no Streamlabs",
+  "encoding.wizard.manual.confirmed":
+    "Marcado como colado à mão. Eu não consigo conferir daqui.",
+  "encoding.wizard.manual.undo": "Desfazer",
   "golive.bar.fix": "Resolver",
   "golive.bar.liveCount": "{live} de {total} no ar",
   "golive.bar.noPlatform": "Nenhuma plataforma ligada.",
@@ -1178,6 +1286,10 @@ export const pt = {
   "golive.chat.title": "Chat",
   "golive.cta.aria.partial": "Bora ao vivo sem {names}",
   "golive.cta.without": "sem {names}",
+  "golive.deckOffer.body":
+    "Marca momento, liga o JÁ VOLTO e acompanha o chat sem dar alt-tab. Sem app e sem conta.",
+  "golive.deckOffer.cta": "Parear o celular",
+  "golive.deckOffer.title": "Na próxima live, quer controlar pelo celular?",
   "golive.destinations.add": "Adicionar",
   "golive.destinations.auto": "automático",
   "golive.destinations.manage": "Ver detalhes",
@@ -1205,6 +1317,9 @@ export const pt = {
     "falta apontar pra cá — use “Configura pra mim” aqui embaixo",
   "golive.drawer.obs.subtitle":
     "A Corneta recebe a imagem do OBS e manda pra cada plataforma.",
+  "golive.drawer.encoder.subtitle":
+    "A Corneta recebe a imagem dele e manda pra cada plataforma.",
+  "golive.drawer.encoder.title": "Liga no {app}",
   "golive.drawer.obs.title": "Liga no OBS",
   "golive.drawer.platforms.add": "Adicionar plataforma",
   "golive.drawer.platforms.empty": "Você ainda não tem nenhuma plataforma.",
@@ -1224,6 +1339,21 @@ export const pt = {
   "golive.drawer.safety.subtitle":
     "O que eu faço sozinha se algo der errado no meio da live.",
   "golive.drawer.safety.title": "Proteções",
+  "golive.error.help": "Pedir ajuda",
+  "golive.error.help.body":
+    "Manda estes códigos junto com o diagnóstico (Configurações → Geral → Exportar diagnóstico). Eles não levam chave nem senha.",
+  "golive.error.ingest.hint":
+    "Nada foi pras plataformas. Tenta de novo; se repetir, pede ajuda.",
+  "golive.error.ingest.title":
+    "Não entrou no ar: o servidor da Corneta não subiu",
+  "golive.error.port.cta": "Usar outra porta e tentar de novo",
+  "golive.error.port.hint":
+    "É por essa porta que o OBS me manda a imagem. Costuma ser outro programa de stream aberto junto. Suas plataformas não receberam nada.",
+  "golive.error.port.repoint":
+    "Troquei a porta, mas não consegui avisar o OBS. Aponte ele de novo no cartão do OBS antes de entrar no ar.",
+  "golive.error.port.title":
+    "Não entrou no ar: outro programa tá usando a porta da Corneta",
+  "golive.error.retryOnly": "Só tentar de novo",
   "golive.header.subtitle.live":
     "Tá no ar. Acompanhe cada plataforma e o chat daqui.",
   "golive.header.subtitle.starting":
@@ -1231,6 +1361,10 @@ export const pt = {
   "golive.list.join": "{head} e {last}",
   "golive.partial.turnedOff":
     "Deixei {names} fora desta live. Liga de novo em Plataformas quando resolver.",
+  "golive.rehearsal.cta": "Ensaiar",
+  "golive.rehearsal.hint":
+    "Testa a live por uns 30 segundos sem aparecer pra ninguém",
+  "golive.rehearsal.title": "Ensaio sem plateia",
   "golive.streamInfo.subtitle":
     "Muda o título nas plataformas em que você entrou, sem abrir cada painel.",
   "golive.streamInfo.youtubeOptions": "Opções do YouTube · {privacy}",
@@ -1246,6 +1380,8 @@ export const pt = {
   "golive.tile.obs.checkingSub": "conferindo o OBS",
   "golive.tile.obs.fixSub": "Configura pra mim",
   "golive.tile.obs.label": "OBS",
+  "golive.tile.obs.manual": "Colado à mão",
+  "golive.tile.obs.manualSub": "sem conferência automática",
   "golive.tile.obs.missing": "Não configurado",
   "golive.tile.obs.notPointing": "Falta apontar pra cá",
   "golive.tile.obs.ok": "Configurado",
@@ -1261,6 +1397,7 @@ export const pt = {
   "golive.tile.safety.count": "{on} de {total} ligadas",
   "golive.tile.safety.label": "Proteções",
   "golive.tile.safety.noneSub": "nenhuma ligada",
+  "golive.toast.stopArmed": "Aperte o atalho de novo pra encerrar a live.",
   "platforms.footer.hint":
     "Arraste pela alça pra mudar a ordem. As chaves ficam no cofre do Windows, nunca em arquivo.",
   "platforms.picker.experimental":
@@ -1794,19 +1931,24 @@ export const pt = {
   "encoding.wizard.manual.key": "Chave de transmissão",
   "encoding.wizard.manual.lede":
     "Na mão também é rápido. No OBS: **Configurações → Transmissão → Serviço “Personalizado”** e cole estes dois campos:",
+  "encoding.wizard.manual.lede.other":
+    "No seu programa, procura nas configurações de transmissão a opção de **servidor personalizado (RTMP)** e cola estes dois campos:",
+  "encoding.wizard.manual.lede.streamlabs":
+    "No Streamlabs, abre as configurações de transmissão, clica em **Transmitir para ingestão personalizada** (em inglês, **Stream to custom ingest**) e cola estes dois campos:",
   "encoding.wizard.manual.note.autostart":
     "Com isso colado, na hora do **BORA AO VIVO** eu tento dar o play no OBS pra você — se nada acontecer, dê **Iniciar transmissão** nele.",
   "encoding.wizard.manual.note.manual":
     "Colou os dois no OBS? Então ele já aponta pra Corneta — sem WebSocket nenhum no meio.",
+  "encoding.wizard.manual.note.other":
+    "Na hora da live, aperta **BORA AO VIVO** aqui primeiro e depois inicia a transmissão no seu programa.",
+  "encoding.wizard.manual.note.streamlabs":
+    "Na hora da live, aperta **BORA AO VIVO** aqui primeiro e depois inicia a transmissão no Streamlabs.",
   "encoding.wizard.manual.server": "Servidor",
   "encoding.wizard.manual.toggle": "Prefiro configurar na mão",
   "encoding.wizard.ok.autostart":
     "Conectado! O OBS já aponta pra Corneta. Quando você der **BORA AO VIVO**, eu mando o OBS transmitir sozinho.",
   "encoding.wizard.ok.manual":
     "Conectado! O OBS já aponta pra Corneta. Na hora da live, é só clicar **Iniciar transmissão** no OBS.",
-  "encoding.wizard.step1.body":
-    "No OBS: **Ferramentas → Configurações do servidor WebSocket** e marque **Ativar servidor WebSocket** (a porta já vem 4455, pode deixar).",
-  "encoding.wizard.step1.title": "Ative o WebSocket no OBS",
   "encoding.wizard.step2.body":
     "Se **Habilitar autenticação** estiver marcado, clique em **Mostrar informações da conexão**, copie e cole aqui. Sem senha? Deixe vazio.",
   "encoding.wizard.step2.placeholder": "senha do WebSocket",
@@ -1842,18 +1984,15 @@ export const pt = {
   "golive.cancel": "Cancelar",
   "golive.checkup.checking": "verificando…",
   "golive.checkup.encoder": "Encoder disponível",
-  "golive.checkup.obsConnected": "OBS conectado",
-  "golive.checkup.obsConnected.fix":
-    "ele tá aberto? Se tá, ative em Ferramentas → Configurações do servidor WebSocket (e a senha em Configurações, se houver)",
-  "golive.checkup.obsNotConnected": "O OBS ainda não conectou",
   "golive.checkup.obsPointing": "OBS apontando pra Corneta",
   "golive.checkup.state.bad": "com problema",
   "golive.checkup.state.ok": "feito",
   "golive.checkup.state.warn": "falta",
   "golive.checkup.tip":
-    "No OBS, em {caminho}: no modo Simples já tá certo — relaxa. No modo Avançado, confira {taxa} e {keyframe} — é o que as plataformas pedem pra não travar.",
-  "golive.checkup.tip.keyframe": "Intervalo de quadro-chave: 2 s",
-  "golive.checkup.tip.path": "Configurações → Saída",
+    "No OBS, em {caminho}, confira {taxa} e {keyframe}. O modo Simples não mostra o intervalo de keyframes, e o YouTube costuma pedir 2 s.",
+  "golive.checkup.tip.keyframe": "Intervalo de keyframes: 2",
+  "golive.checkup.tip.path":
+    "Configurações → Saída → Modo de saída: Avançado → aba Transmissão",
   "golive.checkup.tip.rateControl": "Controle de taxa: CBR",
   "golive.cta": "BORA AO VIVO",
   "golive.cta.aria": "Bora ao vivo",
@@ -2029,6 +2168,9 @@ export const pt = {
     "Não consegui dar play no OBS — dê play manualmente.",
   "golive.toast.obsPlayFailed.action": "Configurar OBS",
   "golive.toast.serverUp": "Servidor no ar! Agora é só dar play no OBS",
+  "golive.obs.openSetup": "Abrir a configuração",
+  "golive.toast.serverUp.byHand":
+    "Servidor no ar! Agora inicia a transmissão no {app}",
   "golive.toast.reencoding":
     "{target}: a Corneta recodifica este destino até o fim da live.",
   "golive.toast.startFailed": "Não consegui entrar no ar: {erro}",

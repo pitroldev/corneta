@@ -116,9 +116,9 @@ describe("public product claims", () => {
     expect(enTerms).not.toContain("depends on OBS to produce");
   });
 
-  it("documents the fixed WebSocket port used by the OBS integration", () => {
-    const native = source("../../src-tauri/src/commands.rs");
-    const port = native.match(/const OBS_WS_PORT: u16 = (\d+);/)?.[1];
+  it("documents the default WebSocket port used by the OBS integration", () => {
+    const native = source("../../src-tauri/src/obs_env.rs");
+    const port = native.match(/const DEFAULT_PORT: u16 = (\d+);/)?.[1];
     const guide = source(
       "../content/pt-BR/help/streaming-software/automatic-obs-setup.mdx",
     );

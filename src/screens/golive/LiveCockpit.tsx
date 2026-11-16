@@ -1,3 +1,4 @@
+import { GUIDE_KEY, TOPIC_KEY } from "../../lib/platformCheckText";
 import { memo, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, m } from "framer-motion";
@@ -25,7 +26,7 @@ import {
 } from "../../lib/platformCheck";
 import { toast } from "../../lib/toast";
 import { cn, errMsg, fmtUptime, openExternal } from "../../lib/utils";
-import { useI18n, useT, type MessageKey } from "../../lib/i18n";
+import { useI18n, useT } from "../../lib/i18n";
 import type { EncodingAction, PlatformCheck } from "../../lib/types";
 import type { LiveTarget } from "../../lib/liveTargets";
 import type { Screen } from "../../components/Sidebar";
@@ -236,27 +237,6 @@ const LiveTargetRow = memo(function LiveTargetRow({
     </Card>
   );
 });
-
-const TOPIC_KEY: Record<PlatformIssueTopic, MessageKey> = {
-  audio: "golive.target.platform.topic.audio",
-  bitrateHigh: "golive.target.platform.topic.bitrateHigh",
-  bitrateLow: "golive.target.platform.topic.bitrateLow",
-  frameRate: "golive.target.platform.topic.frameRate",
-  keyframes: "golive.target.platform.topic.keyframes",
-  other: "golive.target.platform.topic.other",
-  resolution: "golive.target.platform.topic.resolution",
-  signal: "golive.target.platform.topic.signal",
-  slowUpload: "golive.target.platform.topic.slowUpload",
-};
-
-const GUIDE_KEY: Record<ObsGuide, MessageKey> = {
-  audio: "golive.target.platform.guide.audio",
-  bitrate: "golive.target.platform.guide.bitrate",
-  frameRate: "golive.target.platform.guide.frameRate",
-  keyframes: "golive.target.platform.guide.keyframes",
-  other: "golive.target.platform.guide.other",
-  resolution: "golive.target.platform.guide.resolution",
-};
 
 // The warning that led to a re-encode, so the OBS step stays reachable once the platform is happy.
 const fixedGuides = new Map<string, ObsGuide>();

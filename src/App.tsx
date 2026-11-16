@@ -95,6 +95,9 @@ function ScreenLoading() {
   );
 }
 
+/** How long the go-live shortcut waits for its second press before ending a live. */
+const STOP_CONFIRM_MS = 5000;
+
 export default function App() {
   const { t, tp, locale } = useI18n();
   const loaded = useStore((s) => s.loaded);
@@ -212,6 +215,13 @@ export default function App() {
       const st = s.snapshot.state;
       if (action === "toggleLive") {
         const stopping = st === "live" || st === "starting";
+        // One stray chord must not end a live: stopping takes a second press.
+        if (stopping && Date.now() > stopArmedUntil.current) {
+          stopArmedUntil.current = Date.now() + STOP_CONFIRM_MS;
+          toast.info(t("golive.toast.stopArmed"));
+          return;
+        }
+        stopArmedUntil.current = 0;
         (stopping ? s.stop() : s.start()).catch((error: unknown) => {
           const msg = errMsg(error);
           // Cancellation uses a stable backend code, independent of the active locale.
@@ -401,6 +411,7 @@ export default function App() {
   );
   const brbShortcut = useStore((s) => s.config?.settings.brbShortcut);
   const shortcutBootDone = useRef(false);
+  const stopArmedUntil = useRef(0);
   useEffect(() => {
     if (!IS_TAURI || !loaded || shortcutBootDone.current) return;
     shortcutBootDone.current = true;

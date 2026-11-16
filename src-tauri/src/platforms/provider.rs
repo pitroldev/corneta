@@ -169,6 +169,11 @@ pub trait AutoBroadcast: Sync {
     /// Ends the broadcast opened for that live. Blocking; Err leaves the cleanup recoverable.
     fn close(&self, app: &AppHandle, generation: u64) -> Result<(), String>;
     fn open_failure(&self) -> AutoBroadcastFailure;
+    /// The settings that make `open` create a broadcast nobody else can see, for a rehearsal.
+    /// None when the platform has no such broadcast.
+    fn rehearsal_settings(&self, _settings: &Settings) -> Option<Settings> {
+        None
+    }
     /// Notification title and body when closing failed.
     fn close_failure(&self) -> (String, String);
 }

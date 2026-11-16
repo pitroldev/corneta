@@ -8,6 +8,28 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Added
+
+- A rehearsal without an audience, in first-time setup and on the Live screen. For about 30 seconds Corneta sends what OBS is producing to Twitch's test mode and to a private YouTube broadcast, then shows the frame that arrived and what each platform said. Platforms that have no test mode, or have no stream key yet, are left out and say which, and the real stream key is never used for a rehearsal.
+- The OBS step shows three lights (OBS open, remote control on, stream pointed at Corneta) that turn on by themselves, with one instruction at a time, instead of only saying that OBS was not found. Corneta now reads the WebSocket port and password from OBS's own settings, so the password is asked for only when OBS refuses it.
+- "I pasted them into OBS": setting OBS up by hand now counts as ready when OBS can't be reached to confirm it.
+- The OBS step asks which program you stream with: OBS Studio, Streamlabs or another app. Corneta picks Streamlabs for you when it is on the PC and OBS is not, and you can change the answer at any time. Outside OBS it shows the two fields to paste, and since it can't press play there, the rehearsal and the go-live message ask you to start the stream in that program.
+- The empty chat offers the channels of the accounts you already signed in to, in one click.
+- After your first live, the Live screen offers the phone panel once.
+
+### Changed
+
+- First-time setup has three steps (platforms, OBS, rehearsal) instead of six. The upload test runs in the background, and the phone panel moved out of setup.
+- BE RIGHT BACK is on by default in new installs. Existing installs keep their setting.
+- When going live fails, the error names the cause and offers the fix that fits it. If another program holds the port OBS sends to, one button moves Corneta to a free port, points OBS at it and tries again. The support codes moved under "Ask for help", and the panel no longer repeats itself in a toast.
+- The go-live shortcut asks for a second press before ending a live.
+- The Protections card only shows a check when the recommended protections are on.
+
+### Fixed
+
+- The OBS tip on the Live screen no longer says Simple mode is already right: Simple mode doesn't expose the keyframe interval.
+- "About" no longer gets cut off in the sidebar at the smallest window size.
+
 ## [0.15.1] - 2026-11-15
 
 ### Changed

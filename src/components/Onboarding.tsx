@@ -135,8 +135,6 @@ export function Onboarding({
 
   const onStepCompleted = (step: SetupStep) => {
     if (step === "welcome") void saveConsent();
-    // The optional deck step is outside the telemetry schema, which lists what may be collected.
-    if (step === "deck") return;
     captureOnboarding({
       event: "onboarding_step_completed",
       properties: { step_id: step },
@@ -162,7 +160,7 @@ export function Onboarding({
             consent={askConsent ? consent : null}
             onConsent={setConsent}
             onStepCompleted={onStepCompleted}
-            onFinish={(next) => {
+            onFinish={() => {
               captureOnboarding({
                 event: "onboarding_completed",
                 properties: {
@@ -171,7 +169,7 @@ export function Onboarding({
                   ),
                 },
               });
-              close(next);
+              close("golive");
             }}
             onSkip={() => {
               if (run.current === 0)

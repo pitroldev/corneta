@@ -1052,7 +1052,7 @@ pub(crate) fn run_link(
         }
         let mut socket = match connect_with_events(
             crate::commands::OBS_WS_HOST,
-            crate::commands::OBS_WS_PORT,
+            crate::obs_env::port(),
             &password(),
             LINK_EVENTS,
         ) {

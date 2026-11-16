@@ -15,11 +15,13 @@ mod i18n;
 mod job;
 mod keys;
 mod obs;
+mod obs_env;
 mod overlay;
 mod permissions;
 mod platforms;
 mod queue_probe;
 mod recorder;
+mod rehearsal;
 mod renditions;
 mod replay_commands;
 mod replay_media;
@@ -270,6 +272,11 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
             commands::take_config_notice,
+            commands::obs_environment,
+            commands::open_obs,
+            commands::pick_ingest_port,
+            commands::run_rehearsal,
+            commands::cancel_rehearsal,
             commands::save_config,
             commands::set_key,
             commands::clear_key,

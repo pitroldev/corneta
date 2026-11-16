@@ -117,6 +117,7 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
         ingest_live: true,
         operation_id: None,
         error_id: None,
+        error_code: None,
         targets,
         message: None,
         cpu,

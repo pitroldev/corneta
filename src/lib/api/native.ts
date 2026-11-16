@@ -11,6 +11,8 @@ import type {
   EncoderInfo,
   EngineSnapshot,
   ObsCheck,
+  ObsEnvironment,
+  RehearsalReport,
   ObsVideo,
   ObsVideoCheck,
   DeckDesktopRequest,
@@ -594,6 +596,40 @@ export function tauriApi(): CornetaApi {
     async obsCheck() {
       const { invoke } = await core();
       return invoke<ObsCheck>("obs_check");
+    },
+    async obsEnvironment() {
+      const { invoke } = await core();
+      return invoke<ObsEnvironment>("obs_environment");
+    },
+    async openObs() {
+      const { invoke } = await core();
+      await invoke("open_obs");
+    },
+    async pickIngestPort() {
+      const { invoke } = await core();
+      return invoke<AppConfig>("pick_ingest_port");
+    },
+    async runRehearsal() {
+      const { invoke } = await core();
+      return invoke<RehearsalReport>("run_rehearsal");
+    },
+    async cancelRehearsal() {
+      const { invoke } = await core();
+      await invoke("cancel_rehearsal");
+    },
+    subscribeRehearsal(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<RehearsalReport>("rehearsal://progress", (e) =>
+          cb(e.payload),
+        ).then((u) => (cancelled ? u() : (unlisten = u))),
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
     },
     async obsAutoconfigure() {
       const { invoke } = await core();

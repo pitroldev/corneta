@@ -71,6 +71,38 @@ describe("obsConfigured", () => {
       } as Parameters<typeof obsConfigured>[0]),
     ).toBe(false);
   });
+
+  it("counts only the user's word for a program other than OBS", () => {
+    const unreachable = {
+      ...(check as object),
+      reachable: false,
+    } as Parameters<typeof obsConfigured>[0];
+    expect(obsConfigured(unreachable, false, "streamlabs")).toBe(false);
+    expect(obsConfigured(unreachable, true, "streamlabs")).toBe(true);
+    // An OBS that happens to be open and pointed says nothing about the other program.
+    expect(obsConfigured(check, false, "other")).toBe(false);
+    expect(obsConfigured("loading", true, "other")).toBe(true);
+  });
+
+  it("trusts a hand-pasted setup only while OBS cannot answer", () => {
+    const unreachable = {
+      ...(check as object),
+      reachable: false,
+      pointingAtCorneta: false,
+    } as Parameters<typeof obsConfigured>[0];
+    expect(obsConfigured(unreachable)).toBe(false);
+    expect(obsConfigured(unreachable, true)).toBe(true);
+    expect(obsConfigured("loading", true)).toBe(false);
+    expect(
+      obsConfigured(
+        {
+          ...(check as object),
+          pointingAtCorneta: false,
+        } as Parameters<typeof obsConfigured>[0],
+        true,
+      ),
+    ).toBe(false);
+  });
 });
 
 describe("joinNames", () => {

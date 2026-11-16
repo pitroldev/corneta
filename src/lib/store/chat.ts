@@ -151,6 +151,8 @@ export function createChatSlice({
       );
     },
     async connectChat(t) {
+      // The backend reads the channels from the settings file, so pending edits go first.
+      await flushSave();
       // Reconnection preserves history; only explicit clearChat removes it.
       set({ chatStatuses: {}, chatSide: {}, alertStatuses: {}, chatAuth: {} });
       await api.chatStart(t);

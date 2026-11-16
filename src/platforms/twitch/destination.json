@@ -23,5 +23,9 @@
   "liveUrl": "https://dashboard.twitch.tv/stream-manager",
   "account": "twitch",
   "setupRank": 1,
-  "starter": true
+  "starter": true,
+  "rehearsal": {
+    "testFlag": "bandwidthtest=true",
+    "hosts": ["twitch.tv", "live-video.net"]
+  }
 }

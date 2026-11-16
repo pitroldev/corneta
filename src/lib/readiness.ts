@@ -1,7 +1,7 @@
 import type { I18n } from "./i18n";
 import { PLATFORMS } from "./platforms";
 import { accountProvider } from "../platforms";
-import type { ObsCheck, Target } from "./types";
+import type { EncoderApp, ObsCheck, Target } from "./types";
 import { blockingIssueCodes, type TargetIssue } from "./validation";
 
 export interface ReadinessContext {
@@ -58,10 +58,19 @@ export function readiness(targets: Target[], ctx: ReadinessContext): Readiness {
   return { enabled, ready, pending };
 }
 
-export function obsConfigured(obs: ObsCheck | "loading" | null): boolean {
-  return (
-    obs !== null && obs !== "loading" && obs.reachable && obs.pointingAtCorneta
-  );
+/**
+ * OBS answers and points at Corneta, or cannot answer and the user confirmed pasting the server
+ * and key by hand. A reachable OBS that points elsewhere is never ready, whatever was confirmed.
+ * Another program cannot be checked at all, so only the user's confirmation counts for it.
+ */
+export function obsConfigured(
+  obs: ObsCheck | "loading" | null,
+  manual = false,
+  app: EncoderApp = "obs",
+): boolean {
+  if (app !== "obs") return manual;
+  if (obs === null || obs === "loading") return false;
+  return obs.reachable ? obs.pointingAtCorneta : manual;
 }
 
 /** Names joined as a sentence: "Twitch, YouTube e Kick". */

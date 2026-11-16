@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "framer-motion";
 import {
+  Clapperboard,
   AlertTriangle,
   Check,
   ChevronRight,
@@ -13,6 +14,8 @@ import {
   RefreshCw,
   Square,
   Zap,
+  X,
+  Smartphone,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
@@ -30,8 +33,12 @@ import { toast } from "../lib/toast";
 import { updateBusy, useUpdate } from "../lib/updater";
 import { useConfirm } from "../lib/useConfirm";
 import { useNow } from "../lib/useNow";
+import { useEncoder } from "../lib/useEncoder";
 import { useReadiness, useReadinessContext } from "../lib/useReadiness";
 import { liveTargetRows, liveTargetsSignature } from "../lib/liveTargets";
+import { engineErrorCause } from "../lib/engineError";
+import { armDeckOffer, closeDeckOffer, deckOfferDue } from "../lib/deckOffer";
+import { DeckStep } from "../components/setup/DeckStep";
 import { cn, errMsg, fmtUptime } from "../lib/utils";
 import type { EngineState } from "../lib/types";
 import { isUuid } from "../lib/telemetry-schema";
@@ -45,6 +52,8 @@ import {
   SectionTitle,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
+import { Modal } from "../components/Modal";
+import { RehearsalPanel } from "../components/Rehearsal";
 import { ObsQualityGuide } from "../components/ObsQualityGuide";
 import { modeTitleKey } from "../components/QualityModes";
 import {
@@ -59,6 +68,8 @@ import { BrbNowButton } from "./golive/parts";
 let prewarmedUpload = false;
 // The preflight bypass lasts only for this process; persisting it would hide future OBS warnings.
 let skippedPreflightOnce = false;
+/** How long a rejected start waits for the engine's error snapshot before falling back to a toast. */
+const ERROR_PANEL_GRACE_MS = 400;
 
 export function GoLiveScreen({
   onNavigate,
@@ -71,6 +82,8 @@ export function GoLiveScreen({
   const ingestLive = useStore((s) => s.snapshot.ingestLive ?? false);
   const engineMessage = useStore((s) => s.snapshot.message);
   const errorId = useStore((s) => s.snapshot.errorId);
+  const obsManual = useStore((s) => s.config?.settings.obsManual ?? false);
+  const encoder = useEncoder();
   const start = useStore((s) => s.start);
   const stop = useStore((s) => s.stop);
   const toggleTarget = useStore((s) => s.toggleTarget);
@@ -100,18 +113,47 @@ export function GoLiveScreen({
   );
   const blackScreen = useStore((s) => s.snapshot.blackScreen ?? false);
 
+  const deckEnabled = useStore((s) => s.config?.settings.deckEnabled ?? false);
+  const [deckOffer, setDeckOffer] = useState(() => deckOfferDue(deckEnabled));
+  const [showDeck, setShowDeck] = useState(false);
+  const deckTitleRef = useRef<HTMLHeadingElement>(null);
+  const answerDeckOffer = (open: boolean) => {
+    closeDeckOffer();
+    setDeckOffer(false);
+    setShowDeck(open);
+  };
+
   // Initialize from the current state so remounting during a stream does not announce a new transition.
   const prevState = useRef<EngineState>(state);
   useEffect(() => {
     if (state === "live" && prevState.current !== "live") {
       toast.success(t("golive.toast.live"));
     }
+    if (state === "stopped" && prevState.current === "live") {
+      armDeckOffer();
+      setDeckOffer(deckOfferDue(deckEnabled));
+    }
     prevState.current = state;
-  }, [state, t]);
+  }, [state, t, deckEnabled]);
 
   const [panel, setPanel] = useState<ReadinessPanel | null>(null);
   const [testing, setTesting] = useState(false);
   const [showObs, setShowObs] = useState(false);
+  const [showRehearsal, setShowRehearsal] = useState(false);
+  const [showErrorHelp, setShowErrorHelp] = useState(false);
+  const [portBusy, setPortBusy] = useState(false);
+  const errorCause = engineErrorCause(useStore((s) => s.snapshot.errorCode));
+  const moveIngestPort = useStore((s) => s.moveIngestPort);
+  const configureObs = useStore((s) => s.configureObs);
+  const rehearsing = useStore((s) => s.rehearsing);
+  const cancelRehearsal = useStore((s) => s.cancelRehearsal);
+  const clearRehearsal = useStore((s) => s.clearRehearsal);
+  const closeRehearsal = () => {
+    // Closing the dialog mid-run stops the rehearsal instead of leaving it sending unseen.
+    if (rehearsing) void cancelRehearsal();
+    else clearRehearsal();
+    setShowRehearsal(false);
+  };
   const [showGuide, setShowGuide] = useState(false);
 
   useEffect(() => {
@@ -159,6 +201,7 @@ export function GoLiveScreen({
     if (startBusy) return;
     setPreflightWarn(false);
     setStartBusy(true);
+    const snapshotBefore = useStore.getState().snapshot;
     try {
       const obsRes = await start();
       if (obsRes === "obs-ok") toast.success(t("golive.toast.obsPlay"));
@@ -168,14 +211,39 @@ export function GoLiveScreen({
           t("golive.toast.obsPlayFailed.action"),
           () => setShowObs(true),
         );
-      else toast.success(t("golive.toast.serverUp"));
+      else
+        toast.success(
+          encoder.byHand
+            ? t("golive.toast.serverUp.byHand", { app: encoder.name })
+            : t("golive.toast.serverUp"),
+        );
     } catch (e) {
       const msg = errMsg(e);
       // Cancellation uses a stable backend code, independent of the active locale.
-      if (!msg.includes(START_CANCELLED))
+      if (msg.includes(START_CANCELLED)) return;
+      // An engine failure reaches the error panel, with its cause and fix, a moment after the
+      // rejection; the toast is for failures that never got that far.
+      await new Promise((resolve) => setTimeout(resolve, ERROR_PANEL_GRACE_MS));
+      const after = useStore.getState().snapshot;
+      if (after === snapshotBefore || after.state !== "error")
         toast.error(t("golive.toast.startFailed", { erro: msg }));
     } finally {
       setStartBusy(false);
+    }
+  };
+  const onUseOtherPort = async () => {
+    setPortBusy(true);
+    try {
+      await moveIngestPort();
+      // OBS has to follow the new port; when it cannot be reached, the user is told to point it.
+      await configureObs().catch(() =>
+        toast.info(t("golive.error.port.repoint")),
+      );
+      onStart();
+    } catch (error) {
+      toast.error(errMsg(error));
+    } finally {
+      setPortBusy(false);
     }
   };
   const onStart = () => {
@@ -183,7 +251,7 @@ export function GoLiveScreen({
       !skippedPreflightOnce &&
       obs !== null &&
       obs !== "loading" &&
-      !obsConfigured(obs)
+      !obsConfigured(obs, obsManual, encoder.app)
     ) {
       setPreflightWarn(true);
       return;
@@ -275,57 +343,139 @@ export function GoLiveScreen({
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 size-5 shrink-0 text-bad" />
             <div>
-              <div className="font-display font-bold text-bad">
-                {t("golive.error.title")}
+              <div className="font-display text-lg font-bold leading-tight text-bad">
+                {t(
+                  errorCause === "port"
+                    ? "golive.error.port.title"
+                    : errorCause === "ingest"
+                      ? "golive.error.ingest.title"
+                      : "golive.error.title",
+                )}
               </div>
-              <div className="text-sm text-ink-muted" data-selectable>
+              <div className="mt-1 text-sm text-ink-muted" data-selectable>
                 {engineMessage || t("golive.error.body")}
               </div>
+              {errorCause !== "generic" && (
+                <p className="mt-1 text-sm text-ink-muted">
+                  {t(
+                    errorCause === "port"
+                      ? "golive.error.port.hint"
+                      : "golive.error.ingest.hint",
+                  )}
+                </p>
+              )}
             </div>
           </div>
-          <div className="mt-3 flex flex-wrap gap-2">
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            {errorCause === "port" && (
+              <Button
+                variant="primary"
+                size="sm"
+                onClick={() => void onUseOtherPort()}
+                loading={portBusy}
+                disabled={portBusy || startBusy}
+              >
+                {!portBusy && <Zap className="size-4" />}
+                {t("golive.error.port.cta")}
+              </Button>
+            )}
             <Button
-              variant="primary"
+              variant={errorCause === "port" ? "subtle" : "primary"}
               size="sm"
               onClick={onStart}
               loading={startBusy}
-              disabled={startBusy}
+              disabled={startBusy || portBusy}
             >
               {!startBusy && <RefreshCw className="size-4" />}{" "}
-              {t("golive.error.retry")}
+              {t(
+                errorCause === "port"
+                  ? "golive.error.retryOnly"
+                  : "golive.error.retry",
+              )}
             </Button>
-            <Button variant="subtle" size="sm" onClick={() => setShowObs(true)}>
-              <Zap className="size-4 text-brass" /> {t("golive.obs.fixForMe")}
-            </Button>
-            <Button
-              variant="subtle"
-              size="sm"
-              onClick={() => void api.openLogsDir()}
+            {errorCause === "generic" && (
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => setShowObs(true)}
+              >
+                <Zap className="size-4 text-brass" /> {t("golive.obs.fixForMe")}
+              </Button>
+            )}
+            <button
+              type="button"
+              aria-expanded={showErrorHelp}
+              onClick={() => setShowErrorHelp((open) => !open)}
+              className="ml-1 inline-flex min-h-6 items-center text-sm font-bold text-brass hover:underline"
             >
-              <FileText className="size-4" /> {t("golive.error.logs")}
-            </Button>
+              {t("golive.error.help")}
+            </button>
           </div>
-          {lastOperationId && (
-            <CopyField
-              className="mt-3"
-              label={t("golive.error.operationId")}
-              value={lastOperationId}
-              mono
-            />
-          )}
-          {isUuid(errorId) && (
-            <CopyField
-              className="mt-2"
-              label={t("golive.error.errorId")}
-              value={errorId}
-              mono
-            />
+          {showErrorHelp && (
+            <div className="mt-3 border-t border-bad/20 pt-3">
+              <p className="text-xs text-ink-muted">
+                {t("golive.error.help.body")}
+              </p>
+              {lastOperationId && (
+                <CopyField
+                  className="mt-2"
+                  label={t("golive.error.operationId")}
+                  value={lastOperationId}
+                  mono
+                />
+              )}
+              {isUuid(errorId) && (
+                <CopyField
+                  className="mt-2"
+                  label={t("golive.error.errorId")}
+                  value={errorId}
+                  mono
+                />
+              )}
+              <Button
+                variant="subtle"
+                size="sm"
+                className="mt-2"
+                onClick={() => void api.openLogsDir()}
+              >
+                <FileText className="size-4" /> {t("golive.error.logs")}
+              </Button>
+            </div>
           )}
         </Card>
       )}
 
       {!onAir ? (
         <div className="flex flex-col gap-4">
+          {deckOffer && state === "stopped" && (
+            <Card className="flex flex-wrap items-center gap-x-3 gap-y-2 py-3">
+              <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-brass/15 text-brass">
+                <Smartphone className="size-5" />
+              </span>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-base leading-tight">
+                  {t("golive.deckOffer.title")}
+                </h3>
+                <p className="text-pretty text-xs text-ink-muted">
+                  {t("golive.deckOffer.body")}
+                </p>
+              </div>
+              <Button
+                variant="subtle"
+                size="sm"
+                onClick={() => answerDeckOffer(true)}
+              >
+                {t("golive.deckOffer.cta")}
+              </Button>
+              <button
+                type="button"
+                onClick={() => answerDeckOffer(false)}
+                className="inline-flex min-h-6 items-center text-xs font-bold text-ink-faint hover:text-ink-muted"
+              >
+                {t("components.setup.deck.notNow")}
+              </button>
+            </Card>
+          )}
           <ReadinessTiles onOpen={setPanel} testing={testing} />
           <StreamInfoCard />
           <Destinations
@@ -413,6 +563,11 @@ export function GoLiveScreen({
         preflightWarn={preflightWarn}
         onStart={onStart}
         onStartWithoutPending={startWithoutPending}
+        onRehearse={() => {
+          // A result from first-run setup must not greet a new rehearsal.
+          clearRehearsal();
+          setShowRehearsal(true);
+        }}
         onFix={(p) => setPanel(p)}
         onSetupObs={() => {
           setPreflightWarn(false);
@@ -443,6 +598,65 @@ export function GoLiveScreen({
         />
       )}
       {showGuide && <ObsQualityGuide onClose={() => setShowGuide(false)} />}
+      {showDeck && (
+        <Modal
+          title={t("components.setup.deck.title")}
+          onClose={() => setShowDeck(false)}
+          className="max-w-3xl rounded-xl bg-bg pop"
+          initialFocusRef={deckTitleRef}
+        >
+          <div className="p-6">
+            <DeckStep titleRef={deckTitleRef} />
+            <div className="mt-5 flex justify-end">
+              <Button variant="primary" onClick={() => setShowDeck(false)}>
+                {t("encoding.close")}
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+      {showRehearsal && (
+        <Modal
+          title={t("golive.rehearsal.title")}
+          onClose={closeRehearsal}
+          className="max-w-2xl rounded-xl bg-bg pop"
+          lockOutside
+        >
+          <div className="sticky top-0 z-10 flex items-center justify-between bg-brass px-5 py-4 text-brass-ink">
+            <div className="flex items-center gap-3">
+              <div className="grid size-10 place-items-center rounded-lg bg-brass-ink text-brass">
+                <Clapperboard className="size-5" strokeWidth={2.3} />
+              </div>
+              <div>
+                <h2 className="text-xl">{t("golive.rehearsal.title")}</h2>
+                <p className="text-xs font-semibold opacity-80">
+                  {t("golive.rehearsal.hint")}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={closeRehearsal}
+              className="grid size-8 place-items-center text-brass-ink/70 hover:text-brass-ink"
+              aria-label={t("encoding.close")}
+            >
+              <X className="size-5" />
+            </button>
+          </div>
+          <div className="p-5">
+            <RehearsalPanel
+              onGoLive={() => {
+                closeRehearsal();
+                onStart();
+              }}
+              onFixObs={() => {
+                closeRehearsal();
+                setShowObs(true);
+              }}
+            />
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
@@ -516,7 +730,7 @@ function Destinations({
         <button
           type="button"
           onClick={onFix}
-          className="flex items-center gap-0.5 text-xs font-bold text-brass hover:underline"
+          className="flex min-h-6 items-center gap-0.5 text-xs font-bold text-brass hover:underline"
         >
           {t("golive.destinations.manage")}{" "}
           <ChevronRight className="size-3.5" />
@@ -588,6 +802,7 @@ function ActionBar({
   preflightWarn,
   onStart,
   onStartWithoutPending,
+  onRehearse,
   onFix,
   onSetupObs,
   onSkipPreflight,
@@ -600,6 +815,7 @@ function ActionBar({
   preflightWarn: boolean;
   onStart: () => void;
   onStartWithoutPending: () => void;
+  onRehearse: () => void;
   onFix: (panel: ReadinessPanel) => void;
   onSetupObs: () => void;
   onSkipPreflight: () => void;
@@ -706,6 +922,7 @@ function ActionBar({
                 startBusy={startBusy}
                 onStart={onStart}
                 onStartWithoutPending={onStartWithoutPending}
+                onRehearse={onRehearse}
                 onFix={onFix}
                 onSetupObs={onSetupObs}
               />
@@ -762,6 +979,7 @@ function IdleControls({
   startBusy,
   onStart,
   onStartWithoutPending,
+  onRehearse,
   onFix,
   onSetupObs,
 }: {
@@ -769,6 +987,7 @@ function IdleControls({
   startBusy: boolean;
   onStart: () => void;
   onStartWithoutPending: () => void;
+  onRehearse: () => void;
   onFix: (panel: ReadinessPanel) => void;
   onSetupObs: () => void;
 }) {
@@ -777,6 +996,7 @@ function IdleControls({
   const obs = useStore((s) => s.obs);
   const uploadMbps = useStore((s) => s.uploadMbps);
   const r = useReadiness();
+  const encoder = useEncoder();
   const shortcut = config.settings.liveShortcut
     ? shortcutLabel(config.settings.liveShortcut)
     : null;
@@ -788,7 +1008,7 @@ function IdleControls({
     <button
       type="button"
       onClick={() => onFix("platforms")}
-      className="text-sm font-bold text-brass hover:underline"
+      className="inline-flex min-h-6 items-center text-sm font-bold text-brass hover:underline"
     >
       {t("golive.bar.fix")}
     </button>
@@ -834,7 +1054,8 @@ function IdleControls({
     const fit = bandFit(est.uploadKbps, uploadMbps);
     const obsChecked = obs !== null && obs !== "loading";
     status =
-      obsChecked && !obsConfigured(obs) ? (
+      obsChecked &&
+      !obsConfigured(obs, config.settings.obsManual, encoder.app) ? (
         <StatusLine
           tone="warn"
           title={t("golive.bar.obs")}
@@ -843,7 +1064,7 @@ function IdleControls({
             <button
               type="button"
               onClick={onSetupObs}
-              className="text-sm font-bold text-brass hover:underline"
+              className="inline-flex min-h-6 items-center text-sm font-bold text-brass hover:underline"
             >
               {t("golive.obs.fixForMe")}
             </button>
@@ -873,6 +1094,17 @@ function IdleControls({
   return (
     <>
       {status}
+      <Button
+        variant="outline"
+        size="lg"
+        className="shrink-0 px-4"
+        disabled={startBusy || updating}
+        onClick={onRehearse}
+        title={t("golive.rehearsal.hint")}
+      >
+        <Clapperboard className="size-5" />
+        {t("golive.rehearsal.cta")}
+      </Button>
       <Button
         variant="tomato"
         size="lg"

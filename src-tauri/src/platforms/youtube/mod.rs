@@ -248,6 +248,13 @@ impl AutoBroadcast for Youtube {
         account::youtube_complete_active(app, generation)
     }
 
+    fn rehearsal_settings(&self, settings: &Settings) -> Option<Settings> {
+        let mut private = settings.clone();
+        private.youtube_privacy = "private".into();
+        private.stream_title = Msg::YoutubeRehearsalBroadcastTitle.now();
+        Some(private)
+    }
+
     fn open_failure(&self) -> AutoBroadcastFailure {
         AutoBroadcastFailure {
             error_code: "youtube_auto_provision_failed",

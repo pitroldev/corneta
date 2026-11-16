@@ -11,9 +11,15 @@ pub(crate) fn claim_start(engine: &mut EngineRuntime) -> Result<(), String> {
         return Err(START_UPDATE_BLOCKED.into());
     }
     if engine.live {
-        return Err(Msg::EngineAlreadyLive.now());
+        let reason = if engine.rehearsing {
+            Msg::EngineRehearsing
+        } else {
+            Msg::EngineAlreadyLive
+        };
+        return Err(reason.now());
     }
     engine.live = true;
+    engine.rehearsing = false;
     Ok(())
 }
 
@@ -249,6 +255,25 @@ mod tests {
         drop(lease);
         assert!(claim_start(&mut engine.lock().unwrap()).is_ok());
         assert!(InstallLease::acquire(&engine).is_err());
+    }
+
+    #[test]
+    fn a_start_refused_during_a_rehearsal_says_a_rehearsal_is_running() {
+        let mut engine = EngineRuntime {
+            live: true,
+            rehearsing: true,
+            ..Default::default()
+        };
+        assert_eq!(claim_start(&mut engine), Err(Msg::EngineRehearsing.now()));
+        engine.rehearsing = false;
+        assert_eq!(claim_start(&mut engine), Err(Msg::EngineAlreadyLive.now()));
+        engine.live = false;
+        engine.rehearsing = true;
+        assert!(claim_start(&mut engine).is_ok());
+        assert!(
+            !engine.rehearsing,
+            "a live claim never inherits a stale rehearsal flag"
+        );
     }
 
     #[test]

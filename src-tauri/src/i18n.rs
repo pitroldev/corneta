@@ -494,6 +494,9 @@ messages! {
     EngineAlreadyLive = "rust.engine.alreadyLive" =>
         pt: "já está no ar.",
         en: "you're already live.";
+    EngineRehearsing = "rust.engine.rehearsing" =>
+        pt: "tem um ensaio rodando. Espere ele acabar ou cancele.",
+        en: "a rehearsal is running. Wait for it to finish or cancel it.";
     UpdateInProgress = "rust.update.inProgress" =>
         pt: "A Corneta está atualizando. Espere ela reabrir antes de começar a live.",
         en: "Corneta is updating. Wait for it to reopen before starting your stream.";
@@ -530,6 +533,9 @@ messages! {
     EngineIngestPortInUse { port: u16 } = "rust.engine.ingestPortInUse" =>
         pt: "O servidor de ingestão caiu: a porta {port} está ocupada por outro programa ou reservada pelo Windows. Feche o que estiver usando essa porta e tenta de novo.",
         en: "The ingest server crashed: port {port} is taken by another program or reserved by Windows. Close whatever's using it and try again.";
+    EngineNoFreePort = "rust.engine.noFreePort" =>
+        pt: "Não achei uma porta livre neste PC. Feche o programa que está usando a porta e tenta de novo.",
+        en: "I couldn't find a free port on this PC. Close the program that's using the port and try again.";
     EngineInvalidIngestUrl = "rust.engine.invalidIngestUrl" =>
         pt: "URL de ingestão inválida",
         en: "Invalid ingest URL";
@@ -540,6 +546,9 @@ messages! {
     YoutubeDefaultBroadcastTitle = "rust.youtube.defaultBroadcastTitle" =>
         pt: "Ao vivo",
         en: "Live";
+    YoutubeRehearsalBroadcastTitle = "rust.youtube.rehearsalBroadcastTitle" =>
+        pt: "Ensaio da Corneta (privado)",
+        en: "Corneta rehearsal (private)";
 
     SessionNotFound = "rust.session.notFound" =>
         pt: "não achei o relatório dessa live",
