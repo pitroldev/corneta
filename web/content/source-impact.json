@@ -28,14 +28,14 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
-      "reason": "The Live screen only gained the black screen warning and the shortcut hint on Mark a moment; what the article shows about a disconnected platform did not change."
+      "sourceBlob": "38da432402229266a0b45f38138719b5ac32ee82",
+      "reason": "GoLiveScreen.tsx only lists the destinations the engine is streaming and shows an error when ending or cancelling a live fails; the Live screen states and actions the article describes did not change."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
@@ -52,8 +52,8 @@
     {
       "article": "en/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
@@ -70,8 +70,8 @@
     {
       "article": "en/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
@@ -82,8 +82,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -94,8 +94,8 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the encoder choices and session limits the article describes did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -136,14 +136,14 @@
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
-      "reason": "GO LIVE only stopped sending guardian_enabled in telemetry; the flow the article describes did not change."
+      "sourceBlob": "2dc50ac3fc9b1c64ee7d8e8c0008d56fefc0fe19",
+      "reason": "store.ts only shows an error and turns the switch back when Windows refuses the start-with-Windows change; the first live the article walks through did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
@@ -160,32 +160,32 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the upload test the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/telemetry.rs",
-      "sourceBlob": "72edf5572120696f6708f7741bae21aa00c40bbb",
-      "reason": "telemetry.rs only added the splicer_output_died error code; the diagnostic contents the article lists did not change."
+      "sourceBlob": "104963eb87ebaf071ca8e5086ad7a79e9e218fc4",
+      "reason": "telemetry.rs only added the target_output_stalled and target_encoder_fallback failure codes; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -196,8 +196,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "3c91a5466c2fbcaa0b627c9c2ba3f6f856b452be",
-      "reason": "pt.ts only added the platform confirmation and phone notice copy; the OBS setup messages the article quotes did not change."
+      "sourceBlob": "01a0994c87b9ba87ccef0a411752039f4ac3ad0a",
+      "reason": "pt.ts only added the Live screen's Fix it now, OBS guide and re-encode texts; the automatic OBS setup labels the article quotes did not change."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -268,14 +268,14 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "c3a3818c652685766d093957c2b65f4eca8aa91a",
-      "reason": "The Live screen only gained the black screen warning and the shortcut hint on Mark a moment; what the article shows about a disconnected platform did not change."
+      "sourceBlob": "38da432402229266a0b45f38138719b5ac32ee82",
+      "reason": "GoLiveScreen.tsx only lists the destinations the engine is streaming and shows an error when ending or cancelling a live fails; the Live screen states and actions the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -298,8 +298,8 @@
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -316,8 +316,8 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -328,8 +328,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -340,8 +340,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the encoder choices and session limits the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -406,8 +406,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -424,14 +424,14 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "8f03a01011e98fa8441b4e577a46acb8a01e3300",
-      "reason": "Own messages are now recognized by a flag instead of the localized author name; the chat screen and the article's steps did not change."
+      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
+      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "8d8b265f5ea6f8cbea991ac2bae2b67dfdafa80f",
-      "reason": "GO LIVE only stopped sending guardian_enabled in telemetry; the flow the article describes did not change."
+      "sourceBlob": "2dc50ac3fc9b1c64ee7d8e8c0008d56fefc0fe19",
+      "reason": "store.ts only shows an error and turns the switch back when Windows refuses the start-with-Windows change; the first live the article walks through did not change."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -460,8 +460,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -478,26 +478,26 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
+      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the upload test the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "539d71d3f2b3c02b921c9432271a96bc8d7a86ac",
-      "reason": "commands.rs only restarts a crashed ingest server, closes automatic broadcasts after a failed live and asks the platforms to confirm destinations; what the article describes did not change."
+      "sourceBlob": "e27aa3f3a791914f854d6f966e3fec85a68b005f",
+      "reason": "commands.rs only re-encodes a destination on request, reconnects destinations that stop sending, moves a destination whose GPU encoder fails to x264 until the live ends and waits for the ingest server before provisioning; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/telemetry.rs",
-      "sourceBlob": "72edf5572120696f6708f7741bae21aa00c40bbb",
-      "reason": "telemetry.rs only added the splicer_output_died error code; the diagnostic contents the article lists did not change."
+      "sourceBlob": "104963eb87ebaf071ca8e5086ad7a79e9e218fc4",
+      "reason": "telemetry.rs only added the target_output_stalled and target_encoder_fallback failure codes; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/post-live-report.mdx",
@@ -520,8 +520,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "3c91a5466c2fbcaa0b627c9c2ba3f6f856b452be",
-      "reason": "pt.ts only added the platform confirmation and phone notice copy; the OBS setup messages the article quotes did not change."
+      "sourceBlob": "01a0994c87b9ba87ccef0a411752039f4ac3ad0a",
+      "reason": "pt.ts only added the Live screen's Fix it now, OBS guide and re-encode texts; the automatic OBS setup labels the article quotes did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
