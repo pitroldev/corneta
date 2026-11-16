@@ -28,14 +28,14 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; what happens when one platform drops during a live did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "38da432402229266a0b45f38138719b5ac32ee82",
-      "reason": "GoLiveScreen.tsx only lists the destinations the engine is streaming and shows an error when ending or cancelling a live fails; the Live screen states and actions the article describes did not change."
+      "sourceBlob": "463012636c55653914681e698517b37291d811aa",
+      "reason": "GoLiveScreen.tsx only changed how a failed start is explained and added the rehearsal and the phone offer; the per-platform recovery during a live that the article describes did not change."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
@@ -52,8 +52,8 @@
     {
       "article": "en/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat and alert overlays the article describes did not change."
     },
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
@@ -70,32 +70,32 @@
     {
       "article": "en/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat rules the article describes did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d114d15e93492c72e04ffae37086cdf82424cb9c",
-      "reason": "config.rs only refuses destination IDs that name another vault entry, sets an unusable settings file aside and syncs saves to disk; the modes, presets and limits the article describes did not change."
+      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
+      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the quality modes and limits the article describes did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; copying and re-encoding work as the article describes."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
-      "reason": "Only the privacy guard defaults were removed; nothing the article describes changed."
+      "sourceBlob": "b4da8e694ef3121014ce9196cab7b45ba61394c1",
+      "reason": "factory.ts only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the local ingest defaults the article relies on did not change."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the encoder choices and session limits the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the encoder choices and session limits the article describes did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -118,8 +118,8 @@
     {
       "article": "en/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the overlay setup the article describes did not change."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -136,14 +136,14 @@
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; adding channels in Chat, Configure works as the article describes."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "820084d48eff9f91a64b216ec8477f02241d8211",
-      "reason": "store.ts only reports a failed settings save and saves again before going live; the first live the article walks through did not change."
+      "sourceBlob": "82eecef864aababc4cba330e03afed71cda2f8ea",
+      "reason": "store.ts only added the rehearsal, the OBS environment check and the move to a free ingest port, and skips pressing play when the stream comes from a program other than OBS; going live with OBS works as the article describes."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
@@ -154,32 +154,32 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d114d15e93492c72e04ffae37086cdf82424cb9c",
-      "reason": "config.rs only refuses destination IDs that name another vault entry, sets an unusable settings file aside and syncs saves to disk; the modes, presets and limits the article describes did not change."
+      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
+      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the auto-bitrate settings the article describes did not change."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; auto-bitrate works as the article describes."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the metrics the article explains did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the upload test the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the upload test the article describes did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the diagnostic file and what it leaves out did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -220,32 +220,32 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the reconnects, the x264 fallback and the platform checks the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the reconnects, the ingest recovery during a live and the platform checks the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "e3b1ab08d58c60a0f624b3b55b5ec6f2eb9e1848",
-      "reason": "engine_policy.rs only added the recent-speed measure that auto-bitrate reads; the states, the 15 and 25 second reconnects and the x264 fallback the article describes did not change."
+      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
+      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the reconnects and the ingest recovery the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the statuses, the platform checks and Fix it now work as the article describes."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the statuses, the ingest recovery during a live and Fix it now work as the article describes."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "e3b1ab08d58c60a0f624b3b55b5ec6f2eb9e1848",
-      "reason": "engine_policy.rs only added the recent-speed measure that auto-bitrate reads; the states, the 15 and 25 second reconnects and the x264 fallback the article describes did not change."
+      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
+      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -286,14 +286,14 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; what happens when one platform drops during a live did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "38da432402229266a0b45f38138719b5ac32ee82",
-      "reason": "GoLiveScreen.tsx only lists the destinations the engine is streaming and shows an error when ending or cancelling a live fails; the Live screen states and actions the article describes did not change."
+      "sourceBlob": "463012636c55653914681e698517b37291d811aa",
+      "reason": "GoLiveScreen.tsx only changed how a failed start is explained and added the rehearsal and the phone offer; the per-platform recovery during a live that the article describes did not change."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -316,8 +316,8 @@
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat and alert overlays the article describes did not change."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -334,32 +334,32 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat rules the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d114d15e93492c72e04ffae37086cdf82424cb9c",
-      "reason": "config.rs only refuses destination IDs that name another vault entry, sets an unusable settings file aside and syncs saves to disk; the modes, presets and limits the article describes did not change."
+      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
+      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the quality modes and limits the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; copying and re-encoding work as the article describes."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "59e12a234dd440e0359e21e63a0a906d49f426ff",
-      "reason": "Only the privacy guard defaults were removed; nothing the article describes changed."
+      "sourceBlob": "b4da8e694ef3121014ce9196cab7b45ba61394c1",
+      "reason": "factory.ts only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the local ingest defaults the article relies on did not change."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the encoder choices and session limits the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the encoder choices and session limits the article describes did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -424,8 +424,8 @@
     {
       "article": "pt-BR/help/chat-and-alerts/obs-browser-source-overlay.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the overlay setup the article describes did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
@@ -442,14 +442,14 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "10e205601ae0db4091ba23b26013da21599ebf43",
-      "reason": "ChatScreen.tsx only keeps the Alerts button pulsing past 100 alerts and shows an error when the pop-out chat fails to open; what the article describes did not change."
+      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
+      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; adding channels in Chat, Configure works as the article describes."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
       "source": "src/lib/store.ts",
-      "sourceBlob": "820084d48eff9f91a64b216ec8477f02241d8211",
-      "reason": "store.ts only reports a failed settings save and saves again before going live; the first live the article walks through did not change."
+      "sourceBlob": "82eecef864aababc4cba330e03afed71cda2f8ea",
+      "reason": "store.ts only added the rehearsal, the OBS environment check and the move to a free ingest port, and skips pressing play when the stream comes from a program other than OBS; going live with OBS works as the article describes."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -472,14 +472,14 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "d114d15e93492c72e04ffae37086cdf82424cb9c",
-      "reason": "config.rs only refuses destination IDs that name another vault entry, sets an unusable settings file aside and syncs saves to disk; the modes, presets and limits the article describes did not change."
+      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
+      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the auto-bitrate settings the article describes did not change."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; auto-bitrate works as the article describes."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -496,20 +496,20 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "f6dc3cee460d0f7706e2fab2bb2a83acc6ba7367",
-      "reason": "engine.rs only added the per-destination re-encode switch, the veryfast preset for x264 and the encoding action to each destination's status, and left destinations without a URL out of the live snapshot; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the metrics the article explains did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the upload test the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the upload test the article describes did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the diagnostic file and what it leaves out did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the diagnostic file and what it leaves out did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -562,32 +562,32 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the reconnects, the x264 fallback and the platform checks the article describes did not change."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the reconnects, the ingest recovery during a live and the platform checks the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "e3b1ab08d58c60a0f624b3b55b5ec6f2eb9e1848",
-      "reason": "engine_policy.rs only added the recent-speed measure that auto-bitrate reads; the states, the 15 and 25 second reconnects and the x264 fallback the article describes did not change."
+      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
+      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "144db4e195376dbdb8756c9097265c32c6c6a06b",
-      "reason": "engine.rs only added the platform's own confirmation to each destination's status; the presets, destination states and metrics the article describes did not change."
+      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
+      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the reconnects and the ingest recovery the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "93b38f725735a57760b65476f10ef47d29a09e91",
-      "reason": "commands.rs only feeds auto-bitrate the speed of the last few seconds and adds the command that reports a settings file set aside; the statuses, the platform checks and Fix it now work as the article describes."
+      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
+      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the statuses, the ingest recovery during a live and Fix it now work as the article describes."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "e3b1ab08d58c60a0f624b3b55b5ec6f2eb9e1848",
-      "reason": "engine_policy.rs only added the recent-speed measure that auto-bitrate reads; the states, the 15 and 25 second reconnects and the x264 fallback the article describes did not change."
+      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
+      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
     }
   ]
 }
