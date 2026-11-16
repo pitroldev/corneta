@@ -2,7 +2,7 @@
 contentId: help_stream_statuses
 title: "O que significam Aguardando, Conectando, Reconectando, Pausado, JÁ VOLTO e Erro"
 description: "Entenda cada estado mostrado na tela Ao vivo e qual ação tomar quando um destino não chega a NO AR."
-summary: "Cada estado diz em que ponto o sinal parou. Aguardando olha para a entrada; Conectando e Reconectando olham para a plataforma; Pausado e JÁ VOLTO são estados controlados por você."
+summary: "Cada estado diz em que ponto o sinal parou. Aguardando olha para a entrada; Conectando e Reconectando olham para a plataforma; Pausado e JÁ VOLTO são estados controlados por você. Com a conta conectada, a própria plataforma confirma a live na linha do destino."
 locale: pt-BR
 collection: help
 kind: troubleshooting
@@ -14,9 +14,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-20
-reviewedAt: 2026-10-20
-productVersion: 0.10.0
+updatedAt: 2026-11-15
+reviewedAt: 2026-11-15
+productVersion: 0.14.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -32,7 +32,15 @@ sources:
   - title: Corneta engine state policy
     kind: internal
     repoPath: src-tauri/src/engine_policy.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-11-15
+  - title: Corneta ingest server recovery and platform checks
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-11-15
+  - title: Corneta platform warning fixes
+    kind: internal
+    repoPath: src/lib/platformCheck.ts
+    reviewedAt: 2026-11-15
 images:
   - baseName: corneta-first-live-checklist
     alt: "Tela Ao vivo com os indicadores de plataformas, OBS, internet e proteções."
@@ -52,6 +60,26 @@ images:
 | **Erro**         | a tentativa parou com uma causa conhecida    | abra a mensagem e use **Tentar de novo** depois da correção          |
 
 <ContentImage baseName="corneta-first-live-checklist" />
+
+## A plataforma também confirma
+
+Com a conta da Twitch, da Kick ou do YouTube conectada na Corneta, o destino que está **NO AR** ganha uma linha com o que a própria plataforma vê:
+
+- **"Twitch confirmou que você está no ar"**: a live aparece no canal da conta conectada.
+- **"YouTube confirmou a live, mas avisa: …"**: a live chegou, mas a plataforma recomenda um ajuste, como o intervalo de quadros-chave de 2 segundos. A live continua, e a linha mostra como corrigir.
+- **"Kick ainda não mostra sua live. Confira a chave e o canal."**: a Corneta está enviando, mas o canal da conta conectada não mostra a live. Confira se a chave do destino é desse mesmo canal.
+
+Quando o aviso é de configuração, como quadros-chave, bitrate, FPS, resolução ou áudio, a linha mostra **Corrigir agora**. A Corneta passa a recodificar só esse destino até o fim da live, com os quadros-chave, o bitrate e o FPS do preset dele. O destino passa uns segundos em **Reconectando**, e o PC usa mais GPU ou CPU. Depois, a linha diz que a Corneta recodifica o destino até o fim da live; no YouTube, o aviso pode levar alguns minutos para sumir. Para ele não voltar na próxima live, abra **Como evitar no OBS**: a linha mostra onde mudar a configuração no OBS. Se a Corneta já recodifica o destino, a linha pede para ajustar o preset dele em **Qualidade**. Aviso de conexão, como upload lento, não tem esse botão, porque recodificar não resolve a rede.
+
+A primeira consulta sai uns 20 segundos depois de o destino entrar em **NO AR**. O aviso de que a live não aparece só vem depois de 45 segundos, porque as plataformas demoram para listar uma live nova. Depois, a Corneta volta a perguntar a cada 30 segundos na Twitch e na Kick e a cada 5 minutos no YouTube, que limita as consultas por cota. Por isso, no YouTube, a linha pode levar alguns minutos para mudar depois de uma correção. Se o destino reconectar, a contagem recomeça.
+
+A linha não aparece sem conta conectada nem quando há dois destinos da mesma plataforma, porque a conta mostra um canal só.
+
+## Se o servidor de ingestão cair
+
+O servidor de ingestão é a parte da Corneta que recebe o sinal do OBS no seu PC. Se ele cair no meio da live, a Corneta sobe ele de novo sozinha: os destinos passam alguns segundos em **Reconectando**, o OBS reconecta e a live continua. Com o JÁ VOLTO ligado, o público vê a tela do JÁ VOLTO nesse intervalo. O Windows e o celular pareado avisam **O servidor de ingestão voltou**. A saída que monta o JÁ VOLTO também volta sozinha se cair.
+
+Se o servidor de ingestão cair três vezes em dois minutos, a live termina em **Erro** com a mensagem "O servidor de ingestão caiu — tenta de novo." Comece a live de novo. Se voltar a acontecer, peça ajuda com o diagnóstico seguro, como explicado abaixo.
 
 ## Aguardando não é OBS desconectado do WebSocket
 

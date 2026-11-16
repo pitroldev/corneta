@@ -2,7 +2,7 @@
 contentId: help_stream_statuses_en
 title: "What Waiting, Reconnecting, Paused and Error mean in Corneta"
 description: "Learn what each status on Corneta's Live screen means, from Waiting to Error, and what to do when a destination never reaches LIVE."
-summary: "Each status tells you where the signal stopped. Waiting looks at the input; Connecting and Reconnecting look at the platform; Paused and BE RIGHT BACK are states you control."
+summary: "Each status tells you where the signal stopped. Waiting looks at the input; Connecting and Reconnecting look at the platform; Paused and BE RIGHT BACK are states you control. With the account connected, the platform itself confirms the live on the destination's row."
 locale: en
 collection: help
 kind: troubleshooting
@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-11-15
+reviewedAt: 2026-11-15
+productVersion: 0.14.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -32,7 +32,15 @@ sources:
   - title: Corneta engine state policy
     kind: internal
     repoPath: src-tauri/src/engine_policy.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-11-15
+  - title: Corneta ingest server recovery and platform checks
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-11-15
+  - title: Corneta platform warning fixes
+    kind: internal
+    repoPath: src/lib/platformCheck.ts
+    reviewedAt: 2026-11-15
 images:
   - baseName: corneta-first-live-checklist-en
     alt: "Live screen with the platforms, OBS, internet and safety nets indicators."
@@ -52,6 +60,26 @@ images:
 | **Error**         | the attempt stopped with a known cause            | open the message and use **Try again** after the fix             |
 
 <ContentImage baseName="corneta-first-live-checklist-en" />
+
+## The platform confirms it too
+
+With your Twitch, Kick or YouTube account connected in Corneta, a destination that's **LIVE** gets a line with what the platform itself sees:
+
+- **"Twitch confirms you're live"**: the live shows up on the connected account's channel.
+- **"YouTube confirms you're live but warns: …"**: the live arrived, but the platform recommends a change, such as a 2-second keyframe interval. The live carries on, and the line shows how to fix it.
+- **"Kick doesn't show you live yet. Check the key and the channel."**: Corneta is sending, but the connected account's channel doesn't show the live. Check that the destination's key belongs to that same channel.
+
+When the warning is about a setting, such as keyframes, bitrate, frame rate, resolution or audio, the line shows **Fix it now**. Corneta starts re-encoding just that destination until the live ends, with its preset's keyframes, bitrate and frame rate. The destination spends a few seconds in **Reconnecting**, and the PC uses more GPU or CPU. After that, the line says Corneta re-encodes the destination until the live ends; on YouTube, the warning can take a few minutes to clear. To keep it from coming back next time, open **How to avoid it in OBS**: the line shows where to change the setting in OBS. If Corneta already re-encodes the destination, the line asks you to adjust its preset in **Quality**. A connection warning, such as a slow upload, has no such button, because re-encoding doesn't fix the network.
+
+The first check goes out about 20 seconds after the destination reaches **LIVE**. The warning that the live doesn't show up only comes after 45 seconds, because platforms take a while to list a new live. After that, Corneta asks again every 30 seconds on Twitch and Kick and every 5 minutes on YouTube, which limits checks with a quota. That's why, on YouTube, the line can take a few minutes to change after a fix. If the destination reconnects, the count starts over.
+
+The line doesn't show up without a connected account, or when there are two destinations on the same platform, because the account shows a single channel.
+
+## If the ingest server crashes
+
+The ingest server is the part of Corneta that receives the OBS signal on your PC. If it crashes mid-stream, Corneta brings it back on its own: the destinations spend a few seconds in **Reconnecting**, OBS reconnects and the live carries on. With BE RIGHT BACK turned on, viewers see the BE RIGHT BACK screen in the meantime. Windows and the paired phone say **The ingest server is back**. The output that builds the BE RIGHT BACK screen also comes back on its own if it crashes.
+
+If the ingest server crashes three times within two minutes, the live ends in **Error** with the message "The ingest server crashed — try again." Start the live again. If it happens again, ask for help with the safe diagnostics file, as explained below.
 
 ## Waiting doesn't mean OBS is disconnected from the WebSocket
 

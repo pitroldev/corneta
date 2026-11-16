@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-11-15
+reviewedAt: 2026-11-15
+productVersion: 0.14.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -32,7 +32,15 @@ sources:
   - title: Corneta independent target reconnect
     kind: internal
     repoPath: src-tauri/src/engine.rs
-    reviewedAt: 2026-09-07
+    reviewedAt: 2026-11-15
+  - title: Corneta ingest server recovery and platform checks
+    kind: internal
+    repoPath: src-tauri/src/commands.rs
+    reviewedAt: 2026-11-15
+  - title: Corneta target stall and encoder fallback policy
+    kind: internal
+    repoPath: src-tauri/src/engine_policy.rs
+    reviewedAt: 2026-11-15
   - title: KICK OBS or Streamlabs not connecting
     kind: official
     url: https://help.kick.com/en/articles/14994318-obs-or-streamlabs-not-connecting-to-kick
@@ -57,15 +65,21 @@ images:
 
 ## Pick the branch
 
-| Confirmation                         | Likely cause                   | Fix                                   |
-| ------------------------------------ | ------------------------------ | ------------------------------------- |
-| server test fails                    | route, DNS, firewall or ingest | use an alternative official address   |
-| authenticates, then drops            | key or platform rule           | reset the key and review the preset   |
-| bitrate is over the limit            | incompatible settings          | lower only that destination           |
-| official dashboard shows an incident | platform unavailable           | keep it paused and wait               |
-| all of them start dropping           | local upload                   | lower the total and test your network |
+| Confirmation                                                              | Likely cause                               | Fix                                                      |
+| ------------------------------------------------------------------------- | ------------------------------------------ | -------------------------------------------------------- |
+| server test fails                                                         | route, DNS, firewall or ingest             | use an alternative official address                      |
+| authenticates, then drops                                                 | key or platform rule                       | reset the key and review the preset                      |
+| bitrate is over the limit                                                 | incompatible settings                      | lower only that destination                              |
+| official dashboard shows an incident                                      | platform unavailable                       | keep it paused and wait                                  |
+| all of them start dropping                                                | local upload                               | lower the total and test your network                    |
+| all of them reconnect together and **The ingest server is back** shows up | the ingest server crashed on your PC       | none; Corneta already brought it back                    |
+| Windows says **The GPU encoder failed**                                   | the GPU encoder failed on that destination | none; Corneta switched to x264 until the live ends       |
+| the platform confirms the live but warns about something                  | settings outside its recommendation        | **Fix it now** on the destination's row, then adjust OBS |
+| the platform doesn't show the live yet                                    | key from another channel                   | use the key of the connected account's channel           |
 
-The connector tries to come back on its own, but repeated attempts don't fix an invalid credential. If you reset the key, change it in Corneta too.
+The connector tries to come back on its own: if the destination goes 15 seconds without sending anything, or 25 seconds without the platform finishing opening the connection, Corneta reconnects it. But repeated attempts don't fix an invalid credential. If you reset the key, change it in Corneta too.
+
+With the platform's account connected, the destination's row says whether the platform itself confirms the live. See [what each status means](/en/help/troubleshooting/stream-statuses) to understand each warning.
 
 ## If that didn't fix it
 
