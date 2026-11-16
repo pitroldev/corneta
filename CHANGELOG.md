@@ -8,6 +8,8 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-15
+
 ### Added
 
 - When YouTube warns about the stream's settings during a live, such as a keyframe interval outside its recommendation, the destination's row offers "Fix it now": Corneta re-encodes that destination until the live ends, following its preset's keyframes, bitrate and frame rate. The row also shows where to change the setting in OBS, so the warning doesn't come back next time.
@@ -206,7 +208,8 @@ Versions 0.8.2, 0.8.3 and 0.8.4 were never published; their changes are included
 
 - First release published on GitHub, with the Windows installer, `SHA256SUMS.txt` and the third-party compliance bundle.
 
-[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/pitroldev/corneta/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/pitroldev/corneta/compare/v0.13.3...v0.14.0
 [0.13.3]: https://github.com/pitroldev/corneta/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/pitroldev/corneta/compare/v0.13.1...v0.13.2
