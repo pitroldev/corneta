@@ -2,7 +2,7 @@
 contentId: help_obs_not_found_en
 title: "Corneta can't find OBS: WebSocket, password, port, firewall"
 description: "Fix a refused connection, a wrong password or a different port when Corneta's automatic setup can't find OBS Studio through the WebSocket server."
-summary: "In OBS, open Tools → WebSocket Server Settings, keep the server enabled and copy the same password into Corneta. Corneta always looks for OBS on port 4455; if you changed the port in OBS, set it back to 4455."
+summary: "In OBS, open Tools → WebSocket Server Settings and keep the server enabled. From 0.16.0 on, Corneta reads the port and the password from OBS's own settings; only paste the password into Corneta if it asks."
 locale: en
 collection: help
 kind: troubleshooting
@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-11-16
+reviewedAt: 2026-11-16
+productVersion: 0.15.1
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -39,7 +39,11 @@ sources:
   - title: Corneta OBS WebSocket client
     kind: internal
     repoPath: src-tauri/src/obs.rs
-    reviewedAt: 2026-10-18T18:05
+    reviewedAt: 2026-11-16
+  - title: Corneta OBS settings reader
+    kind: internal
+    repoPath: src-tauri/src/obs_env.rs
+    reviewedAt: 2026-11-16
 images:
   - baseName: corneta-obs-connection-details-en
     alt: "Corneta screen with the OBS connection set up and the local input details."
@@ -51,21 +55,21 @@ images:
 In OBS 28 or later, open **Tools → WebSocket Server Settings**. WebSocket comes built in; don't install a separate plugin unless you need to.
 
 1. Turn on the WebSocket server.
-2. Check that **Server Port** is set to `4455`. Corneta doesn't let you change this port.
+2. **Server Port** can stay as it is. From 0.16.0 on, Corneta reads the port from OBS's settings; up to 0.15.1, it only looked on `4455`.
 3. Keep **Enable Authentication** on.
-4. Click **Show Connect Info**, copy the password and paste it into **Settings → OBS** in Corneta.
+4. Corneta reads the password from OBS's settings too. If it says OBS asked for a password it couldn't read, click **Show Connect Info**, copy the password and paste it into the field Corneta shows or into **Settings → OBS**.
 5. Click **Test connection** or go back to **Hook up OBS**.
 
 <ContentImage baseName="corneta-obs-connection-details-en" />
 
 ## By symptom
 
-| Message in Corneta                           | Likely cause                                                                                                     | Fix                                                                                 |
-| -------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Couldn't find OBS                            | OBS is closed, the WebSocket is off or the port isn't 4455. Up to 0.8.5, a wrong password also shows up this way | open OBS, turn on the server, set the port back to 4455 and copy the password again |
-| Password refused                             | OBS asks for a password and Corneta has none or, after 0.8.5, a different one                                    | paste the password into **Settings → OBS**                                          |
-| Connected, but OBS isn't pointing at Corneta | OBS is streaming to another server                                                                               | click **Set it up for me** on the **Live** screen                                   |
-| Connected, but **Waiting for signal**        | the WebSocket is fine; the video hasn't arrived                                                                  | start streaming in OBS                                                              |
+| Message in Corneta                           | Likely cause                                                                                                                              | Fix                                                                      |
+| -------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| Couldn't find OBS                            | OBS is closed or the WebSocket is off. Up to 0.15.1, a port other than 4455 also shows up this way; up to 0.8.5, so does a wrong password | open OBS and turn on the server; up to 0.15.1, set the port back to 4455 |
+| Password refused                             | OBS asks for a password and Corneta has none or, after 0.8.5, a different one                                                             | paste the password into **Settings → OBS**                               |
+| Connected, but OBS isn't pointing at Corneta | OBS is streaming to another server                                                                                                        | click **Set it up for me** on the **Live** screen                        |
+| Connected, but **Waiting for signal**        | the WebSocket is fine; the video hasn't arrived                                                                                           | start streaming in OBS                                                   |
 
 If OBS froze, close it and open it again. Antivirus software with its own firewall can also block the connection: allow OBS and Corneta in it.
 
