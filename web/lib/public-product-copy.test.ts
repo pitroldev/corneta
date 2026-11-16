@@ -116,15 +116,25 @@ describe("public product claims", () => {
     expect(enTerms).not.toContain("depends on OBS to produce");
   });
 
-  it("documents the default WebSocket port used by the OBS integration", () => {
+  it("says the OBS integration reads the WebSocket port from OBS instead of fixing it", () => {
     const native = source("../../src-tauri/src/obs_env.rs");
-    const port = native.match(/const DEFAULT_PORT: u16 = (\d+);/)?.[1];
     const guide = source(
       "../content/pt-BR/help/streaming-software/automatic-obs-setup.mdx",
     );
-    expect(port).toBeDefined();
-    expect(guide).toContain(`mantenha a porta \`${port}\``);
-    expect(guide).not.toContain("só mude se você já usa outra configuração");
+    const troubleshooting = source(
+      "../content/pt-BR/help/troubleshooting/obs-not-found.mdx",
+    );
+    expect(native).toMatch(
+      /pub fn port\(\) -> u16 \{\s+websocket_settings\(\)/,
+    );
+    expect(guide).toContain(
+      "a Corneta lê a porta e a senha nas configurações do próprio OBS",
+    );
+    expect(guide).not.toContain("mantenha a porta");
+    expect(troubleshooting).toContain(
+      "a Corneta lê a porta nas configurações do OBS",
+    );
+    expect(troubleshooting).not.toContain("A Corneta não deixa trocar");
   });
 
   it("starts Corneta before asking OBS to send the first manual stream", () => {
