@@ -53,6 +53,8 @@ export type AuthStatus = {
 
 export interface CornetaApi {
   getConfig(): Promise<AppConfig>;
+  /** Name of a settings file set aside at startup because it could not be used, once. */
+  takeConfigNotice(): Promise<string | null>;
   saveConfig(config: AppConfig): Promise<AppConfig>;
   /** Synchronize config saved by any webview to prevent cross-window overwrites. */
   subscribeConfigChanged(cb: (c: AppConfig) => void): () => void;

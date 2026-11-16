@@ -405,8 +405,25 @@ pub(crate) fn run(input: &str, running: Arc<AtomicBool>, sink: &dyn OutputPort) 
         }
     }
 
+    let mut liveness = crate::chat::Liveness::new(Instant::now());
     while running.load(Ordering::Relaxed) {
-        match socket.read() {
+        match liveness.step(Instant::now()) {
+            crate::chat::LivenessStep::Probe => {
+                let _ = socket.send(Message::Text(
+                    "{\"event\":\"pusher:ping\",\"data\":{}}".into(),
+                ));
+            }
+            crate::chat::LivenessStep::Dead => {
+                log::warn!("cinefy chat: connection went silent; reconnecting");
+                break;
+            }
+            crate::chat::LivenessStep::Wait => {}
+        }
+        let received = socket.read();
+        if received.is_ok() {
+            liveness.on_frame(Instant::now());
+        }
+        match received {
             Ok(Message::Text(raw)) => {
                 let raw = raw.as_str();
                 if pusher_event_is(raw, "pusher:ping") {

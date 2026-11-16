@@ -45,6 +45,7 @@ const native = vi.hoisted(() => {
 
   const api = {
     getConfig: vi.fn(async () => copy(state.disk)),
+    takeConfigNotice: vi.fn(async () => null),
     saveConfig: vi.fn(
       (config: AppConfig) =>
         new Promise<AppConfig>((resolve, reject) => {

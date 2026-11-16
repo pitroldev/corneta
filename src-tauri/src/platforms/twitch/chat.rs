@@ -130,7 +130,18 @@ pub(crate) fn run_twitch(
     let mut assets = ChannelAssets::global(helix.as_ref());
     let mut channel_assets_done = false;
 
+    let mut liveness = crate::chat::Liveness::new(Instant::now());
     while running.load(Ordering::Relaxed) {
+        match liveness.step(Instant::now()) {
+            crate::chat::LivenessStep::Probe => {
+                let _ = socket.send(Message::Text("PING :corneta".into()));
+            }
+            crate::chat::LivenessStep::Dead => {
+                log::warn!("twitch chat: connection went silent; reconnecting");
+                break;
+            }
+            crate::chat::LivenessStep::Wait => {}
+        }
         // Drain on read timeouts too, so quiet channels do not stall outgoing messages.
 
         if let (Some(rx), Some(login)) = (&out_rx, &send_login) {
@@ -173,7 +184,11 @@ pub(crate) fn run_twitch(
             }
         }
 
-        match socket.read() {
+        let received = socket.read();
+        if received.is_ok() {
+            liveness.on_frame(Instant::now());
+        }
+        match received {
             Ok(Message::Text(t)) => {
                 for line in t.split("\r\n").filter(|l| !l.is_empty()) {
                     if is_ping(line) {

@@ -189,6 +189,11 @@ pub(crate) fn kill_sidecar(child: tauri_plugin_shell::process::CommandChild) {
 }
 
 #[tauri::command]
+pub fn take_config_notice() -> Option<String> {
+    config::take_set_aside_notice()
+}
+
+#[tauri::command]
 pub fn get_config(app: AppHandle) -> AppConfig {
     let mut cfg = config::load(&app);
     refresh_secret_presence(&app, &mut cfg);
@@ -2530,6 +2535,7 @@ async fn start_engine_inner(
                 let mut encoder_failed = false;
                 let mut reencode_restart = false;
                 let mut progress = ProgressWatch::new(now_ms() as u64);
+                let mut recent_speed = crate::engine_policy::SpeedWindow::default();
                 // Release the output promptly if its input stalls or it is paused.
                 let mut watchdog = tokio::time::interval(std::time::Duration::from_millis(250));
                 watchdog.tick().await; // Skip the interval's immediate first tick.
@@ -2560,7 +2566,12 @@ async fn start_engine_inner(
                                     }
                                     // Adaptation updates the bitrate; restart FFmpeg to apply the selected value.
                                     if auto_bitrate && transcoding {
-                                        if let Some(speed) = parse_kv(&line, "speed=") {
+                                        let stats_speed = parse_kv(&line, "speed=");
+                                        let windowed = recent_speed.on_stats(
+                                            crate::engine_policy::stats_media_secs(&line),
+                                            now_ms() as u64,
+                                        );
+                                        if let Some(speed) = windowed.or(stats_speed) {
                                             match abr.on_speed(speed) {
                                                 engine::BitrateAction::Down(kbps) => {
                                                     log::info!("auto-bitrate: reducing target to {kbps} kbps");

@@ -269,6 +269,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::get_config,
+            commands::take_config_notice,
             commands::save_config,
             commands::set_key,
             commands::clear_key,

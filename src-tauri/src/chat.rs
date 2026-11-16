@@ -428,6 +428,95 @@ pub(crate) fn chat_status(app: &AppHandle, platform: &str, source: &str, status:
     );
 }
 
+/// A half-open socket only times out its reads, so a silent connection needs its own probe.
+pub(crate) struct Liveness {
+    last_frame: std::time::Instant,
+    probed: Option<std::time::Instant>,
+}
+
+#[derive(Debug, PartialEq)]
+pub(crate) enum LivenessStep {
+    Wait,
+    Probe,
+    Dead,
+}
+
+impl Liveness {
+    const QUIET: std::time::Duration = std::time::Duration::from_secs(60);
+    const PROBE_WAIT: std::time::Duration = std::time::Duration::from_secs(20);
+
+    pub(crate) fn new(now: std::time::Instant) -> Self {
+        Self {
+            last_frame: now,
+            probed: None,
+        }
+    }
+
+    pub(crate) fn on_frame(&mut self, now: std::time::Instant) {
+        self.last_frame = now;
+        self.probed = None;
+    }
+
+    pub(crate) fn step(&mut self, now: std::time::Instant) -> LivenessStep {
+        match self.probed {
+            Some(probed) if now.duration_since(probed) >= Self::PROBE_WAIT => LivenessStep::Dead,
+            Some(_) => LivenessStep::Wait,
+            None if now.duration_since(self.last_frame) >= Self::QUIET => {
+                self.probed = Some(now);
+                LivenessStep::Probe
+            }
+            None => LivenessStep::Wait,
+        }
+    }
+}
+
+#[cfg(test)]
+mod liveness_tests {
+    use super::{Liveness, LivenessStep};
+    use std::time::{Duration, Instant};
+
+    #[test]
+    fn a_silent_connection_is_probed_once_and_then_declared_dead() {
+        let start = Instant::now();
+        let mut liveness = Liveness::new(start);
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(59)),
+            LivenessStep::Wait
+        );
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(60)),
+            LivenessStep::Probe
+        );
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(70)),
+            LivenessStep::Wait
+        );
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(80)),
+            LivenessStep::Dead
+        );
+    }
+
+    #[test]
+    fn any_frame_clears_the_probe() {
+        let start = Instant::now();
+        let mut liveness = Liveness::new(start);
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(60)),
+            LivenessStep::Probe
+        );
+        liveness.on_frame(start + Duration::from_secs(61));
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(100)),
+            LivenessStep::Wait
+        );
+        assert_eq!(
+            liveness.step(start + Duration::from_secs(121)),
+            LivenessStep::Probe
+        );
+    }
+}
+
 pub(crate) fn chat_status_gen(
     app: &AppHandle,
     gen: u64,

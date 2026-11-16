@@ -8,6 +8,21 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Changed
+
+- Destinations that Corneta re-encodes with an NVIDIA card now decode, scale and encode on the card, which cuts the processor work of each one to about a fifth. If the card refuses, the destination goes back to the previous path on its own.
+
+### Fixed
+
+- Auto-bitrate now reacts to a network drop late in a long live. Before, it followed FFmpeg's average speed since the connection opened, which barely moves after the first hour.
+- The chat reconnects when its Twitch, Kick or Cinefy connection dies silently. Before, it could stop receiving messages while still showing as connected.
+- A settings file that Corneta can't use is kept under another name, and Corneta tells you, instead of being replaced by the defaults on the next change.
+- When your settings can't be saved, Corneta says so, and going live saves them again first instead of starting with the previous settings.
+
+### Security
+
+- An imported settings file can no longer name a destination after one of Corneta's own vault entries, which would have sent an account token as that destination's stream key when going live.
+
 ## [0.15.0] - 2026-11-15
 
 ### Added

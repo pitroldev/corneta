@@ -50,6 +50,10 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       return invoke<AppConfig>("get_config");
     },
+    async takeConfigNotice() {
+      const { invoke } = await core();
+      return invoke<string | null>("take_config_notice");
+    },
     async saveConfig(config) {
       const { invoke } = await core();
       return invoke<AppConfig>("save_config", { config });

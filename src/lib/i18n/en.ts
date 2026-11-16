@@ -1515,6 +1515,10 @@ export const en: Dict = {
   "components.update.ready": "I'll install it and reopen in a second.",
 
   "core.auth.login.error.fallback": "couldn't log in",
+  "core.config.saveFailed":
+    "Couldn't save your settings. Check your disk space and try again.",
+  "core.config.setAside":
+    "Couldn't read your settings and started fresh. The old file was kept as {file}.",
   "core.chat.autoConnect.failed":
     "Couldn't connect the chat on my own — open the Chat screen and hit Connect.",
   "core.mesa.camera.blocked":

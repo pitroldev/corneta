@@ -1508,6 +1508,10 @@ export const pt = {
   "components.update.ready": "Instalo e abro de novo num instante.",
 
   "core.auth.login.error.fallback": "erro no login",
+  "core.config.saveFailed":
+    "Não consegui salvar suas configurações. Confira o espaço em disco e tente de novo.",
+  "core.config.setAside":
+    "Não consegui ler suas configurações e comecei do zero. O arquivo antigo ficou guardado como {file}.",
   "core.chat.autoConnect.failed":
     "Não consegui ligar o chat sozinho — vá na tela Chat e clique em Conectar.",
   "core.mesa.camera.blocked":

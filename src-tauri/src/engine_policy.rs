@@ -497,6 +497,57 @@ impl ProgressWatch {
     }
 }
 
+/// FFmpeg's own `speed=` averages since the process started, so an hour into a live a network
+/// drop barely moves it. This measures the media time written over the last few seconds.
+#[derive(Debug, Default)]
+pub(crate) struct SpeedWindow {
+    samples: std::collections::VecDeque<(u64, f64)>,
+}
+
+impl SpeedWindow {
+    const SPAN_MS: u64 = 6_000;
+    const MIN_SPAN_MS: u64 = 3_000;
+
+    /// The recent speed, once the window covers enough time to be steady.
+    pub(crate) fn on_stats(&mut self, media_secs: Option<f64>, now_ms: u64) -> Option<f64> {
+        let media_secs = media_secs?;
+        if self
+            .samples
+            .back()
+            .is_some_and(|(_, last)| media_secs < *last)
+        {
+            self.samples.clear();
+        }
+        self.samples.push_back((now_ms, media_secs));
+        while self.samples.len() > 2 && now_ms.saturating_sub(self.samples[1].0) >= Self::SPAN_MS {
+            self.samples.pop_front();
+        }
+        let (first_ms, first_secs) = *self.samples.front()?;
+        let wall_ms = now_ms.saturating_sub(first_ms);
+        if wall_ms < Self::MIN_SPAN_MS {
+            return None;
+        }
+        Some((media_secs - first_secs) * 1000.0 / wall_ms as f64)
+    }
+}
+
+/// The media time a stats line reports as written (`time=HH:MM:SS.cc`), in seconds.
+pub(crate) fn stats_media_secs(line: &str) -> Option<f64> {
+    if !matches!(classify_target_line(line), TargetLine::Stats { .. }) {
+        return None;
+    }
+    let rest = &line[line.find("time=")? + 5..];
+    let clock = rest.split_whitespace().next()?;
+    let mut parts = clock.split(':');
+    let hours: f64 = parts.next()?.parse().ok()?;
+    let minutes: f64 = parts.next()?.parse().ok()?;
+    let seconds: f64 = parts.next()?.parse().ok()?;
+    if parts.next().is_some() || hours < 0.0 {
+        return None;
+    }
+    Some(hours * 3600.0 + minutes * 60.0 + seconds)
+}
+
 /// The output size a stats line reports, in kB.
 pub(crate) fn stats_written_kb(line: &str) -> Option<f64> {
     if matches!(classify_target_line(line), TargetLine::Stats { .. }) {
@@ -1024,6 +1075,56 @@ mod tests {
         .unwrap();
         assert!(!diagnostic.contains("live_sk_abc123"), "{diagnostic:?}");
         assert!(diagnostic.contains("I/O error"), "{diagnostic:?}");
+    }
+
+    #[test]
+    fn speed_window_follows_recent_progress_instead_of_the_average() {
+        let mut window = SpeedWindow::default();
+        // An hour at full speed, sampled every 500 ms.
+        let mut now = 0u64;
+        let mut media = 0.0;
+        let mut speed = None;
+        for _ in 0..7200 {
+            now += 500;
+            media += 0.5;
+            speed = window.on_stats(Some(media), now);
+        }
+        assert!((speed.unwrap() - 1.0).abs() < 0.01);
+        // The network stalls: media time stops while the clock runs.
+        for _ in 0..8 {
+            now += 500;
+            speed = window.on_stats(Some(media), now);
+        }
+        assert!(speed.unwrap() < 0.6, "got {speed:?}");
+        // FFmpeg's cumulative average would still read about 0.999.
+        assert!(media / (now as f64 / 1000.0) > 0.99);
+    }
+
+    #[test]
+    fn speed_window_waits_for_enough_span_and_restarts_with_a_new_process() {
+        let mut window = SpeedWindow::default();
+        assert_eq!(window.on_stats(Some(1.0), 1_000), None);
+        assert_eq!(window.on_stats(Some(2.0), 2_000), None);
+        assert_eq!(window.on_stats(None, 3_000), None);
+        assert!((window.on_stats(Some(4.0), 4_000).unwrap() - 1.0).abs() < 1e-9);
+        // A restarted FFmpeg counts media time from zero again.
+        assert_eq!(window.on_stats(Some(0.5), 4_500), None);
+    }
+
+    #[test]
+    fn stats_media_secs_reads_the_time_field_of_stats_lines_only() {
+        let line = "frame= 1234 fps= 60 q=23.0 size=   10240kB time=01:02:03.50 bitrate=6000.0kbits/s speed=1x";
+        assert_eq!(stats_media_secs(line), Some(3723.5));
+        assert_eq!(
+            stats_media_secs(
+                "frame=    0 fps=0.0 q=0.0 size=       0kB time=N/A bitrate=N/A speed=N/A"
+            ),
+            None
+        );
+        assert_eq!(
+            stats_media_secs("[flv @ 0x1] time=00:00:01.00 is not a stats line"),
+            None
+        );
     }
 
     #[test]

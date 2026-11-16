@@ -189,8 +189,25 @@ pub(crate) fn run_kick(
         emit_modes(&app, gen, "kick", source, Value::Object(channel.modes));
     }
 
+    let mut liveness = crate::chat::Liveness::new(std::time::Instant::now());
     while running.load(Ordering::Relaxed) {
-        match socket.read() {
+        match liveness.step(std::time::Instant::now()) {
+            crate::chat::LivenessStep::Probe => {
+                let _ = socket.send(Message::Text(
+                    "{\"event\":\"pusher:ping\",\"data\":{}}".into(),
+                ));
+            }
+            crate::chat::LivenessStep::Dead => {
+                log::warn!("kick chat: connection went silent; reconnecting");
+                break;
+            }
+            crate::chat::LivenessStep::Wait => {}
+        }
+        let received = socket.read();
+        if received.is_ok() {
+            liveness.on_frame(std::time::Instant::now());
+        }
+        match received {
             Ok(Message::Text(t)) => {
                 let Ok(frame) = serde_json::from_str::<Value>(&t) else {
                     continue;

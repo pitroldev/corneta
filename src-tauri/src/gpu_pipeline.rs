@@ -1,14 +1,22 @@
-//! Experimental GPU-resident decode/scale/encode. Opt-in until measured across
-//! devices; unsupported codecs, CPU filters and providers retain the stable path.
+//! GPU-resident decode/scale/encode. NVIDIA is on by default; Quick Sync stays opt-in until it
+//! is measured. Unsupported codecs, CPU filters and providers retain the stable path, and a
+//! destination whose GPU pipeline exits on its own goes back to that path for the rest of the live.
+const SWITCH: &str = "CORNETA_EXPERIMENTAL_GPU_PIPELINE";
+
+/// `0` turns the pipeline off, as a support escape hatch.
 pub(crate) fn enabled() -> bool {
-    std::env::var("CORNETA_EXPERIMENTAL_GPU_PIPELINE").is_ok_and(|value| value == "1")
+    std::env::var(SWITCH).map_or(true, |value| value != "0")
 }
 
 pub(crate) fn candidate(args: &[String]) -> Option<Vec<String>> {
+    candidate_for(args, std::env::var(SWITCH).is_ok_and(|value| value == "1"))
+}
+
+fn candidate_for(args: &[String], unmeasured: bool) -> Option<Vec<String>> {
     let codec = args.windows(2).find(|pair| pair[0] == "-c:v")?.get(1)?;
     let (device, format, scaler) = match codec.as_str() {
         "h264_nvenc" => ("cuda", "cuda", "scale_cuda"),
-        "h264_qsv" => ("qsv", "qsv", "scale_qsv"),
+        "h264_qsv" if unmeasured => ("qsv", "qsv", "scale_qsv"),
         // The bundled FFmpeg has no scale_amf/scale_d3d11. No CPU→GPU→CPU detour.
         _ => return None,
     };
@@ -48,17 +56,18 @@ mod tests {
     }
     #[test]
     fn keeps_supported_simple_pipeline_on_one_device() {
-        let result = candidate(&args("h264_nvenc", "scale=1280:720")).unwrap();
+        let result = candidate_for(&args("h264_nvenc", "scale=1280:720"), false).unwrap();
         assert!(result.windows(2).any(|pair| pair == ["-hwaccel", "cuda"]));
         assert!(result
             .iter()
             .any(|arg| arg == "scale_cuda=w=1280:h=720:format=nv12"));
-        assert!(candidate(&args("h264_qsv", "scale=1280:720")).is_some());
+        assert!(candidate_for(&args("h264_qsv", "scale=1280:720"), true).is_some());
+        assert!(candidate_for(&args("h264_qsv", "scale=1280:720"), false).is_none());
     }
     #[test]
     fn leaves_copy_unsupported_providers_and_cpu_filters_untouched() {
         for codec in ["copy", "libx264", "h264_amf"] {
-            assert!(candidate(&args(codec, "scale=1280:720")).is_none());
+            assert!(candidate_for(&args(codec, "scale=1280:720"), true).is_none());
         }
         for filter in [
             "crop=640:720,scale=720:1280",
@@ -66,7 +75,7 @@ mod tests {
             "scale=1281:720",
             "scale=1280:720,fps=30",
         ] {
-            assert!(candidate(&args("h264_nvenc", filter)).is_none());
+            assert!(candidate_for(&args("h264_nvenc", filter), true).is_none());
         }
     }
 }

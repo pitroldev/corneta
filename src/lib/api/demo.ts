@@ -568,6 +568,9 @@ export function mockApi(): CornetaApi {
     async getConfig() {
       return loadConfig();
     },
+    async takeConfigNotice() {
+      return null;
+    },
     async saveConfig(config) {
       const saved = { ...config, revision: config.revision + 1 };
       localStorage.setItem(CONFIG_KEY, JSON.stringify(saved));

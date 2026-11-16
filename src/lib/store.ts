@@ -82,6 +82,7 @@ export const useStore = create<State>((set, get) => {
   let queuedConfig: AppConfig | null = null;
   let saving = false;
   let saveFailed = false;
+  let translate: T | null = null;
   let liveOperation: { id: string } | null = null;
   const flushSave = () => saveChain;
   const confirmSaved = (config: AppConfig) => {
@@ -125,6 +126,8 @@ export const useStore = create<State>((set, get) => {
     } catch (error) {
       rebased = await rebaseOnNewerFile(revision);
       if (!rebased) {
+        if (!saveFailed && translate)
+          toast.error(translate("core.config.saveFailed"));
         saveFailed = true;
         console.error("Failed to save configuration", error);
       }
@@ -181,6 +184,7 @@ export const useStore = create<State>((set, get) => {
     async load(t) {
       // Encoder probing starts native processes, so keep it off the initial configuration load path.
       set({ bootError: null });
+      translate = t;
       let config: AppConfig;
       try {
         config = await readConfig(t);
@@ -193,6 +197,12 @@ export const useStore = create<State>((set, get) => {
       confirmSaved(config);
       saveFailed = false;
       set({ config, loaded: true });
+      api
+        .takeConfigNotice()
+        .then((file) => {
+          if (file) toast.error(t("core.config.setAside", { file }));
+        })
+        .catch(() => {});
       try {
         set({ chatConnected: await api.chatRunning() });
       } catch {
@@ -489,6 +499,15 @@ export const useStore = create<State>((set, get) => {
       let requestCaptured = false;
       try {
         await flushSave();
+        // The engine reads the file, so unsaved edits would go live with the previous settings.
+        if (saveFailed && config) {
+          persist(get().config ?? config);
+          await flushSave();
+          if (saveFailed)
+            throw new Error(
+              translate?.("core.config.saveFailed") ?? "config_save_failed",
+            );
+        }
         set({ viewers: { total: 0, anyLive: false, items: [] } });
         // The UI owns request intent before invoke; native code owns subsequent outcomes.
         capture("live_start_requested", requestProperties);

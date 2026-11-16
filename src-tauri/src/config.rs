@@ -69,12 +69,27 @@ fn limited(l: Locale, label: Msg<'_>, value: &str, max: usize) -> Result<(), Str
     }
 }
 
+/// Account tokens share the vault service with stream keys, which are named by destination ID.
+fn names_account_secret(value: &str) -> bool {
+    ["oauth_", "twitch_", "youtube_", "kick_"]
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+}
+
+/// A destination ID is its stream key's vault entry, so it must not name any other secret.
+fn valid_target_id(value: &str) -> bool {
+    valid_id(value)
+        && !names_account_secret(value)
+        && !value.starts_with("alert_")
+        && !value.starts_with("chat_send_")
+}
+
 pub fn validate_secret_namespace(value: &str) -> Result<(), String> {
     let id = value
         .strip_prefix("alert_")
         .or_else(|| value.strip_prefix("chat_send_"))
         .unwrap_or(value);
-    if valid_id(id) && !value.starts_with("oauth_") {
+    if valid_id(id) && !names_account_secret(value) {
         Ok(())
     } else {
         Err(Msg::ConfigInvalidSecretNamespace.now())
@@ -684,7 +699,7 @@ impl AppConfig {
 }
 
 fn normalize_target(target: &mut Target, l: Locale) -> Result<(), String> {
-    if !valid_id(&target.id) || !crate::platforms::is_destination(&target.platform_id) {
+    if !valid_target_id(&target.id) || !crate::platforms::is_destination(&target.platform_id) {
         return Err(Msg::ConfigInvalidTarget.text(l));
     }
     limited(l, Msg::ConfigLabelTargetName, &target.name, 120)?;
@@ -895,34 +910,58 @@ pub fn load(app: &AppHandle) -> AppConfig {
                         cfg
                     }
                     Err(e) => {
-                        log::error!("config.json rejected: {e}");
+                        log::error!("config.json rejected ({e}); preserving it and using defaults");
+                        set_aside(&path, "rejected");
                         AppConfig::default()
                     }
                 }
             }
             Err(e) => {
                 log::error!("config.json invalid ({e}); preserving as .corrupt and using defaults");
-                let ts = std::time::SystemTime::now()
-                    .duration_since(std::time::UNIX_EPOCH)
-                    .map(|d| d.as_secs())
-                    .unwrap_or(0);
-                let _ = std::fs::rename(&path, path.with_extension(format!("corrupt-{ts}.json")));
+                set_aside(&path, "corrupt");
                 AppConfig::default()
             }
         },
         Err(ConfigReadError::TooLarge) => {
-            log::error!("config.json exceeds the 2 MiB limit");
+            log::error!("config.json exceeds the 2 MiB limit; preserving it and using defaults");
+            set_aside(&path, "oversized");
             AppConfig::default()
         }
         Err(_) => AppConfig::default(),
     }
 }
 
+static SET_ASIDE: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(None);
+
+/// The next save would replace a file the app could not use, so it is kept under another name.
+fn set_aside(path: &std::path::Path, label: &str) {
+    let ts = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    let kept = path.with_extension(format!("{label}-{ts}.json"));
+    if std::fs::rename(path, &kept).is_ok() {
+        if let Some(name) = kept.file_name().and_then(|name| name.to_str()) {
+            *SET_ASIDE.lock().unwrap() = Some(name.to_string());
+        }
+    }
+}
+
+/// The file name set aside by the last failed load, handed out once for the user notice.
+pub fn take_set_aside_notice() -> Option<String> {
+    SET_ASIDE.lock().unwrap().take()
+}
+
 pub fn save(app: &AppHandle, config: &AppConfig) -> Result<(), String> {
+    use std::io::Write;
     let path = config_path(app)?;
     let raw = serde_json::to_string_pretty(config).map_err(|e| e.to_string())?;
     let tmp = path.with_extension("json.tmp");
-    std::fs::write(&tmp, raw).map_err(|e| e.to_string())?;
+    let mut file = std::fs::File::create(&tmp).map_err(|e| e.to_string())?;
+    file.write_all(raw.as_bytes()).map_err(|e| e.to_string())?;
+    // A power cut after the rename must not leave an empty settings file.
+    file.sync_all().map_err(|e| e.to_string())?;
+    drop(file);
     std::fs::rename(&tmp, &path).map_err(|e| e.to_string())?;
     crate::deck::config_saved(app, config);
     Ok(())
@@ -1238,6 +1277,36 @@ mod tests {
         assert!(validate_secret_namespace("alert_source_1").is_ok());
         assert!(validate_secret_namespace("../oauth_token").is_err());
         assert!(validate_secret_namespace("oauth_refresh").is_err());
+        for account_secret in ["twitch_oauth", "youtube_refresh", "kick_client_secret"] {
+            assert!(validate_secret_namespace(account_secret).is_err());
+        }
+    }
+
+    #[test]
+    fn a_destination_id_cannot_name_another_vault_entry() {
+        for id in [
+            "twitch_oauth",
+            "twitch_refresh",
+            "youtube_refresh",
+            "youtube_client_secret",
+            "kick_refresh",
+            "oauth_token",
+            "alert_source_1",
+            "chat_send_source_1",
+        ] {
+            let mut target = target_fixture(id);
+            assert!(
+                normalize_target(&mut target, Locale::En).is_err(),
+                "{id:?} would read another secret as the stream key"
+            );
+            let mut file = serde_json::to_value(AppConfig::default()).unwrap();
+            file["targets"] = serde_json::json!([target_fixture(id)]);
+            assert!(
+                config_from_import(&file.to_string(), &AppConfig::default(), Locale::En).is_err(),
+                "an imported file must not carry {id:?}"
+            );
+        }
+        assert!(normalize_target(&mut target_fixture("tgt_a1"), Locale::En).is_ok());
     }
 
     use serde_json::{json, Value};
