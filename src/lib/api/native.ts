@@ -104,6 +104,10 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("retry_target", { targetId });
     },
+    async reencodeTarget(targetId) {
+      const { invoke } = await core();
+      await invoke("reencode_target", { targetId });
+    },
     async setForceBrb(on) {
       const { invoke } = await core();
       await invoke("set_force_brb", { on });

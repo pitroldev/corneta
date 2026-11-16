@@ -470,6 +470,12 @@ export type TargetState =
 export interface TargetStatus {
   targetId: string;
   name: string;
+  /** Kept with the status so the live panel lists what is streaming even after config edits. */
+  platformId: PlatformId;
+  /** How this live sends the destination; a re-encode requested mid-live switches it. */
+  action: EncodingAction;
+  /** The user asked mid-live to re-encode what OBS sent, so platform warnings may lag behind. */
+  reencoded?: boolean;
   state: TargetState;
   bitrateKbps: number;
   fps: number;

@@ -66,6 +66,8 @@ export interface CornetaApi {
   setTargetPaused(targetId: string, paused: boolean): Promise<void>;
   /** Reread a failed destination's vault key and retry without restarting the stream. */
   retryTarget(targetId: string): Promise<void>;
+  /** Re-encode a destination that copies OBS's signal, until the live ends. */
+  reencodeTarget(targetId: string): Promise<void>;
   /** Toggle manual BRB; requires protection to have been enabled at stream startup. */
   setForceBrb(on: boolean): Promise<void>;
   subscribe(cb: (s: EngineSnapshot) => void): () => void;

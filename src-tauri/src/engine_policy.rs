@@ -454,6 +454,91 @@ pub(crate) fn is_current_live(live: bool, current_generation: u64, generation: u
     live && current_generation == generation
 }
 
+/// How long a destination may stop writing before its connection counts as dead. A blocked
+/// socket can hold FFmpeg for minutes while it keeps printing stats with the same size.
+pub(crate) const TARGET_STALL_MS: u64 = 15_000;
+/// How long a new output may take to write its first bytes, including the wait for OBS's first
+/// keyframe. A server that accepts the TCP connection but never answers the RTMP handshake would
+/// otherwise hold it forever, since FFmpeg sets no timeout there.
+pub(crate) const TARGET_OPEN_MS: u64 = 25_000;
+
+/// Follows the bytes a destination's FFmpeg reports as written in its stats lines.
+#[derive(Debug)]
+pub(crate) struct ProgressWatch {
+    started_ms: u64,
+    written_kb: Option<f64>,
+    last_growth_ms: Option<u64>,
+}
+
+impl ProgressWatch {
+    pub(crate) fn new(started_ms: u64) -> Self {
+        Self {
+            started_ms,
+            written_kb: None,
+            last_growth_ms: None,
+        }
+    }
+
+    pub(crate) fn on_stats(&mut self, written_kb: Option<f64>, now_ms: u64) {
+        let Some(kb) = written_kb.filter(|kb| *kb > 0.0) else {
+            return;
+        };
+        if self.written_kb.is_none_or(|last| kb > last) {
+            self.written_kb = Some(kb);
+            self.last_growth_ms = Some(now_ms);
+        }
+    }
+
+    pub(crate) fn stalled(&self, now_ms: u64) -> bool {
+        match self.last_growth_ms {
+            Some(at) => now_ms.saturating_sub(at) >= TARGET_STALL_MS,
+            None => now_ms.saturating_sub(self.started_ms) >= TARGET_OPEN_MS,
+        }
+    }
+}
+
+/// The output size a stats line reports, in kB.
+pub(crate) fn stats_written_kb(line: &str) -> Option<f64> {
+    if matches!(classify_target_line(line), TargetLine::Stats { .. }) {
+        parse_kv(line, "size=")
+    } else {
+        None
+    }
+}
+
+/// The video codec an FFmpeg command line encodes with, or `copy`.
+pub(crate) fn video_codec(args: &[String]) -> Option<&str> {
+    args.windows(2)
+        .find(|pair| pair[0] == "-c:v")
+        .map(|pair| pair[1].as_str())
+}
+
+/// GPU encoders can vanish mid-live (driver reset, session limit); libx264 only needs the CPU.
+pub(crate) fn is_hardware_video_codec(codec: &str) -> bool {
+    ["_nvenc", "_qsv", "_amf", "_videotoolbox"]
+        .iter()
+        .any(|suffix| codec.ends_with(suffix))
+}
+
+/// Whether a lowercased FFmpeg line comes from the encoder itself and reports a failure. The codec
+/// logs as `[h264_nvenc @` (`[enc:h264_nvenc @` since FFmpeg 7.1); the output stream's
+/// `[vost#0:0/h264_nvenc @` prefix also carries muxer and network errors, so it does not count.
+pub(crate) fn hardware_encoder_failed(low: &str, codec: &str) -> bool {
+    const FAILURE: [&str; 8] = [
+        "error",
+        "failed",
+        "cannot",
+        "could not",
+        "not supported",
+        "unsupported",
+        "no capable",
+        "out of memory",
+    ];
+    let from_encoder =
+        low.contains(&format!("[{codec} @")) || low.contains(&format!("[enc:{codec} @"));
+    from_encoder && FAILURE.iter().any(|word| low.contains(word))
+}
+
 pub(crate) fn is_loopback_host(host: &str) -> bool {
     host.eq_ignore_ascii_case("localhost")
         || host
@@ -492,6 +577,9 @@ mod tests {
         TargetStatus {
             target_id: name.into(),
             name: name.into(),
+            platform_id: "twitch".into(),
+            action: "copy".into(),
+            reencoded: false,
             state: state.into(),
             bitrate_kbps: kbps,
             fps: 0,
@@ -1080,6 +1168,60 @@ mod tests {
         assert!(platform_check_due(360_000, Some(60_000), true, 300_000));
         // Free platforms keep their own shorter interval.
         assert!(platform_check_due(50_000, Some(20_000), true, 30_000));
+    }
+
+    #[test]
+    fn a_destination_that_stops_writing_is_seen_as_stalled() {
+        let mut watch = ProgressWatch::new(0);
+        // Nothing written yet: opening the connection gets the longer allowance.
+        watch.on_stats(None, 0);
+        watch.on_stats(Some(0.0), 1_000);
+        assert!(!watch.stalled(TARGET_OPEN_MS - 1));
+        assert!(ProgressWatch::new(0).stalled(TARGET_OPEN_MS));
+
+        watch.on_stats(Some(512.0), 2_000);
+        watch.on_stats(Some(1_024.0), 3_000);
+        assert!(!watch.stalled(3_000 + TARGET_STALL_MS - 1));
+        // Stats keep coming with the same size while the socket is blocked.
+        watch.on_stats(Some(1_024.0), 10_000);
+        watch.on_stats(Some(1_024.0), 17_000);
+        assert!(watch.stalled(3_000 + TARGET_STALL_MS));
+
+        watch.on_stats(Some(1_100.0), 18_500);
+        assert!(!watch.stalled(18_500 + TARGET_STALL_MS - 1));
+        // Stats that stop altogether count the same way.
+        assert!(watch.stalled(18_500 + TARGET_STALL_MS));
+    }
+
+    #[test]
+    fn hardware_encoder_failures_are_told_apart_from_network_ones() {
+        let args: Vec<String> = ["-i", "in", "-c:v", "h264_nvenc", "-f", "flv", "out"]
+            .map(String::from)
+            .to_vec();
+        let codec = video_codec(&args).unwrap();
+        assert_eq!(codec, "h264_nvenc");
+        assert!(is_hardware_video_codec(codec));
+        assert!(!is_hardware_video_codec("libx264"));
+        assert!(!is_hardware_video_codec("copy"));
+
+        for line in [
+            "[h264_nvenc @ 000001] openencodesessionex failed: out of memory (10): (no details)",
+            "[h264_nvenc @ 000001] cannot load nvcuda.dll",
+            "[h264_nvenc @ 000001] encodepicture failed!: unknown error (999)",
+            "[vost#0:0/h264_nvenc @ 000001] [enc:h264_nvenc @ 000002] error while opening encoder - maybe incorrect parameters such as bit_rate, rate, width or height.",
+        ] {
+            assert!(hardware_encoder_failed(line, codec), "{line}");
+        }
+        for line in [
+            "[tls @ 000001] error in the push function.",
+            // Seen live: a dropped connection, reported under the output stream's encoder prefix.
+            "[vost#0:0/h264_nvenc @ 000001] error submitting a packet to the muxer: error number -10053 occurred",
+            "[out#0/flv @ 000001] error muxing a packet: generic error in an external library",
+            "[h264_nvenc @ 000001] using deprecated pixel format",
+            "frame= 120 fps= 60 q=21.0 size=  1024kib bitrate=6000.5kbits/s",
+        ] {
+            assert!(!hardware_encoder_failed(line, codec), "{line}");
+        }
     }
 
     #[test]

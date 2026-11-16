@@ -153,7 +153,7 @@ export function ChatScreen() {
     () =>
       useStore.subscribe((state, previous) => {
         if (
-          state.alerts.length > previous.alerts.length &&
+          state.alertsReceived > previous.alertsReceived &&
           !showAlertsRef.current
         )
           setAlertPulse(true);
@@ -450,7 +450,11 @@ export function ChatScreen() {
               <Button
                 variant="subtle"
                 size="sm"
-                onClick={() => void api.openChatWindow()}
+                onClick={() =>
+                  void api
+                    .openChatWindow()
+                    .catch((error: unknown) => toast.error(errMsg(error)))
+                }
                 title={t("chat.action.popout.title")}
               >
                 <PictureInPicture2 className="size-4" />{" "}

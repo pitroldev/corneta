@@ -289,6 +289,7 @@ pub fn run() {
             updater::update_installing,
             commands::set_target_paused,
             commands::retry_target,
+            commands::reencode_target,
             commands::set_force_brb,
             commands::list_sessions,
             commands::read_session,

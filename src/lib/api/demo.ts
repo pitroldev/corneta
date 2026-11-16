@@ -2,6 +2,7 @@ import { defaultConfig } from "../factory";
 import { resolveLocale } from "../i18n/locale";
 import type { I18n, MessageKey } from "../i18n";
 import { PLATFORMS } from "../platforms";
+import { effectiveAction } from "../estimates";
 import {
   EMPTY_TELEMETRY_STATUS,
   TELEMETRY_NOTICE_VERSION,
@@ -351,6 +352,7 @@ export function mockApi(): CornetaApi {
   let timer: ReturnType<typeof setInterval> | null = null;
   let rec: { id: string; lines: string[] } | null = null;
   const pausedTargets = new Set<string>();
+  const reencodedAt = new Map<string, number>();
   const targetPlatforms = new Map<string, string>();
 
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
@@ -502,9 +504,11 @@ export function mockApi(): CornetaApi {
       }
       st.uptimeSec = snapshot.startedAt ? (now - snapshot.startedAt) / 1000 : 0;
       // Like the native checks, platforms answer once the live has run for a while.
-      if (st.state === "live" && st.uptimeSec >= 20 && !st.platform) {
+      const askedFrom =
+        reencodedAt.get(st.targetId) ?? snapshot.startedAt ?? now;
+      if (st.state === "live" && now - askedFrom >= 20_000 && !st.platform) {
         st.platform =
-          targetPlatforms.get(st.targetId) === "youtube"
+          targetPlatforms.get(st.targetId) === "youtube" && !st.reencoded
             ? {
                 state: "confirmed",
                 health: "ok",
@@ -607,6 +611,7 @@ export function mockApi(): CornetaApi {
     async start(_operationId) {
       const cfg = loadConfig();
       pausedTargets.clear();
+      reencodedAt.clear();
       targetPlatforms.clear();
       const targets: Record<string, TargetStatus> = {};
       for (const t of cfg.targets.filter((x) => x.enabled)) {
@@ -617,6 +622,8 @@ export function mockApi(): CornetaApi {
         targets[t.id] = {
           targetId: t.id,
           name: t.name,
+          platformId: t.platformId,
+          action: effectiveAction(cfg.mode, t),
           state: "connecting",
           bitrateKbps: target,
           fps: 60,
@@ -681,6 +688,17 @@ export function mockApi(): CornetaApi {
       if (st) {
         st.state = "connecting";
         st.message = undefined;
+      }
+      emit();
+    },
+    async reencodeTarget(targetId) {
+      const st = snapshot.targets[targetId];
+      if (st && st.action === "copy") {
+        st.action = "transcode";
+        st.reencoded = true;
+        st.platform = undefined;
+        st.state = "connecting";
+        reencodedAt.set(targetId, Date.now());
       }
       emit();
     },

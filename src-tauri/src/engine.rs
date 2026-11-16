@@ -273,6 +273,10 @@ pub fn ffmpeg_args_for_target(
             ]
             .map(String::from),
         );
+        // x264's default preset cannot keep up with 1080p60 live on a typical streaming PC.
+        if codec == "libx264" {
+            args.extend(["-preset", "veryfast"].map(String::from));
+        }
     }
 
     // Optional mapping permits video-only sources.
@@ -632,6 +636,13 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
 pub struct TargetStatus {
     pub target_id: String,
     pub name: String,
+    /// Kept with the status so the live panel lists what is streaming even after config edits.
+    pub platform_id: String,
+    /// copy | transcode, as this live sends it; a re-encode requested mid-live switches it.
+    pub action: String,
+    /// The user asked mid-live to re-encode what OBS sent, so platform warnings may lag behind.
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    pub reencoded: bool,
     pub state: String, // idle | connecting | live | reconnecting | error | paused | waiting | signal-lost | brb
     pub bitrate_kbps: u32,
     pub fps: u32,
@@ -730,12 +741,20 @@ impl EngineSnapshot {
 
     pub fn live(config: &AppConfig, started_at: u128) -> Self {
         let mut targets = HashMap::new();
-        for t in config.targets.iter().filter(|t| t.enabled) {
+        // Same filter as the start: a destination without a URL never connects.
+        for t in config
+            .targets
+            .iter()
+            .filter(|t| t.enabled && !t.ingest_url.is_empty())
+        {
             targets.insert(
                 t.id.clone(),
                 TargetStatus {
                     target_id: t.id.clone(),
                     name: t.name.clone(),
+                    platform_id: t.platform_id.clone(),
+                    action: effective_action(&config.mode, t).to_string(),
+                    reencoded: false,
                     state: "connecting".into(),
                     // Do not seed metrics from presets: only measured output may appear healthy.
                     bitrate_kbps: 0,
@@ -889,6 +908,8 @@ pub struct EngineRuntime {
     /// Terminal failures park the supervisor until retry_target clears the flag.
     pub auth_error:
         std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
+    /// Set by reencode_target: the destination stops copying OBS's signal until the live ends.
+    pub reencode: std::collections::HashMap<String, std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Available only while the compositor is running.
     pub force_brb: Option<std::sync::Arc<std::sync::atomic::AtomicBool>>,
     /// Revalidate `live` and this generation after awaits so stopped/superseded setup cannot install children.

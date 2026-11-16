@@ -441,6 +441,12 @@ messages! {
     NotifyBitrateUpBody { target_name: &'a str } = "rust.notify.bitrateUp.body" =>
         pt: "{target_name}: qualidade de volta ao normal.",
         en: "{target_name}: quality's back to normal.";
+    NotifyEncoderFallbackTitle = "rust.notify.encoderFallback.title" =>
+        pt: "O encoder da placa de vídeo falhou",
+        en: "The GPU encoder failed";
+    NotifyEncoderFallbackBody { target_name: &'a str } = "rust.notify.encoderFallback.body" =>
+        pt: "{target_name}: passei a codificar no processador (x264) até o fim da live.",
+        en: "{target_name}: I switched to encoding on the processor (x264) until the stream ends.";
     NotifyLiveTitle = "rust.notify.live.title" =>
         pt: "Corneta no ar 📣",
         en: "Corneta's on air 📣";

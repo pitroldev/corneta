@@ -1,4 +1,4 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, m } from "framer-motion";
 import {
@@ -18,12 +18,16 @@ import { PLATFORMS, platformName } from "../../lib/platforms";
 import { resolveSendTargets } from "../../lib/chatSend";
 import {
   describePlatformCheck,
+  obsGuide,
+  platformFix,
+  type ObsGuide,
   type PlatformIssueTopic,
 } from "../../lib/platformCheck";
 import { toast } from "../../lib/toast";
 import { cn, errMsg, fmtUptime, openExternal } from "../../lib/utils";
 import { useI18n, useT, type MessageKey } from "../../lib/i18n";
-import type { PlatformCheck, PlatformId, Target } from "../../lib/types";
+import type { EncodingAction, PlatformCheck } from "../../lib/types";
+import type { LiveTarget } from "../../lib/liveTargets";
 import type { Screen } from "../../components/Sidebar";
 import type { ChatView } from "../../components/ChatFeed";
 import { LiveChatFeed } from "../chat/LiveFeeds";
@@ -35,7 +39,7 @@ export function LiveCockpit({
   targets,
   onNavigate,
 }: {
-  targets: Target[];
+  targets: LiveTarget[];
   onNavigate?: (s: Screen) => void;
 }) {
   return (
@@ -69,7 +73,7 @@ const LiveTargetList = memo(function LiveTargetList({
   targets,
   onNavigate,
 }: {
-  targets: Target[];
+  targets: LiveTarget[];
   onNavigate?: (s: Screen) => void;
 }) {
   return (
@@ -102,7 +106,7 @@ const LiveTargetRow = memo(function LiveTargetRow({
   target,
   onNavigate,
 }: {
-  target: Target;
+  target: LiveTarget;
   onNavigate?: (s: Screen) => void;
 }) {
   const { t, fmt } = useI18n();
@@ -117,6 +121,8 @@ const LiveTargetRow = memo(function LiveTargetRow({
         droppedFrames: metrics?.droppedFrames,
         uptimeSec: metrics?.uptimeSec,
         platform: metrics?.platform,
+        action: metrics?.action ?? "copy",
+        reencoded: metrics?.reencoded ?? false,
       };
     }),
   );
@@ -134,10 +140,13 @@ const LiveTargetRow = memo(function LiveTargetRow({
       <div className="min-w-28 flex-1">
         <div className="font-display font-bold">{target.name}</div>
         <StatePill state={st.state ?? "idle"} />
-        {flowing && st.platform && (
+        {flowing && (st.platform || st.reencoded) && (
           <PlatformCheckNote
             check={st.platform}
-            platformId={target.platformId}
+            target={target}
+            action={st.action}
+            reencoded={st.reencoded}
+            onNavigate={onNavigate}
           />
         )}
         {st.message && (
@@ -185,10 +194,10 @@ const LiveTargetRow = memo(function LiveTargetRow({
           />
         </div>
       </div>
-      {PLATFORMS[target.platformId].liveUrl && (
+      {PLATFORMS[target.platformId]?.liveUrl && (
         <button
           onClick={() =>
-            void openExternal(PLATFORMS[target.platformId].liveUrl!)
+            void openExternal(PLATFORMS[target.platformId]!.liveUrl!)
           }
           className="grid size-9 shrink-0 place-items-center rounded-md text-ink-faint transition-colors hover:bg-surface-2 hover:text-ink"
           title={t("golive.target.openChannel.title")}
@@ -200,7 +209,11 @@ const LiveTargetRow = memo(function LiveTargetRow({
         </button>
       )}
       <button
-        onClick={() => void api.setTargetPaused(target.id, !paused)}
+        onClick={() =>
+          void api
+            .setTargetPaused(target.id, !paused)
+            .catch((e) => toast.error(errMsg(e)))
+        }
         className={cn(
           "inline-flex h-9 shrink-0 items-center gap-1.5 rounded-md px-2.5 text-xs font-bold uppercase tracking-wide transition-colors",
           paused
@@ -236,35 +249,141 @@ const TOPIC_KEY: Record<PlatformIssueTopic, MessageKey> = {
   slowUpload: "golive.target.platform.topic.slowUpload",
 };
 
-/** The platform's own word on the live: confirmed, confirmed with a warning, or not showing it. */
+const GUIDE_KEY: Record<ObsGuide, MessageKey> = {
+  audio: "golive.target.platform.guide.audio",
+  bitrate: "golive.target.platform.guide.bitrate",
+  frameRate: "golive.target.platform.guide.frameRate",
+  keyframes: "golive.target.platform.guide.keyframes",
+  other: "golive.target.platform.guide.other",
+  resolution: "golive.target.platform.guide.resolution",
+};
+
+// The warning that led to a re-encode, so the OBS step stays reachable once the platform is happy.
+const fixedGuides = new Map<string, ObsGuide>();
+
+/** The platform's own word on the live, and what the row can do about a warning. */
 function PlatformCheckNote({
   check,
-  platformId,
+  target,
+  action,
+  reencoded,
+  onNavigate,
 }: {
-  check: PlatformCheck;
-  platformId: PlatformId;
+  check?: PlatformCheck;
+  target: LiveTarget;
+  action: EncodingAction;
+  reencoded: boolean;
+  onNavigate?: (s: Screen) => void;
 }) {
   const t = useT();
-  const line = describePlatformCheck(check);
-  const platform = platformName(platformId, t);
-  if (line.kind === "confirmed") {
-    return (
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [fixing, setFixing] = useState(false);
+  const line = check ? describePlatformCheck(check) : null;
+  const platform = platformName(target.platformId, t);
+  const fix = platformFix(
+    line,
+    action,
+    reencoded,
+    fixedGuides.get(target.id) ?? null,
+  );
+  const guide =
+    fix.kind === "reencode" || fix.kind === "reencoded" ? fix.guide : null;
+
+  const reencode = async (topic: PlatformIssueTopic) => {
+    setFixing(true);
+    try {
+      await api.reencodeTarget(target.id);
+      const fixed = obsGuide(topic);
+      if (fixed) fixedGuides.set(target.id, fixed);
+      toast.success(t("golive.toast.reencoding", { target: target.name }));
+    } catch (e) {
+      toast.error(errMsg(e));
+    } finally {
+      setFixing(false);
+    }
+  };
+
+  const guideToggle = guide && (
+    <button
+      onClick={() => setGuideOpen((open) => !open)}
+      className="text-xs font-bold text-brass hover:underline"
+      aria-expanded={guideOpen}
+    >
+      {t("golive.target.platform.guide.toggle")}
+    </button>
+  );
+  const guideText = guide && guideOpen && (
+    <p className="mt-0.5 max-w-prose text-xs text-ink-muted">
+      {t(GUIDE_KEY[guide])}
+    </p>
+  );
+
+  let headline: ReactNode = null;
+  if (line?.kind === "confirmed") {
+    headline = (
       <div className="mt-0.5 flex items-center gap-1 text-xs text-ok">
         <BadgeCheck className="size-3.5 shrink-0" aria-hidden />
         {t("golive.target.platform.confirmed", { platform })}
       </div>
     );
+  } else if (line?.kind === "notLive") {
+    headline = (
+      <div className="mt-0.5 flex items-start gap-1 text-xs text-warn">
+        <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+        {t("golive.target.platform.notLive", { platform })}
+      </div>
+    );
+  } else if (line?.kind === "confirmedWithIssue" && fix.kind !== "reencoded") {
+    headline = (
+      <div className="mt-0.5 flex items-start gap-1 text-xs text-warn">
+        <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
+        {t("golive.target.platform.issue", {
+          platform,
+          issue: t(TOPIC_KEY[line.topic]),
+        })}
+      </div>
+    );
   }
+
   return (
-    <div className="mt-0.5 flex items-start gap-1 text-xs text-warn">
-      <AlertTriangle className="mt-px size-3.5 shrink-0" aria-hidden />
-      {line.kind === "notLive"
-        ? t("golive.target.platform.notLive", { platform })
-        : t("golive.target.platform.issue", {
-            platform,
-            issue: t(TOPIC_KEY[line.topic]),
-          })}
-    </div>
+    <>
+      {headline}
+      {fix.kind === "reencode" && line?.kind === "confirmedWithIssue" && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3">
+          <button
+            onClick={() => void reencode(line.topic)}
+            disabled={fixing}
+            title={t("golive.target.platform.fix.title")}
+            className="text-xs font-bold text-brass hover:underline disabled:opacity-60"
+          >
+            {t("golive.target.platform.fix")}
+          </button>
+          {guideToggle}
+        </div>
+      )}
+      {fix.kind === "reencoded" && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-ink-muted">
+          <span>
+            {line?.kind === "confirmedWithIssue"
+              ? t("golive.target.platform.reencodedPending")
+              : t("golive.target.platform.reencoded")}
+          </span>
+          {guideToggle}
+        </div>
+      )}
+      {fix.kind === "preset" && (
+        <div className="mt-0.5 flex flex-wrap items-center gap-x-3 text-xs text-ink-muted">
+          <span>{t("golive.target.platform.transcoded")}</span>
+          <button
+            onClick={() => onNavigate?.("encoding")}
+            className="font-bold text-brass hover:underline"
+          >
+            {t("golive.target.platform.transcoded.open")}
+          </button>
+        </div>
+      )}
+      {guideText}
+    </>
   );
 }
 

@@ -1966,10 +1966,33 @@ export const pt = {
   "golive.target.pause.title": "Pausar esta plataforma",
   "golive.target.platform.confirmed":
     "{platform} confirmou que você está no ar",
+  "golive.target.platform.fix": "Corrigir agora",
+  "golive.target.platform.fix.title":
+    "A Corneta recodifica este destino até o fim da live. Ele passa uns segundos em Reconectando e usa mais GPU ou CPU.",
+  "golive.target.platform.guide.audio":
+    "No OBS: Configurações → Áudio → Taxa de amostragem: 48 kHz, e Configurações → Saída → Taxa de bits do áudio: 160.",
+  "golive.target.platform.guide.bitrate":
+    "No OBS: Configurações → Saída → Taxa de bits do vídeo (no modo Avançado, aba Transmissão → Taxa de bits). Use o valor que a plataforma recomenda para a sua resolução e FPS.",
+  "golive.target.platform.guide.frameRate":
+    "No OBS: Configurações → Vídeo → Valores comuns de FPS: 30 ou 60.",
+  "golive.target.platform.guide.keyframes":
+    "No OBS: Configurações → Saída → Modo de saída: Avançado → aba Transmissão → Intervalo de keyframes: 2. O modo Avançado guarda o codificador e a taxa de bits à parte: confira os dois.",
+  "golive.target.platform.guide.other":
+    "No OBS, confira Configurações → Saída e Configurações → Vídeo: a plataforma pediu um ajuste de configuração.",
+  "golive.target.platform.guide.resolution":
+    "No OBS: Configurações → Vídeo → Resolução de saída (escala): 1920x1080 ou 1280x720.",
+  "golive.target.platform.guide.toggle": "Como evitar no OBS",
   "golive.target.platform.issue":
     "{platform} confirmou a live, mas avisa: {issue}",
   "golive.target.platform.notLive":
     "{platform} ainda não mostra sua live. Confira a chave e o canal.",
+  "golive.target.platform.reencoded":
+    "Recodificado pela Corneta até o fim da live.",
+  "golive.target.platform.reencodedPending":
+    "Recodificado pela Corneta. O aviso da plataforma pode levar alguns minutos para sumir.",
+  "golive.target.platform.transcoded":
+    "A Corneta já recodifica este destino: ajuste o preset dele em Qualidade.",
+  "golive.target.platform.transcoded.open": "Abrir Qualidade",
   "golive.target.platform.topic.audio": "áudio fora do recomendado",
   "golive.target.platform.topic.bitrateHigh": "bitrate acima do recomendado",
   "golive.target.platform.topic.bitrateLow": "bitrate abaixo do recomendado",
@@ -2002,6 +2025,8 @@ export const pt = {
     "Não consegui dar play no OBS — dê play manualmente.",
   "golive.toast.obsPlayFailed.action": "Configurar OBS",
   "golive.toast.serverUp": "Servidor no ar! Agora é só dar play no OBS",
+  "golive.toast.reencoding":
+    "{target}: a Corneta recodifica este destino até o fim da live.",
   "golive.toast.startFailed": "Não consegui entrar no ar: {erro}",
   "golive.toast.stopped": "Cortou! Tá fora do ar 👋",
   "golive.toast.stopped.action": "Ver relatório",

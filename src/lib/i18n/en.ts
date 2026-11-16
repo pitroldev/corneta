@@ -1976,10 +1976,33 @@ export const en: Dict = {
   "golive.target.pause": "Pause",
   "golive.target.pause.title": "Pause this platform",
   "golive.target.platform.confirmed": "{platform} confirms you're live",
+  "golive.target.platform.fix": "Fix it now",
+  "golive.target.platform.fix.title":
+    "Corneta re-encodes this destination until the stream ends. It spends a few seconds in Reconnecting and uses more GPU or CPU.",
+  "golive.target.platform.guide.audio":
+    "In OBS: Settings → Audio → Sample Rate: 48 kHz, and Settings → Output → Audio Bitrate: 160.",
+  "golive.target.platform.guide.bitrate":
+    "In OBS: Settings → Output → Video Bitrate (in Advanced mode, Streaming tab → Bitrate). Use the value the platform recommends for your resolution and frame rate.",
+  "golive.target.platform.guide.frameRate":
+    "In OBS: Settings → Video → Common FPS Values: 30 or 60.",
+  "golive.target.platform.guide.keyframes":
+    "In OBS: Settings → Output → Output Mode: Advanced → Streaming tab → Keyframe Interval: 2. Advanced mode keeps its own encoder and bitrate: check both.",
+  "golive.target.platform.guide.other":
+    "In OBS, check Settings → Output and Settings → Video: the platform asked for a settings change.",
+  "golive.target.platform.guide.resolution":
+    "In OBS: Settings → Video → Output (Scaled) Resolution: 1920x1080 or 1280x720.",
+  "golive.target.platform.guide.toggle": "How to avoid it in OBS",
   "golive.target.platform.issue":
     "{platform} confirms you're live but warns: {issue}",
   "golive.target.platform.notLive":
     "{platform} doesn't show you live yet. Check the key and the channel.",
+  "golive.target.platform.reencoded":
+    "Re-encoded by Corneta until the stream ends.",
+  "golive.target.platform.reencodedPending":
+    "Re-encoded by Corneta. The platform's warning may take a few minutes to clear.",
+  "golive.target.platform.transcoded":
+    "Corneta already re-encodes this destination: adjust its preset in Quality.",
+  "golive.target.platform.transcoded.open": "Open Quality",
   "golive.target.platform.topic.audio": "audio outside its recommendation",
   "golive.target.platform.topic.bitrateHigh":
     "bitrate above its recommendation",
@@ -2016,6 +2039,8 @@ export const en: Dict = {
     "Couldn't hit play in OBS — go hit Start Streaming over there.",
   "golive.toast.obsPlayFailed.action": "Set up OBS",
   "golive.toast.serverUp": "Server's up! Now just hit play in OBS",
+  "golive.toast.reencoding":
+    "{target}: Corneta re-encodes this destination until the stream ends.",
   "golive.toast.startFailed": "Couldn't go live: {erro}",
   "golive.toast.stopped": "Cut! You're off the air 👋",
   "golive.toast.stopped.action": "See the report",

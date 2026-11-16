@@ -16,7 +16,7 @@ import {
 } from "./telemetry-schema";
 import { toast } from "./toast";
 import type { AppConfig, EncoderInfo, EngineSnapshot, Target } from "./types";
-import { uid } from "./utils";
+import { errMsg, uid } from "./utils";
 import { createObsCoordinator, ObsConfigSaveError } from "./obsCoordinator";
 
 let pendingRemoval: { target: Target; index: number } | null = null;
@@ -330,7 +330,19 @@ export const useStore = create<State>((set, get) => {
       const config = get().config;
       if (!config) return;
       persist({ ...config, settings: { ...config.settings, ...patch } });
-      if (patch.autostart !== undefined) void api.setAutostart(patch.autostart);
+      const wanted = patch.autostart;
+      if (wanted !== undefined) {
+        api.setAutostart(wanted).catch((error: unknown) => {
+          toast.error(errMsg(error));
+          // Keep the switch truthful when Windows refused the startup entry.
+          const current = get().config;
+          if (current?.settings.autostart === wanted)
+            persist({
+              ...current,
+              settings: { ...current.settings, autostart: !wanted },
+            });
+        });
+      }
     },
     loadProfile(id) {
       pendingRemoval = null;

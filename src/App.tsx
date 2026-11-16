@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { MotionConfig, m } from "framer-motion";
 import { FileText, RefreshCw } from "lucide-react";
 import { downTargets, useStore } from "./lib/store";
-import { api, IS_TAURI, type ShortcutAction } from "./lib/api";
+import { api, IS_TAURI, START_CANCELLED, type ShortcutAction } from "./lib/api";
 import { errMsg } from "./lib/utils";
 import { MESA_ENABLED } from "./lib/flags";
 import { toast } from "./lib/toast";
@@ -211,8 +211,15 @@ export default function App() {
       const s = useStore.getState();
       const st = s.snapshot.state;
       if (action === "toggleLive") {
-        if (st === "live" || st === "starting") void s.stop();
-        else void s.start();
+        const stopping = st === "live" || st === "starting";
+        (stopping ? s.stop() : s.start()).catch((error: unknown) => {
+          const msg = errMsg(error);
+          // Cancellation uses a stable backend code, independent of the active locale.
+          if (msg.includes(START_CANCELLED)) return;
+          toast.error(
+            stopping ? msg : t("golive.toast.startFailed", { erro: msg }),
+          );
+        });
         return;
       }
       // Moment and BRB keys act only on a running live, like their buttons.

@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { describePlatformCheck, issueTopic } from "./platformCheck";
+import {
+  describePlatformCheck,
+  issueTopic,
+  obsGuide,
+  platformFix,
+} from "./platformCheck";
 
 describe("platform check line", () => {
   it("confirms a healthy live and ignores informational notes", () => {
@@ -54,5 +59,42 @@ describe("platform check line", () => {
     expect(issueTopic("audioSampleRate")).toBe("audio");
     expect(issueTopic("noAudioStream")).toBe("audio");
     expect(issueTopic("somethingNew")).toBe("other");
+  });
+});
+
+describe("platform warning fix", () => {
+  const keyframes = {
+    kind: "confirmedWithIssue",
+    topic: "keyframes",
+  } as const;
+
+  it("offers a re-encode for a destination that copies OBS's signal", () => {
+    expect(platformFix(keyframes, "copy", false)).toEqual({
+      kind: "reencode",
+      guide: "keyframes",
+    });
+    expect(platformFix(keyframes, "transcode", false)).toEqual({
+      kind: "preset",
+    });
+  });
+
+  it("explains a lagging warning after the re-encode and keeps the OBS guide", () => {
+    expect(platformFix(keyframes, "transcode", true)).toEqual({
+      kind: "reencoded",
+      guide: "keyframes",
+    });
+    expect(
+      platformFix({ kind: "confirmed" }, "transcode", true, "keyframes"),
+    ).toEqual({ kind: "reencoded", guide: "keyframes" });
+  });
+
+  it("offers nothing for connection trouble or a live the platform does not show", () => {
+    const slow = { kind: "confirmedWithIssue", topic: "slowUpload" } as const;
+    expect(platformFix(slow, "copy", false)).toEqual({ kind: "none" });
+    expect(platformFix({ kind: "notLive" }, "copy", false)).toEqual({
+      kind: "none",
+    });
+    expect(obsGuide("bitrateHigh")).toBe("bitrate");
+    expect(obsGuide("signal")).toBeNull();
   });
 });

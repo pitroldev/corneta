@@ -1,5 +1,6 @@
 import { api } from "../api";
 import { applyChatBatch, type ChatEvent } from "../chatBatch";
+import { appendAlert } from "../alertList";
 import type { ChatSideEvent } from "../types";
 import {
   chatSideKey,
@@ -29,7 +30,6 @@ function applySide(
   return { ...side, [key]: next };
 }
 const CHAT_CAP = 400;
-const ALERT_CAP = 100;
 export function createChatSlice({
   set,
   get,
@@ -57,6 +57,7 @@ export function createChatSlice({
   | "moderate"
   | "clearChat"
   | "alerts"
+  | "alertsReceived"
   | "bindAlerts"
   | "clearAlerts"
   | "viewers"
@@ -255,20 +256,12 @@ export function createChatSlice({
       set({ chatMessages: [] });
     },
     alerts: [],
+    alertsReceived: 0,
     bindAlerts() {
-      return api.subscribeAlerts((a) =>
-        set((s) => {
-          if (s.alerts.length < ALERT_CAP) {
-            return { alerts: [...s.alerts, a] };
-          }
-          const next = s.alerts.slice(-(ALERT_CAP - 1));
-          next.push(a);
-          return { alerts: next };
-        }),
-      );
+      return api.subscribeAlerts((a) => set((s) => appendAlert(s, a)));
     },
     clearAlerts() {
-      set({ alerts: [] });
+      set({ alerts: [], alertsReceived: 0 });
     },
     viewers: { total: 0, anyLive: false, items: [] },
     bindViewers() {

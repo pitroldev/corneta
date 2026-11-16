@@ -99,6 +99,9 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
         crate::engine::TargetStatus {
             target_id: "t1".into(),
             name: "Twitch".into(),
+            platform_id: "twitch".into(),
+            action: "copy".into(),
+            reencoded: false,
             state: "live".into(),
             bitrate_kbps: 6000,
             fps: 60,

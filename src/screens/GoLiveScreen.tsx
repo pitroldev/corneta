@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { AnimatePresence, m } from "framer-motion";
 import {
   AlertTriangle,
@@ -31,6 +31,7 @@ import { updateBusy, useUpdate } from "../lib/updater";
 import { useConfirm } from "../lib/useConfirm";
 import { useNow } from "../lib/useNow";
 import { useReadiness, useReadinessContext } from "../lib/useReadiness";
+import { liveTargetRows, liveTargetsSignature } from "../lib/liveTargets";
 import { cn, errMsg, fmtUptime } from "../lib/utils";
 import type { EngineState } from "../lib/types";
 import { isUuid } from "../lib/telemetry-schema";
@@ -87,9 +88,15 @@ export function GoLiveScreen({
   const onAir = live || starting;
   const r = useReadiness();
   const signalLost = useStore((s) =>
-    r.enabled.some(
-      (target) => s.snapshot.targets[target.id]?.state === "signal-lost",
-    ),
+    Object.values(s.snapshot.targets).some((x) => x.state === "signal-lost"),
+  );
+  const liveSignature = useStore((s) =>
+    liveTargetsSignature(s.snapshot.targets),
+  );
+  const configTargets = useStore((s) => s.config?.targets);
+  const liveTargets = useMemo(
+    () => liveTargetRows(liveSignature, configTargets ?? []),
+    [liveSignature, configTargets],
   );
   const blackScreen = useStore((s) => s.snapshot.blackScreen ?? false);
 
@@ -212,7 +219,12 @@ export function GoLiveScreen({
   }, [ingestLive, starting]);
 
   const onStop = async () => {
-    await stop();
+    try {
+      await stop();
+    } catch (e) {
+      toast.error(errMsg(e));
+      return;
+    }
     toast.action(
       t("golive.toast.stopped"),
       t("golive.toast.stopped.action"),
@@ -220,7 +232,12 @@ export function GoLiveScreen({
     );
   };
   const onCancel = async () => {
-    await stop();
+    try {
+      await stop();
+    } catch (e) {
+      toast.error(errMsg(e));
+      return;
+    }
     toast.info(t("golive.toast.canceled"));
   };
 
@@ -385,7 +402,7 @@ export function GoLiveScreen({
               </Button>
             </AlertCard>
           )}
-          <LiveCockpit targets={r.enabled} onNavigate={onNavigate} />
+          <LiveCockpit targets={liveTargets} onNavigate={onNavigate} />
           <StreamInfoCard />
         </div>
       )}
@@ -900,9 +917,7 @@ function LiveControls({ onStop }: { onStop: () => Promise<void> }) {
         (x) => x.state === "live" || x.state === "brb",
       ).length,
   );
-  const total = useStore(
-    (s) => s.config?.targets.filter((x) => x.enabled).length ?? 0,
-  );
+  const total = useStore((s) => Object.keys(s.snapshot.targets).length);
   const now = useNow(true);
   const stopStep = useConfirm(3000, { minDelayMs: 400 });
   const onMark = async () => {

@@ -2,10 +2,11 @@ use crate::chat;
 use crate::config::{self, AppConfig};
 use crate::engine::{self, EngineSnapshot};
 use crate::engine_policy::{
-    brb_slate_is_video, classify_target_line, is_brb_slate_path, is_current_live, is_loopback_host,
-    mediamtx_port_conflict, parse_ingest_hostport, parse_kv, parse_mediamtx_paths, platform_check,
-    platform_check_due, quality_of, safe_ffmpeg_diagnostic, target_error_update, tray_tooltip,
-    RestartBudget, TargetErrorUpdate, TargetLine,
+    brb_slate_is_video, classify_target_line, hardware_encoder_failed, is_brb_slate_path,
+    is_current_live, is_hardware_video_codec, is_loopback_host, mediamtx_port_conflict,
+    parse_ingest_hostport, parse_kv, parse_mediamtx_paths, platform_check, platform_check_due,
+    quality_of, safe_ffmpeg_diagnostic, stats_written_kb, target_error_update, tray_tooltip,
+    video_codec, ProgressWatch, RestartBudget, TargetErrorUpdate, TargetLine,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -883,6 +884,81 @@ fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
     parse_mediamtx_paths(&body, ingest_name, program_name)
 }
 
+// Retain publisher lifecycle failures without frame-grab noise.
+fn log_mediamtx_line(raw: &str) {
+    let line = raw.to_lowercase();
+    const KEEP: [&str; 8] = [
+        "publish",
+        "available",
+        "online",
+        "destroyed",
+        "queue",
+        "too slow",
+        "timed out",
+        "err",
+    ];
+    if KEEP.iter().any(|word| line.contains(word)) {
+        log::warn!("mediamtx: {}", raw.trim());
+    }
+}
+
+/// MediaMTX serves its API only after binding every listener, so an answer means OBS can connect.
+fn mediamtx_api_answers() -> bool {
+    let url = format!(
+        "http://127.0.0.1:{}/v3/paths/list",
+        engine::MEDIAMTX_API_PORT
+    );
+    match ureq::get(&url)
+        .timeout(std::time::Duration::from_millis(400))
+        .call()
+    {
+        Ok(_) | Err(ureq::Error::Status(..)) => true,
+        Err(_) => false,
+    }
+}
+
+/// A busy PC can delay the first answer; past this, the start provisions anyway and the
+/// supervisor still catches a later crash.
+const MEDIAMTX_READY_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(8);
+
+/// Holds the start until MediaMTX answers, so no broadcast opens on a platform when the ingest
+/// server already exited or lost its port.
+async fn wait_mediamtx_ready(
+    events: &mut tauri::async_runtime::Receiver<CommandEvent>,
+    ingest_port: u16,
+    timeout: std::time::Duration,
+    answers: fn() -> bool,
+) -> Result<(), EngineFailure> {
+    let deadline = tokio::time::Instant::now() + timeout;
+    let mut probe = tokio::time::interval(std::time::Duration::from_millis(150));
+    loop {
+        tokio::select! {
+            event = events.recv() => match event {
+                Some(CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes)) => {
+                    let raw = String::from_utf8_lossy(&bytes);
+                    log_mediamtx_line(&raw);
+                    if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
+                        return Err(EngineFailure::IngestPortInUse { port });
+                    }
+                }
+                Some(CommandEvent::Terminated(_)) | None => {
+                    return Err(EngineFailure::MediamtxExited);
+                }
+                Some(_) => {}
+            },
+            _ = probe.tick() => {
+                if tauri::async_runtime::spawn_blocking(answers).await.unwrap_or(false) {
+                    return Ok(());
+                }
+                if tokio::time::Instant::now() >= deadline {
+                    log::warn!("engine: MediaMTX API silent after {timeout:?}; provisioning anyway");
+                    return Ok(());
+                }
+            }
+        }
+    }
+}
+
 fn mediamtx_ingest_ready(config: &crate::config::AppConfig) -> bool {
     let (ready, _, _) = mediamtx_paths(
         &engine::ingest_path_name(config),
@@ -1332,6 +1408,7 @@ fn spawn_platform_checks(
         flowing_since: Option<std::time::Instant>,
         last_check_flowing_ms: Option<u64>,
         settled: bool,
+        action: Option<String>,
     }
     let mut tracked: Vec<Tracked> = plans
         .into_iter()
@@ -1341,13 +1418,23 @@ fn spawn_platform_checks(
             flowing_since: None,
             last_check_flowing_ms: None,
             settled: false,
+            action: None,
         })
         .collect();
     tauri::async_runtime::spawn_blocking(move || {
         while running.load(std::sync::atomic::Ordering::Relaxed) {
             for item in &mut tracked {
-                let flowing = target_state(&app, &item.plan.target_id)
-                    .is_some_and(|state| state == "live" || state == "brb");
+                let flow = target_flow(&app, &item.plan.target_id);
+                if let Some((_, action)) = &flow {
+                    // A mid-live re-encode changes what the platform receives; its checks start over.
+                    if item.action.as_ref().is_some_and(|seen| seen != action) {
+                        item.flowing_since = None;
+                        item.last_check_flowing_ms = None;
+                        item.settled = false;
+                    }
+                    item.action = Some(action.clone());
+                }
+                let flowing = flow.is_some_and(|(state, _)| state == "live" || state == "brb");
                 if !flowing {
                     if item.flowing_since.take().is_some() {
                         item.last_check_flowing_ms = None;
@@ -1400,7 +1487,8 @@ fn spawn_platform_checks(
     });
 }
 
-fn target_state(app: &AppHandle, target_id: &str) -> Option<String> {
+/// A destination's state and how this live sends it.
+fn target_flow(app: &AppHandle, target_id: &str) -> Option<(String, String)> {
     let state = app.state::<AppState>();
     let engine = state.engine.lock().unwrap();
     engine
@@ -1408,7 +1496,7 @@ fn target_state(app: &AppHandle, target_id: &str) -> Option<String> {
         .as_ref()?
         .targets
         .get(target_id)
-        .map(|target| target.state.clone())
+        .map(|target| (target.state.clone(), target.action.clone()))
 }
 
 fn set_platform_check(
@@ -1904,6 +1992,10 @@ async fn start_engine_inner(
         .iter()
         .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
         .collect();
+    let reencode_flags: HashMap<String, Arc<AtomicBool>> = enabled
+        .iter()
+        .map(|t| (t.id.clone(), Arc::new(AtomicBool::new(false))))
+        .collect();
     {
         let mut eng = state.engine.lock().unwrap();
         // An await may outlive cancellation or a newer startup; do not install stale handles.
@@ -1925,8 +2017,38 @@ async fn start_engine_inner(
         eng.session_path = session_path;
         eng.paused = pause_flags.clone();
         eng.auth_error = auth_flags.clone();
+        eng.reencode = reencode_flags.clone();
     }
     emit(&app, &snap);
+
+    if let Err(failure) = wait_mediamtx_ready(
+        &mut mtx_rx,
+        ingest_port,
+        MEDIAMTX_READY_TIMEOUT,
+        mediamtx_api_answers,
+    )
+    .await
+    {
+        log::error!("engine: {failure} before provisioning");
+        let message = failure.message().now();
+        capture_engine_error(
+            &app,
+            failure.code(),
+            failure.stage(),
+            true,
+            Some(message.clone()),
+        );
+        return Err(message);
+    }
+    {
+        let eng = state.engine.lock().unwrap();
+        if !eng.live || eng.start_gen != my_gen {
+            drop(eng);
+            log::info!("engine: startup cancelled while MediaMTX started; aborting");
+            start_guard.armed = false;
+            return Err(START_CANCELLED.into());
+        }
+    }
 
     // Provision only after local startup succeeds to avoid broadcasts orphaned by setup failure.
     let mut provisioned: HashMap<String, ProvisionedIngest> = HashMap::new();
@@ -1976,19 +2098,7 @@ async fn start_engine_inner(
                 match ev {
                     CommandEvent::Stdout(b) | CommandEvent::Stderr(b) => {
                         let raw = String::from_utf8_lossy(&b);
-                        let line = raw.to_lowercase();
-                        // Retain publisher lifecycle failures without frame-grab noise.
-                        if line.contains("publish")
-                            || line.contains("available")
-                            || line.contains("online")
-                            || line.contains("destroyed")
-                            || line.contains("queue")
-                            || line.contains("too slow")
-                            || line.contains("timed out")
-                            || line.contains("err")
-                        {
-                            log::warn!("mediamtx: {}", raw.trim());
-                        }
+                        log_mediamtx_line(&raw);
                         if let Some(port) = mediamtx_port_conflict(&raw, ingest_port) {
                             set_engine_error(
                                 &app_m,
@@ -2279,12 +2389,26 @@ async fn start_engine_inner(
         let auto_codec = hw_codec.clone();
         let out_source = out_source.clone();
         let rendition = shared_renditions.get(&t.id).cloned();
+        let reencode_flag = reencode_flags.get(&t.id).cloned().unwrap_or_default();
+        // A mid-live re-encode follows the destination's preset, as per-platform mode would.
+        let reencode_cfg = {
+            let mut c = config.clone();
+            c.mode = "per-platform".into();
+            c
+        };
         tauri::async_runtime::spawn(async move {
             // Preserve bitrate adaptation across FFmpeg restarts.
             let mut abr = engine::AutoBitrate::new(base_kbps, floor_kbps);
             // Notify once per degradation episode, not once per bitrate step.
             let mut drop_notified = false;
             let mut gpu_pipeline = crate::gpu_pipeline::enabled();
+            // The start probes GPU encoders only when something encodes; a re-encode probes then.
+            let mut auto_codec = auto_codec;
+            let mut probed = auto_codec.is_some();
+            // After a GPU encoder fails, this destination stays on x264 until the live ends.
+            let mut software_encoder = false;
+            let mut software_target = target.clone();
+            software_target.encoding.encoder = "software".into();
             while run_flag.load(Ordering::Relaxed) {
                 if pause_flag.load(Ordering::Relaxed) {
                     set_target_state(&app_t, &target_id, "paused");
@@ -2328,12 +2452,22 @@ async fn start_engine_inner(
                     tokio::time::sleep(std::time::Duration::from_millis(100)).await;
                     continue;
                 }
+                let reencoding = !is_transcode && reencode_flag.load(Ordering::Relaxed);
+                if reencoding && !probed {
+                    probed = true;
+                    auto_codec = detect_hw_encoder(&app_t).await;
+                }
+                let transcoding = is_transcode || reencoding;
                 let mut args = if let Some(shared) = shared {
                     engine::ffmpeg_args_for_rendition_egress(&cfg, &target, &key, &shared.url)
                 } else {
                     engine::ffmpeg_args_for_target(
-                        &cfg,
-                        &target,
+                        if reencoding { &reencode_cfg } else { &cfg },
+                        if software_encoder {
+                            &software_target
+                        } else {
+                            &target
+                        },
                         &key,
                         Some(abr.current()),
                         &out_source,
@@ -2349,6 +2483,11 @@ async fn start_engine_inner(
                 if let Some(accelerated) = accelerated {
                     args = accelerated;
                 }
+                // A failing GPU pipeline is retried without it first; only plain GPU encoding
+                // failures move the destination to x264.
+                let hardware_codec = video_codec(&args)
+                    .filter(|codec| !used_gpu_pipeline && is_hardware_video_codec(codec))
+                    .map(str::to_owned);
                 let spawned = app_t
                     .shell()
                     .sidecar("ffmpeg")
@@ -2387,6 +2526,10 @@ async fn start_engine_inner(
                 let mut rebitrate = false;
                 let mut signal_lost = false;
                 let mut paused_kill = false;
+                let mut stalled = false;
+                let mut encoder_failed = false;
+                let mut reencode_restart = false;
+                let mut progress = ProgressWatch::new(now_ms() as u64);
                 // Release the output promptly if its input stalls or it is paused.
                 let mut watchdog = tokio::time::interval(std::time::Duration::from_millis(250));
                 watchdog.tick().await; // Skip the interval's immediate first tick.
@@ -2409,8 +2552,14 @@ async fn start_engine_inner(
                                         signal.load(Ordering::Relaxed),
                                         brb_flag.load(Ordering::Relaxed),
                                     );
+                                    progress.on_stats(stats_written_kb(&line), now_ms() as u64);
+                                    if let Some(codec) = hardware_codec.as_deref() {
+                                        if hardware_encoder_failed(&line.to_lowercase(), codec) {
+                                            encoder_failed = true;
+                                        }
+                                    }
                                     // Adaptation updates the bitrate; restart FFmpeg to apply the selected value.
-                                    if auto_bitrate && is_transcode {
+                                    if auto_bitrate && transcoding {
                                         if let Some(speed) = parse_kv(&line, "speed=") {
                                             match abr.on_speed(speed) {
                                                 engine::BitrateAction::Down(kbps) => {
@@ -2462,6 +2611,14 @@ async fn start_engine_inner(
                                 signal_lost = true;
                                 break;
                             }
+                            if progress.stalled(now_ms() as u64) {
+                                stalled = true;
+                                break;
+                            }
+                            if !reencoding && !is_transcode && reencode_flag.load(Ordering::Relaxed) {
+                                reencode_restart = true;
+                                break;
+                            }
                         }
                     }
                 }
@@ -2470,7 +2627,8 @@ async fn start_engine_inner(
                     let removed = st.engine.lock().unwrap().ffmpegs.remove(&target_id);
                     removed
                 };
-                if rebitrate || signal_lost || paused_kill {
+                let killed = rebitrate || signal_lost || paused_kill || stalled || reencode_restart;
+                if killed {
                     if let Some(c) = leftover {
                         kill_sidecar(c);
                     }
@@ -2478,15 +2636,33 @@ async fn start_engine_inner(
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
                 }
-                if used_gpu_pipeline && !rebitrate && !signal_lost && !paused_kill {
+                if used_gpu_pipeline && !killed {
                     gpu_pipeline = false;
+                }
+                if encoder_failed && !killed && !software_encoder {
+                    software_encoder = true;
+                    log::warn!("target GPU encoder failed; this destination moves to x264");
+                    capture_native_error(&app_t, "target_encoder_fallback", "encoder", true, None);
+                    notify(
+                        &app_t,
+                        &Msg::NotifyEncoderFallbackTitle.now(),
+                        &Msg::NotifyEncoderFallbackBody {
+                            target_name: &target_name,
+                        }
+                        .now(),
+                    );
                 }
                 if pause_flag.load(Ordering::Relaxed) {
                     continue;
                 }
-                // Bitrate changes do not need the network-reconnect backoff.
-                if rebitrate {
+                // Bitrate, encoder and re-encode changes do not need the network-reconnect backoff.
+                if rebitrate || reencode_restart || (encoder_failed && software_encoder && !stalled)
+                {
                     continue;
+                }
+                if stalled {
+                    log::warn!("target FFmpeg is not writing; reconnecting");
+                    capture_native_error(&app_t, "target_output_stalled", "target", true, None);
                 }
                 if !signal.load(Ordering::Relaxed) {
                     continue;
@@ -2661,6 +2837,37 @@ pub fn retry_target(app: AppHandle, target_id: String) -> Result<(), String> {
     });
     drop(eng);
     if let Some(out) = out {
+        emit(&app, &out);
+    }
+    Ok(())
+}
+
+/// Re-encodes a destination that receives OBS's signal as-is, until the live ends, so its
+/// keyframes, bitrate and frame rate follow its preset. OBS's encoder settings are out of
+/// obs-websocket's reach, so this is the fix Corneta can apply mid-live.
+#[tauri::command]
+pub fn reencode_target(app: AppHandle, target_id: String) -> Result<(), String> {
+    use std::sync::atomic::Ordering;
+    let state = app.state::<AppState>();
+    let mut eng = state.engine.lock().unwrap();
+    let Some(flag) = eng.reencode.get(&target_id).cloned() else {
+        return Err(Msg::TargetNotInThisStream.now());
+    };
+    let out = eng.snapshot.as_mut().and_then(|snap| {
+        let st = snap.targets.get_mut(&target_id)?;
+        if st.action == "transcode" {
+            return None;
+        }
+        flag.store(true, Ordering::Relaxed);
+        st.action = "transcode".into();
+        st.reencoded = true;
+        // The platform's verdict described the copied signal; the next check describes this one.
+        st.platform = None;
+        Some(snap.clone())
+    });
+    drop(eng);
+    if let Some(out) = out {
+        log::info!("engine: re-encoding a destination until the live ends");
         emit(&app, &out);
     }
     Ok(())
@@ -3016,6 +3223,7 @@ fn stop_engine_internal(app: &AppHandle, error: Option<String>, reason: &str) {
         eng.snapshot = Some(out.clone());
         eng.paused.clear();
         eng.auth_error.clear();
+        eng.reencode.clear();
         eng.force_brb = None;
         eng.target_platforms.clear();
         eng.operation_id = None;
@@ -4096,6 +4304,63 @@ mod supervisor_wait_tests {
             }
         );
         assert!(first && second && retry.load(Ordering::Relaxed));
+    }
+}
+
+#[cfg(test)]
+mod mediamtx_ready_tests {
+    use super::{wait_mediamtx_ready, CommandEvent, EngineFailure};
+    use std::time::Duration;
+    use tauri_plugin_shell::process::TerminatedPayload;
+
+    fn silent() -> bool {
+        false
+    }
+    fn answering() -> bool {
+        true
+    }
+
+    #[tokio::test]
+    async fn an_exit_before_the_api_answers_fails_the_start() {
+        let (events, mut rx) = tauri::async_runtime::channel(4);
+        events
+            .send(CommandEvent::Terminated(TerminatedPayload {
+                code: Some(1),
+                signal: None,
+            }))
+            .await
+            .unwrap();
+        let result = wait_mediamtx_ready(&mut rx, 1935, Duration::from_secs(5), silent).await;
+        assert!(matches!(result, Err(EngineFailure::MediamtxExited)));
+    }
+
+    #[tokio::test]
+    async fn a_taken_port_fails_the_start_with_that_port() {
+        let (events, mut rx) = tauri::async_runtime::channel(4);
+        let line = "2026/11/15 03:13:42 ERR listen tcp 127.0.0.1:19351: bind: Only one usage of each socket address (protocol/network address/port) is normally permitted.";
+        events
+            .send(CommandEvent::Stderr(line.as_bytes().to_vec()))
+            .await
+            .unwrap();
+        let result = wait_mediamtx_ready(&mut rx, 1935, Duration::from_secs(5), silent).await;
+        assert!(matches!(
+            result,
+            Err(EngineFailure::IngestPortInUse { port: 19351 })
+        ));
+    }
+
+    #[tokio::test]
+    async fn an_answering_api_lets_the_start_provision() {
+        let (_events, mut rx) = tauri::async_runtime::channel::<CommandEvent>(4);
+        let result = wait_mediamtx_ready(&mut rx, 1935, Duration::from_secs(5), answering).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn a_silent_but_running_server_does_not_hold_the_start_forever() {
+        let (_events, mut rx) = tauri::async_runtime::channel::<CommandEvent>(4);
+        let result = wait_mediamtx_ready(&mut rx, 1935, Duration::from_millis(300), silent).await;
+        assert!(result.is_ok());
     }
 }
 

@@ -246,6 +246,8 @@ export function ChatPopout() {
     try {
       const main = await WebviewWindow.getByLabel("main");
       if (!main) return;
+      // Closing the main window only hides it in the tray, where focus alone cannot reach it.
+      await main.show();
       if (await main.isMinimized()) await main.unminimize();
       await main.setFocus();
     } catch {

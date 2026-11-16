@@ -8,6 +8,24 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+### Added
+
+- When YouTube warns about the stream's settings during a live, such as a keyframe interval outside its recommendation, the destination's row offers "Fix it now": Corneta re-encodes that destination until the live ends, following its preset's keyframes, bitrate and frame rate. The row also shows where to change the setting in OBS, so the warning doesn't come back next time.
+
+### Changed
+
+- Destinations that Corneta encodes with x264 use the veryfast preset, which keeps up with a live on a typical streaming PC.
+
+### Fixed
+
+- If the GPU encoder fails mid-live for a destination that Corneta encodes, that destination switches to x264 until the live ends instead of failing again on every reconnect, and Windows says so.
+- A destination stuck on a dead connection now reconnects on its own: after 15 seconds without sending anything, or after 25 seconds when the platform never finishes opening the connection. Before, it could keep showing LIVE while sending nothing.
+- Going live waits for the ingest server to answer before opening the automatic YouTube broadcast, so a server that fails to start no longer opens a broadcast for nothing.
+- The Live screen lists the destinations that are actually streaming. Switching a destination off or changing profiles mid-live no longer hides one that is still on air, the "on air" count no longer goes past the total, and a destination without a URL no longer sits in Connecting.
+- The chat's Alerts button keeps pulsing and counting after the 100th alert.
+- The pop-out chat's "Open Corneta" button brings the main window back when it is hidden in the tray.
+- Pausing a destination, ending or cancelling a live, the go-live shortcut, the start-with-Windows switch and opening the pop-out chat now show an error when they fail, instead of failing silently.
+
 ## [0.14.0] - 2026-11-15
 
 ### Added

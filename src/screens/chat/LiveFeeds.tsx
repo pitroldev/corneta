@@ -53,6 +53,6 @@ export function AlertCountLabel({
 }: {
   children: (count: number) => ReactNode;
 }) {
-  const count = useStore((s) => s.alerts.length);
+  const count = useStore((s) => s.alertsReceived);
   return <>{children(count)}</>;
 }

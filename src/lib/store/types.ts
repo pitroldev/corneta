@@ -163,6 +163,8 @@ export interface State {
   clearChat: () => void;
 
   alerts: Alert[];
+  /** Alerts received since the list was last cleared, beyond the list's cap. */
+  alertsReceived: number;
   bindAlerts: () => () => void;
   clearAlerts: () => void;
 

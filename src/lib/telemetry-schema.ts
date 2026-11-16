@@ -283,6 +283,8 @@ export const TELEMETRY_ERROR_CODES = [
   "splicer_task_failed",
   "splicer_setup_fallback",
   "splicer_output_died",
+  "target_output_stalled",
+  "target_encoder_fallback",
   "youtube_auto_provision_failed",
   "oauth_broker_failed",
   "oauth_refresh_failed",
