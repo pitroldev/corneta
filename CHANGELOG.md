@@ -8,6 +8,8 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-16
+
 ### Added
 
 - A rehearsal without an audience, in first-time setup and on the Live screen. For about 30 seconds Corneta sends what OBS is producing to Twitch's test mode and to a private YouTube broadcast, then shows the frame that arrived and what each platform said. Platforms that have no test mode, or have no stream key yet, are left out and say which, and the real stream key is never used for a rehearsal.
@@ -247,7 +249,8 @@ Versions 0.8.2, 0.8.3 and 0.8.4 were never published; their changes are included
 
 - First release published on GitHub, with the Windows installer, `SHA256SUMS.txt` and the third-party compliance bundle.
 
-[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.15.1...HEAD
+[Unreleased]: https://github.com/pitroldev/corneta/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/pitroldev/corneta/compare/v0.15.1...v0.16.0
 [0.15.1]: https://github.com/pitroldev/corneta/compare/v0.15.0...v0.15.1
 [0.15.0]: https://github.com/pitroldev/corneta/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/pitroldev/corneta/compare/v0.13.3...v0.14.0
