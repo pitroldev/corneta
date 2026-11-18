@@ -15,12 +15,16 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const config = useStore((s) => s.config)!;
   const encoders = useStore((s) => s.encoders);
   const encodersError = useStore((s) => s.encodersError);
+  const sourceCodec = useStore(
+    (s) =>
+      (s.obs && s.obs !== "loading" ? s.obs.videoCodec : undefined) ?? "h264",
+  );
   const { t, fmt } = useI18n();
 
   const enabled = config.targets.filter((x) => x.enabled);
   // The BRB splicer preserves stream copy, so only per-destination choices re-encode.
   const copies = enabled.filter(
-    (x) => effectiveAction(config.mode, x) === "copy",
+    (x) => effectiveAction(config.mode, x, sourceCodec) === "copy",
   );
   const transcodes = enabled.filter((x) => !copies.includes(x));
 
@@ -39,7 +43,7 @@ export function ObsQualityGuide({ onClose }: { onClose: () => void }) {
   const srcRes = needsFullHd ? "1920×1080" : "1280×720";
 
   // Copied destinations constrain input bitrate; re-encoded destinations use a higher-quality local source.
-  const lcd = lowestCommonDenominator(config);
+  const lcd = lowestCommonDenominator(config, sourceCodec);
   const hasCopy = copies.length > 0 && lcd.videoKbps != null;
   const contribKbps = needsFullHd
     ? fps >= 60

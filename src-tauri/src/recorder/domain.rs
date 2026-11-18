@@ -36,10 +36,11 @@ pub fn video_path(dir: &Path, id: &str, seg: u32) -> PathBuf {
 
 /// Reuse the encoded program stream without another encode.
 pub fn record_args(source: &str, out: &Path) -> Vec<String> {
-    vec![
-        "-hide_banner".into(),
-        "-loglevel".into(),
-        "warning".into(),
+    let mut args: Vec<String> = vec!["-hide_banner".into(), "-loglevel".into(), "warning".into()];
+    if source.starts_with("rtmp://") || source.starts_with("rtmps://") {
+        args.extend(["-rtmp_enhanced_codecs", "hvc1,av01"].map(String::from));
+    }
+    args.extend([
         "-i".into(),
         source.into(),
         "-c".into(),
@@ -55,7 +56,8 @@ pub fn record_args(source: &str, out: &Path) -> Vec<String> {
         "-progress".into(),
         "pipe:1".into(),
         "-nostats".into(),
-    ]
+    ]);
+    args
 }
 
 /// Build a seekable MP4 index without re-encoding.

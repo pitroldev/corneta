@@ -10,7 +10,7 @@ pub mod youtube;
 
 use crate::config::VideoPreset;
 use provider::{AccountProvider, ChatProvider};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::sync::OnceLock;
 
 static CHAT_PROVIDERS: [&dyn ChatProvider; 4] = [
@@ -42,6 +42,99 @@ pub fn account_provider(id: &str) -> Option<&'static dyn AccountProvider> {
 // build.rs assembles every src/platforms/<id>/destination.json into one document.
 const CATALOG: &str = include_str!(concat!(env!("OUT_DIR"), "/destinations.json"));
 
+#[derive(Clone, Copy, Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum VideoCodec {
+    #[default]
+    H264,
+    Hevc,
+    Av1,
+}
+
+impl VideoCodec {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::H264 => "h264",
+            Self::Hevc => "hevc",
+            Self::Av1 => "av1",
+        }
+    }
+
+    pub fn from_obs_encoder(encoder: &str) -> Self {
+        let low = encoder.trim().to_ascii_lowercase();
+        if low.contains("av1") {
+            Self::Av1
+        } else if low.contains("hevc") || low.contains("h265") || low.contains("x265") {
+            Self::Hevc
+        } else {
+            Self::H264
+        }
+    }
+
+    pub fn from_mediamtx_track(track: &str) -> Option<Self> {
+        match track.trim().to_ascii_uppercase().as_str() {
+            "H264" | "AVC" => Some(Self::H264),
+            "H265" | "HEVC" => Some(Self::Hevc),
+            "AV1" => Some(Self::Av1),
+            _ => None,
+        }
+    }
+
+    const fn bit(self) -> u8 {
+        match self {
+            Self::H264 => 1 << 0,
+            Self::Hevc => 1 << 1,
+            Self::Av1 => 1 << 2,
+        }
+    }
+}
+
+/// Bitmask keeping `CopyLimits: Copy` while deserializing `acceptedCodecs` arrays.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AcceptedCodecs(u8);
+
+impl AcceptedCodecs {
+    pub const H264_ONLY: Self = Self(VideoCodec::H264.bit());
+
+    pub const fn from_slice(codecs: &[VideoCodec]) -> Self {
+        let mut mask = 0u8;
+        let mut i = 0;
+        while i < codecs.len() {
+            mask |= codecs[i].bit();
+            i += 1;
+        }
+        Self(if mask == 0 {
+            VideoCodec::H264.bit()
+        } else {
+            mask
+        })
+    }
+
+    pub const fn accepts(self, codec: VideoCodec) -> bool {
+        (self.0 & codec.bit()) != 0
+    }
+
+    pub const fn intersect(self, other: Self) -> Self {
+        Self(self.0 & other.0)
+    }
+}
+
+impl Default for AcceptedCodecs {
+    fn default() -> Self {
+        Self::H264_ONLY
+    }
+}
+
+impl<'de> Deserialize<'de> for AcceptedCodecs {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let codecs = Vec::<VideoCodec>::deserialize(deserializer)?;
+        Ok(Self::from_slice(&codecs))
+    }
+}
+
 /// The most a destination takes as-is; beyond it, a copy is refused or degrades viewers.
 #[derive(Clone, Copy, Debug, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -50,6 +143,14 @@ pub struct CopyLimits {
     pub max_height: u32,
     pub max_fps: u32,
     pub max_kbps: u32,
+    #[serde(default)]
+    pub accepted_codecs: AcceptedCodecs,
+}
+
+impl CopyLimits {
+    pub const fn accepts_codec(&self, codec: VideoCodec) -> bool {
+        self.accepted_codecs.accepts(codec)
+    }
 }
 
 #[derive(Debug, Deserialize)]
@@ -137,6 +238,19 @@ pub fn copy_limits(id: &str) -> Option<CopyLimits> {
     destination(id).and_then(|d| d.copy_limits)
 }
 
+/// Custom RTMP servers accept Enhanced RTMP as-is; catalog platforms accept H.264 unless listed in `acceptedCodecs`.
+pub fn accepts_codec(id: &str, codec: VideoCodec) -> bool {
+    match destination(id) {
+        Some(d) if d.fallback => true,
+        Some(d) => {
+            d.copy_limits
+                .is_some_and(|limits| limits.accepts_codec(codec))
+                || codec == VideoCodec::H264
+        }
+        None => true,
+    }
+}
+
 pub fn is_vertical(id: &str) -> bool {
     let preset = recommended_preset(id);
     preset.height > preset.width
@@ -190,13 +304,23 @@ mod tests {
             Some(CopyLimits {
                 max_height: 1080,
                 max_fps: 60,
-                max_kbps: 6000
+                max_kbps: 6000,
+                accepted_codecs: AcceptedCodecs::H264_ONLY,
             })
         );
         assert_eq!(copy_limits("kick").map(|l| l.max_kbps), Some(8000));
         assert_eq!(copy_limits("facebook").map(|l| l.max_kbps), Some(9000));
         assert_eq!(copy_limits("youtube").map(|l| l.max_height), Some(2160));
         assert_eq!(copy_limits("tiktok"), None);
+        for codec in [VideoCodec::H264, VideoCodec::Hevc, VideoCodec::Av1] {
+            assert!(accepts_codec("youtube", codec));
+            assert!(accepts_codec("custom", codec));
+        }
+        for legacy in ["twitch", "kick", "facebook", "tiktok", "instagram", "x"] {
+            assert!(accepts_codec(legacy, VideoCodec::H264), "{legacy} h264");
+            assert!(!accepts_codec(legacy, VideoCodec::Hevc), "{legacy} hevc");
+            assert!(!accepts_codec(legacy, VideoCodec::Av1), "{legacy} av1");
+        }
     }
 
     #[test]

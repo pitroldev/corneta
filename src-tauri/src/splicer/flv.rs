@@ -85,8 +85,11 @@ pub(super) fn read_tag(r: &mut impl Read) -> std::io::Result<Option<FlvTag>> {
     Ok(Some(FlvTag { tag_type, ts, data }))
 }
 
-/// AVC composition offset is a signed 24-bit value in tag bytes 2..5.
+/// Composition offset is a signed 24-bit value in tag bytes 2..5 (classic AVC) or 5..8 (Enhanced RTMP `CodedFrames`).
 pub(super) fn read_cts(data: &[u8]) -> i32 {
+    if super::enhanced_flv::is_ex_header(data) {
+        return super::enhanced_flv::read_enhanced_cts(data);
+    }
     if data.len() < 5 {
         return 0;
     }
@@ -99,7 +102,17 @@ pub(super) fn read_cts(data: &[u8]) -> i32 {
 }
 
 pub(super) fn tag_is_video_seqhdr(data: &[u8]) -> bool {
+    if super::enhanced_flv::is_ex_header(data) {
+        return super::enhanced_flv::tag_is_enhanced_seqhdr(data);
+    }
     data.len() >= 5 && (data[0] & 0x0F) == 7 && data[1] == 0
+}
+
+pub(super) fn tag_is_video_coded_frame(data: &[u8]) -> bool {
+    if super::enhanced_flv::is_ex_header(data) {
+        return super::enhanced_flv::tag_is_enhanced_coded_frame(data);
+    }
+    data.len() > 5 && (data[0] & 0x0F) == 7 && data[1] == 1
 }
 
 pub(super) fn tag_is_audio_seqhdr(data: &[u8]) -> bool {

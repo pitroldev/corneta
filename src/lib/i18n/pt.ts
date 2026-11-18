@@ -1856,9 +1856,13 @@ export const pt = {
   "encoding.target.bitrate.edit": "ajustar número",
   "encoding.target.bitrate.range": "entre {min} e {max}",
   "encoding.target.bitrate.useRecommended": "usar recomendado ({kbps})",
+  "encoding.target.codecReason":
+    "Convertido pra H.264 porque {platform} não aceita {codec}.",
   "encoding.target.copy.badge": "em cópia",
   "encoding.target.copy.body":
     "A qualidade se define no OBS (bitrate, resolução, fps).",
+  "encoding.target.copy.codecWarn":
+    "⚠ {platform} não aceita {codec} em cópia — troque pra “Recodificar”",
   "encoding.target.copy.headline": "vai exatamente como sai do OBS",
   "encoding.target.copy.resolution": "resolução e fps: os do OBS",
   "encoding.target.copy.verticalWarn":
@@ -2491,6 +2495,8 @@ export const pt = {
   "replay.volume": "Volume",
   "replay.warn.codec":
     "Essa gravação está num formato que o player não toca. Abra na pasta.",
+  "replay.warn.enhancedCodec":
+    "Esta gravação está em {codec} (Enhanced RTMP) e depende da extensão de vídeo do Windows pra tocar aqui. O arquivo está intacto — abra na pasta pra ver no VLC ou MPV.",
   "replay.warn.estimated":
     "Estimei a sincronia — se o vídeo estiver fora do gráfico, use o ajuste.",
   "replay.warn.segments":

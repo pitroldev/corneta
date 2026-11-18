@@ -5,9 +5,10 @@ import type {
   EncodingMode,
   PlatformId,
   Target,
+  VideoCodec,
   VideoPreset,
 } from "./types";
-import { PLATFORMS, isVertical } from "./platforms";
+import { PLATFORMS, isVertical, presetOf } from "./platforms";
 
 // Reference workload: one 1080p60 encode.
 const REF_PIXELS_PER_SEC = 1920 * 1080 * 60;
@@ -20,24 +21,57 @@ function transcodeCost(p: VideoPreset, encoder: EncoderKind): number {
   return pixelFactor * encoderWeight * bitrateFactor;
 }
 
-export function smartHybridAction(platformId: PlatformId): EncodingAction {
-  return isVertical(platformId) ? "transcode" : "copy";
+/** Custom RTMP accepts Enhanced RTMP as-is; catalog platforms default to H.264 unless listed in `acceptedCodecs`. */
+export function acceptsCodec(
+  platformId: PlatformId,
+  sourceCodec: VideoCodec = "h264",
+): boolean {
+  const preset = presetOf(platformId);
+  if (preset.fallback) return true;
+  const accepted = preset.copyLimits?.acceptedCodecs ?? ["h264"];
+  return accepted.includes(sourceCodec);
 }
 
-export function effectiveAction(mode: EncodingMode, t: Target): EncodingAction {
+export function smartHybridAction(
+  platformId: PlatformId,
+  sourceCodec: VideoCodec = "h264",
+): EncodingAction {
+  return isVertical(platformId) || !acceptsCodec(platformId, sourceCodec)
+    ? "transcode"
+    : "copy";
+}
+
+export function effectiveAction(
+  mode: EncodingMode,
+  t: Target,
+  sourceCodec: VideoCodec = "h264",
+): EncodingAction {
   if (mode === "passthrough") return "copy";
   if (mode === "per-platform") return "transcode";
-  return t.encoding.hybridOverride ?? smartHybridAction(t.platformId);
+  return (
+    t.encoding.hybridOverride ?? smartHybridAction(t.platformId, sourceCodec)
+  );
 }
 
 function recommended(t: Target) {
   return PLATFORMS[t.platformId].recommended;
 }
 
+function renditionKey(t: Target, p: VideoPreset): string {
+  const rf =
+    p.height > p.width
+      ? `${(t.encoding.reframe?.x ?? 0.5).toFixed(4)}:${(t.encoding.reframe?.y ?? 0.5).toFixed(4)}:${(t.encoding.reframe?.zoom ?? 1).toFixed(4)}`
+      : "landscape";
+  return `${p.width}x${p.height}@${p.fps}:${p.videoBitrateKbps}:${p.audioBitrateKbps}:${p.keyframeSec}:${t.encoding.encoder}:${rf}`;
+}
+
 /** Only copied destinations constrain OBS input bitrate; re-encoded destinations use their own settings. */
-export function lowestCommonDenominator(config: AppConfig) {
+export function lowestCommonDenominator(
+  config: AppConfig,
+  sourceCodec: VideoCodec = "h264",
+) {
   const copies = config.targets.filter(
-    (t) => t.enabled && effectiveAction(config.mode, t) === "copy",
+    (t) => t.enabled && effectiveAction(config.mode, t, sourceCodec) === "copy",
   );
   if (copies.length === 0)
     return { videoKbps: null as number | null, capBy: null as string | null };
@@ -67,7 +101,7 @@ export function bandFit(
 export interface EngineEstimate {
   uploadKbps: number;
   transcodeCount: number;
-  /** Only hardware transcodes consume GPU session capacity. */
+  /** Only hardware transcodes consume GPU session capacity; identical renditions share one session. */
   hwTranscodeCount: number;
   copyCount: number;
   enabledCount: number;
@@ -78,45 +112,45 @@ export interface EngineEstimate {
 /** Resolve auto encoder availability for hardware session counts; assume hardware when unknown. */
 export function estimate(
   config: AppConfig,
-  opts?: { anyHwAvailable?: boolean },
+  opts?: { anyHwAvailable?: boolean; sourceCodec?: VideoCodec },
 ): EngineEstimate {
   const anyHw = opts?.anyHwAvailable ?? true;
+  const sourceCodec = opts?.sourceCodec ?? "h264";
   const enabled = config.targets.filter((t) => t.enabled);
-  const lcd = lowestCommonDenominator(config).videoKbps;
+  const lcd = lowestCommonDenominator(config, sourceCodec).videoKbps;
 
   let uploadKbps = 0;
   let transcodeCount = 0;
   let hwTranscodeCount = 0;
   let copyCount = 0;
+  let load = 0;
+  const seenRenditions = new Set<string>();
 
   for (const t of enabled) {
-    const act = effectiveAction(config.mode, t);
+    const act = effectiveAction(config.mode, t, sourceCodec);
     const rec = recommended(t);
+    const p = t.encoding.preset ?? rec;
     const video =
-      act === "copy"
-        ? (lcd ?? rec.videoBitrateKbps)
-        : (t.encoding.preset?.videoBitrateKbps ?? rec.videoBitrateKbps);
-    const audio = t.encoding.preset?.audioBitrateKbps ?? rec.audioBitrateKbps;
+      act === "copy" ? (lcd ?? rec.videoBitrateKbps) : p.videoBitrateKbps;
+    const audio = p.audioBitrateKbps;
     uploadKbps += video + audio;
     if (act === "transcode") {
       transcodeCount++;
-      const onHw =
-        t.encoding.encoder === "software"
-          ? false
-          : t.encoding.encoder === "auto"
-            ? anyHw
-            : true;
-      if (onHw) hwTranscodeCount++;
+      const key = renditionKey(t, p);
+      if (!seenRenditions.has(key)) {
+        seenRenditions.add(key);
+        const onHw =
+          t.encoding.encoder === "software"
+            ? false
+            : t.encoding.encoder === "auto"
+              ? anyHw
+              : true;
+        if (onHw) hwTranscodeCount++;
+        load += transcodeCost(p, t.encoding.encoder);
+      }
     } else copyCount++;
   }
 
-  let load = 0;
-  for (const t of enabled) {
-    if (effectiveAction(config.mode, t) === "transcode") {
-      const p = t.encoding.preset ?? recommended(t);
-      load += transcodeCost(p, t.encoding.encoder);
-    }
-  }
   load = Math.min(1, load);
 
   return {

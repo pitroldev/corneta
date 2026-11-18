@@ -13,6 +13,7 @@ import { useStore } from "../lib/store";
 import type { EncoderKind, EncodingAction } from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
 import {
+  acceptsCodec,
   bandFit,
   estimate,
   effectiveAction,
@@ -52,6 +53,10 @@ export function EncodingScreen() {
   const runUploadTest = useStore((s) => s.runUploadTest);
   const refreshEncoders = useStore((s) => s.refreshEncoders);
   const encodersError = useStore((s) => s.encodersError);
+  const obs = useStore((s) => s.obs);
+  const runObsCheck = useStore((s) => s.runObsCheck);
+  const sourceCodec =
+    (obs && obs !== "loading" ? obs.videoCodec : undefined) ?? "h264";
   const requestNavigate = useStore((s) => s.requestNavigate);
   const { t, fmt } = useI18n();
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -69,12 +74,16 @@ export function EncodingScreen() {
     if (encoders.length === 0) void refreshEncoders();
   }, [encoders.length, refreshEncoders]);
 
+  useEffect(() => {
+    if (obs === null) void runObsCheck();
+  }, [obs, runObsCheck]);
+
   const anyHw = encoders.some((e) => e.available && e.kind !== "software");
   const estimates = useModeEstimates();
 
   if (!config || !estimates) return null;
 
-  const lcd = lowestCommonDenominator(config);
+  const lcd = lowestCommonDenominator(config, sourceCodec);
   const anyEnabled = config.targets.some((x) => x.enabled);
 
   const maxHw = Math.max(
@@ -86,7 +95,8 @@ export function EncodingScreen() {
       .map((e) => e.maxSessions!),
   );
   const activeEst =
-    estimates.get(config.mode) ?? estimate(config, { anyHwAvailable: anyHw });
+    estimates.get(config.mode) ??
+    estimate(config, { anyHwAvailable: anyHw, sourceCodec });
   // Only GPU transcodes count against hardware session limits.
   const overSessions = maxHw > 0 && activeEst.hwTranscodeCount > maxHw;
 
@@ -95,7 +105,7 @@ export function EncodingScreen() {
     return (
       x.enabled &&
       r.height > r.width &&
-      effectiveAction(config.mode, x) === "copy"
+      effectiveAction(config.mode, x, sourceCodec) === "copy"
     );
   });
   const verticalNames = verticalCopies.map((x) => x.name);
@@ -425,12 +435,19 @@ function PerTargetRow({ targetId }: { targetId: string }) {
   const config = useStore((s) => s.config)!;
   const updateTarget = useStore((s) => s.updateTarget);
   const encoders = useStore((s) => s.encoders);
+  const sourceCodec = useStore(
+    (s) =>
+      (s.obs && s.obs !== "loading" ? s.obs.videoCodec : undefined) ?? "h264",
+  );
   const { t, fmt } = useI18n();
   const target = config.targets.find((x) => x.id === targetId)!;
   const preset = PLATFORMS[target.platformId];
   const enc = target.encoding;
   const p = enc.preset ?? preset.recommended;
-  const action = effectiveAction(config.mode, target);
+  const action = effectiveAction(config.mode, target, sourceCodec);
+  const codecAccepted = acceptsCodec(target.platformId, sourceCodec);
+  const codecLabel =
+    sourceCodec === "hevc" ? "HEVC" : sourceCodec === "av1" ? "AV1" : "H.264";
   const isVertical = p.height > p.width;
   const recVertical = preset.recommended.height > preset.recommended.width;
   const [reframing, setReframing] = useState(false);
@@ -472,7 +489,7 @@ function PerTargetRow({ targetId }: { targetId: string }) {
       .map((x) => ({ value: x.kind, label: friendlyEncoder(t, x) })),
   ];
 
-  const autoAct = smartHybridAction(target.platformId);
+  const autoAct = smartHybridAction(target.platformId, sourceCodec);
   const overrideOpts: {
     v: EncodingAction | undefined;
     labelKey: MessageKey;
@@ -502,6 +519,14 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 ? t("encoding.target.copy.resolution")
                 : fmtResolution(p.width, p.height, p.fps)}
             </div>
+            {action === "transcode" && !codecAccepted && (
+              <div className="text-[11px] font-semibold text-brass">
+                {t("encoding.target.codecReason", {
+                  platform: target.name,
+                  codec: codecLabel,
+                })}
+              </div>
+            )}
           </div>
           {config.mode === "hybrid" && (
             <div className="flex h-9 shrink-0 items-center overflow-hidden rounded-md border-2 border-border">
@@ -713,6 +738,14 @@ function PerTargetRow({ targetId }: { targetId: string }) {
                 <p className="text-[11px] font-bold text-warn">
                   {t("encoding.target.copy.verticalWarn", {
                     platform: target.name,
+                  })}
+                </p>
+              )}
+              {!codecAccepted && (
+                <p className="text-[11px] font-bold text-warn">
+                  {t("encoding.target.copy.codecWarn", {
+                    platform: target.name,
+                    codec: codecLabel,
                   })}
                 </p>
               )}

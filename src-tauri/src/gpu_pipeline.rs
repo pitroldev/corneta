@@ -8,7 +8,7 @@ use tauri::AppHandle;
 use tauri_plugin_shell::{process::CommandEvent, ShellExt};
 
 const SWITCH: &str = "CORNETA_EXPERIMENTAL_GPU_PIPELINE";
-const PROBE_TIMEOUT: Duration = Duration::from_millis(1500);
+const PROBE_TIMEOUT: Duration = Duration::from_millis(2500);
 const MAX_HW_DIMENSION: u32 = 4096;
 
 /// Probed video header of the active local feed (`out_source`).
@@ -267,6 +267,24 @@ fn needs_source_video_for(args: &[String], unmeasured: bool) -> bool {
     ) || (unmeasured && codec == "h264_amf" && matches!(shape, FilterShape::Scale { .. }))
 }
 
+fn is_cuda_supported_source(source_codec: &str) -> bool {
+    source_codec.eq_ignore_ascii_case("h264")
+        || source_codec.eq_ignore_ascii_case("hevc")
+        || source_codec.eq_ignore_ascii_case("h265")
+        || source_codec.eq_ignore_ascii_case("av1")
+}
+
+fn cuvid_decoder_for(source_codec: &str) -> Option<&'static str> {
+    if source_codec.eq_ignore_ascii_case("h264") {
+        Some("h264_cuvid")
+    } else if source_codec.eq_ignore_ascii_case("hevc") || source_codec.eq_ignore_ascii_case("h265")
+    {
+        Some("hevc_cuvid")
+    } else {
+        None
+    }
+}
+
 fn candidate_for(
     args: &[String],
     source: Option<&SourceVideo>,
@@ -274,7 +292,11 @@ fn candidate_for(
 ) -> Option<Vec<String>> {
     let (input, filter_index, codec, shape) = inspect_args(args)?;
     if let Some(src) = source {
-        if !src.codec.eq_ignore_ascii_case("h264") {
+        if codec == "h264_nvenc" {
+            if !is_cuda_supported_source(&src.codec) {
+                return None;
+            }
+        } else if !src.codec.eq_ignore_ascii_case("h264") {
             return None;
         }
     }
@@ -288,7 +310,7 @@ fn candidate_for(
             );
             Some(result)
         }
-        // scale_cuda ignores AVFrame->crop_* on CUDA surfaces; h264_cuvid crops and scales in NVDEC/VRAM.
+        // scale_cuda ignores AVFrame->crop_* on CUDA surfaces; *_cuvid crops and scales in NVDEC/VRAM.
         (
             "h264_nvenc",
             FilterShape::CropScale {
@@ -299,30 +321,42 @@ fn candidate_for(
         ) => {
             let src = source?;
             let resolved = crop.resolve(src.width, src.height)?;
-            result.drain(filter_index..filter_index + 2);
-            let mut prefix = vec![
-                "-hwaccel".to_string(),
-                "cuda".to_string(),
-                "-hwaccel_output_format".to_string(),
-                "cuda".to_string(),
-                "-c:v".to_string(),
-                "h264_cuvid".to_string(),
-            ];
-            if resolved.top != 0
-                || resolved.bottom != 0
-                || resolved.left != 0
-                || resolved.right != 0
-            {
-                prefix.push("-crop".into());
-                prefix.push(format!(
-                    "{}x{}x{}x{}",
-                    resolved.top, resolved.bottom, resolved.left, resolved.right
-                ));
+            if let Some(decoder) = cuvid_decoder_for(&src.codec) {
+                result.drain(filter_index..filter_index + 2);
+                let mut prefix = vec![
+                    "-hwaccel".to_string(),
+                    "cuda".to_string(),
+                    "-hwaccel_output_format".to_string(),
+                    "cuda".to_string(),
+                    "-c:v".to_string(),
+                    decoder.to_string(),
+                ];
+                if resolved.top != 0
+                    || resolved.bottom != 0
+                    || resolved.left != 0
+                    || resolved.right != 0
+                {
+                    prefix.push("-crop".into());
+                    prefix.push(format!(
+                        "{}x{}x{}x{}",
+                        resolved.top, resolved.bottom, resolved.left, resolved.right
+                    ));
+                }
+                prefix.push("-resize".into());
+                prefix.push(format!("{width}x{height}"));
+                result.splice(input..input, prefix);
+                Some(result)
+            } else if src.codec.eq_ignore_ascii_case("av1") {
+                // av1_cuvid faults on pre-keyframe RTMP packets; native NVDEC hwaccel + crop + scale_cuda avoids cuvid.
+                result[filter_index + 1] = format!(
+                    "crop={}:{}:{}:{},hwupload_cuda,scale_cuda=w={width}:h={height}:format=nv12",
+                    resolved.cw, resolved.ch, resolved.left, resolved.top
+                );
+                result.splice(input..input, ["-hwaccel", "cuda"].map(String::from));
+                Some(result)
+            } else {
+                None
             }
-            prefix.push("-resize".into());
-            prefix.push(format!("{width}x{height}"));
-            result.splice(input..input, prefix);
-            Some(result)
         }
         ("h264_qsv", FilterShape::Scale { width, height }) if unmeasured => {
             result[filter_index + 1] = format!("scale_qsv=w={width}:h={height}:format=nv12");
@@ -384,6 +418,7 @@ fn strip_parenthesized(input: &str) -> String {
 }
 
 pub(crate) fn parse_source_video(stderr: &str) -> Option<SourceVideo> {
+    let mut found: Option<SourceVideo> = None;
     for line in stderr.lines() {
         let Some((_, rest)) = line.split_once("Video: ") else {
             continue;
@@ -410,15 +445,23 @@ pub(crate) fn parse_source_video(stderr: &str) -> Option<SourceVideo> {
                 continue;
             };
             if width >= 16 && height >= 16 && token == format!("{width}x{height}") {
-                return Some(SourceVideo {
-                    codec,
-                    width,
-                    height,
-                });
+                if codec == "wrapped_avframe" {
+                    if let Some(prev) = &mut found {
+                        prev.width = width;
+                        prev.height = height;
+                    }
+                } else if found.is_none() {
+                    found = Some(SourceVideo {
+                        codec: codec.clone(),
+                        width,
+                        height,
+                    });
+                }
+                break;
             }
         }
     }
-    None
+    found
 }
 
 async fn probe_source_video(
@@ -431,6 +474,9 @@ async fn probe_source_video(
     if source_url.contains("://") {
         args.extend(["-rw_timeout".into(), "1500000".into()]);
     }
+    if source_url.starts_with("rtmp://") || source_url.starts_with("rtmps://") {
+        args.extend(["-rtmp_enhanced_codecs".into(), "hvc1,av01".into()]);
+    }
     args.extend([
         "-analyzeduration".into(),
         "500000".into(),
@@ -438,6 +484,15 @@ async fn probe_source_video(
         "262144".into(),
         "-i".into(),
         source_url.to_string(),
+        "-map".into(),
+        "0:v:0".into(),
+        "-frames:v".into(),
+        "1".into(),
+        "-an".into(),
+        "-sn".into(),
+        "-f".into(),
+        "null".into(),
+        "-".into(),
     ]);
     let (mut events, child) = command.args(args).spawn().ok()?;
     crate::job::adopt_pid(child.pid());
@@ -452,6 +507,13 @@ async fn probe_source_video(
                 Some(CommandEvent::Stdout(bytes) | CommandEvent::Stderr(bytes)) => {
                     if output.len() < 32 * 1024 {
                         output.push_str(&String::from_utf8_lossy(&bytes));
+                    }
+                    if let Some(probed) = parse_source_video(&output) {
+                        if !probed.codec.eq_ignore_ascii_case("av1")
+                            || output.contains("wrapped_avframe")
+                        {
+                            break false;
+                        }
                     }
                 }
                 Some(CommandEvent::Terminated(_)) | None => break true,
@@ -578,9 +640,45 @@ mod tests {
             width: 1920,
             height: 1080,
         };
-        assert!(candidate_for(
+        let nvenc_hevc = candidate_for(
             &args("h264_nvenc", "crop=608:1080:656:0,scale=720:1280"),
             Some(&hevc_src),
+            false,
+        )
+        .unwrap();
+        assert!(nvenc_hevc
+            .windows(2)
+            .any(|pair| pair == ["-c:v", "hevc_cuvid"]));
+        assert!(
+            candidate_for(&args("h264_qsv", "scale=1280:720"), Some(&hevc_src), true).is_none()
+        );
+
+        let av1_src = SourceVideo {
+            codec: "av1".into(),
+            width: 1920,
+            height: 1080,
+        };
+        let nvenc_av1 = candidate_for(
+            &args("h264_nvenc", "crop=608:1080:656:0,scale=720:1280"),
+            Some(&av1_src),
+            false,
+        )
+        .unwrap();
+        assert!(nvenc_av1
+            .windows(2)
+            .any(|pair| pair == ["-hwaccel", "cuda"]));
+        assert!(nvenc_av1.iter().any(|arg| {
+            arg == "crop=608:1080:656:0,hwupload_cuda,scale_cuda=w=720:h=1280:format=nv12"
+        }));
+        assert!(candidate_for(&args("h264_qsv", "scale=1280:720"), Some(&av1_src), true).is_none());
+        let vp9_src = SourceVideo {
+            codec: "vp9".into(),
+            width: 1920,
+            height: 1080,
+        };
+        assert!(candidate_for(
+            &args("h264_nvenc", "crop=608:1080:656:0,scale=720:1280"),
+            Some(&vp9_src),
             true
         )
         .is_none());
@@ -613,6 +711,20 @@ Input #0, flv, from 'rtmp://127.0.0.1:1935/live/stream':
   Stream #0:0: Video: h264 (High), 1 reference frame ([7][0][0][0] / 0x0007), yuv420p(tv, bt709/bt709/bt709, progressive), 1920x1080 [SAR 1:1 DAR 16:9], 6000 kb/s, 60 fps, 60 tbr, 1k tbn
   Stream #0:1: Audio: aac (LC), 48000 Hz, stereo, fltp, 160 kb/s";
         assert_eq!(parse_source_video(stderr), Some(h264_1080p()));
+
+        let av1_stderr = "\
+Input #0, flv, from 'rtmp://127.0.0.1:1935/live/av1':
+  Stream #0:0: Video: av1 (libdav1d) (Main), yuv420p(tv), 1920x1080, 30 fps
+Output #0, null, to 'pipe:':
+  Stream #0:0: Video: wrapped_avframe, yuv420p(tv, progressive), 1280x720 [SAR 1:1 DAR 16:9], q=2-31, 200 kb/s, 30 fps";
+        assert_eq!(
+            parse_source_video(av1_stderr),
+            Some(SourceVideo {
+                codec: "av1".into(),
+                width: 1280,
+                height: 720,
+            })
+        );
     }
 
     #[test]

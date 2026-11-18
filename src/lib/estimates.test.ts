@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
+  acceptsCodec,
   smartHybridAction,
   effectiveAction,
   lowestCommonDenominator,
@@ -31,6 +32,25 @@ describe("smartHybridAction / effectiveAction", () => {
     expect(effectiveAction("hybrid", t)).toBe("copy");
     t.encoding.hybridOverride = "transcode";
     expect(effectiveAction("hybrid", t)).toBe("transcode");
+  });
+
+  it("copies HEVC and AV1 to YouTube and Custom while transcoding H.264-only destinations", () => {
+    for (const codec of ["hevc", "av1"] as const) {
+      expect(acceptsCodec("youtube", codec)).toBe(true);
+      expect(acceptsCodec("custom", codec)).toBe(true);
+      expect(smartHybridAction("youtube", codec)).toBe("copy");
+      expect(smartHybridAction("custom", codec)).toBe("copy");
+      for (const legacy of [
+        "twitch",
+        "kick",
+        "facebook",
+        "x",
+        "tiktok",
+      ] as const) {
+        expect(acceptsCodec(legacy, codec)).toBe(false);
+        expect(smartHybridAction(legacy, codec)).toBe("transcode");
+      }
+    }
   });
 });
 
@@ -87,5 +107,17 @@ describe("estimate", () => {
     // Load estimation still weights the raw auto encoder as hardware; availability affects session counts only.
     expect(withHw.load).toBeGreaterThan(0);
     expect(noHw.load).toBe(withHw.load);
+  });
+
+  it("computes upload and shared GPU session count when OBS sends HEVC or AV1 in hybrid mode", () => {
+    const c = cfg("hybrid", ["youtube", "twitch", "kick"]);
+    for (const sourceCodec of ["hevc", "av1"] as const) {
+      const est = estimate(c, { anyHwAvailable: true, sourceCodec });
+      // YouTube stays on copy (9000+192); Twitch and Kick transcode (6000+160 each) and share 1 GPU session.
+      expect(est.copyCount).toBe(1);
+      expect(est.transcodeCount).toBe(2);
+      expect(est.hwTranscodeCount).toBe(1);
+      expect(est.uploadKbps).toBe(9000 + 192 + 2 * (6000 + 160));
+    }
   });
 });

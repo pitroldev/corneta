@@ -1,7 +1,9 @@
-use super::avc::{each_nalu, parse_asc, parse_avcc, seqhdr_video, tag_is_idr, AvcC, SpsInfo};
+use super::avc::{
+    each_nalu, parse_asc, parse_avcc, parse_video_seqhdr, seqhdr_video, tag_is_idr, AvcC, SpsInfo,
+};
 use super::flv::{
-    read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_seqhdr, write_ops, write_preamble,
-    write_tag, FlvTag, WriteOp,
+    read_cts, read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_coded_frame,
+    tag_is_video_seqhdr, write_ops, write_preamble, write_tag, FlvTag, WriteOp,
 };
 use super::pump::{emit_copy_video, emit_resume_idr, Clock};
 use super::slate::{extract_slate_media, SLATE_FPS};
@@ -115,6 +117,87 @@ fn each_nalu_rejects_oversized_prefix() {
     assert!(each_nalu(&payload, 4).is_empty());
 }
 
+#[test]
+fn enhanced_rtmp_hevc_and_av1_headers_and_keyframes_parse() {
+    use crate::platforms::VideoCodec;
+
+    let hevc_seq: [u8; 132] = [
+        0x90, 0x68, 0x76, 0x63, 0x31, 0x01, 0x01, 0x60, 0x00, 0x00, 0x00, 0x90, 0x00, 0x00, 0x00,
+        0x00, 0x00, 0x78, 0xF0, 0x00, 0xFC, 0xFD, 0xF8, 0xF8, 0x00, 0x00, 0x0F, 0x03, 0x20, 0x00,
+        0x01, 0x00, 0x18, 0x40, 0x01, 0x0C, 0x01, 0xFF, 0xFF, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00,
+        0x90, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x78, 0x97, 0x02, 0x40, 0x21, 0x00, 0x01,
+        0x00, 0x3A, 0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
+        0x00, 0x00, 0x03, 0x00, 0x78, 0xA0, 0x03, 0xC0, 0x80, 0x11, 0x07, 0xCB, 0x96, 0x5D, 0x29,
+        0x08, 0x46, 0x45, 0xFD, 0x0C, 0x04, 0x04, 0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
+        0x00, 0x79, 0x80, 0x17, 0x79, 0x44, 0x00, 0x02, 0xDC, 0x6C, 0x00, 0x00, 0xF4, 0x24, 0x04,
+        0x22, 0x00, 0x01, 0x00, 0x07, 0x44, 0x01, 0xC0, 0xAD, 0xF0, 0x33, 0x24,
+    ];
+    assert!(tag_is_video_seqhdr(&hevc_seq));
+    assert!(!tag_is_video_coded_frame(&hevc_seq));
+    let hevc = parse_video_seqhdr(&hevc_seq).expect("parse hvc1 sequence header");
+    assert_eq!(hevc.codec(), VideoCodec::Hevc);
+    assert_eq!(hevc.info.width, 1920);
+    assert_eq!(hevc.info.height, 1080);
+    assert_eq!(hevc.info.profile_idc, 1);
+    assert_eq!(hevc.info.chroma_format_idc, 1);
+    assert_eq!(hevc.info.bit_depth_luma_minus8, 0);
+    assert_eq!(seqhdr_video(&hevc), hevc_seq);
+
+    // PacketTypeCodedFramesX (0x93) with IDR_W_RADL (NAL type 19 => (19 << 1) = 0x26).
+    let mut hevc_idr_x = vec![0x93, b'h', b'v', b'c', b'1'];
+    let irap_nal = [0x26u8, 0x01, 0xAF, 0x12];
+    hevc_idr_x.extend_from_slice(&(irap_nal.len() as u32).to_be_bytes());
+    hevc_idr_x.extend_from_slice(&irap_nal);
+    assert!(tag_is_video_coded_frame(&hevc_idr_x));
+    assert!(tag_is_idr(&hevc_idr_x, 4));
+    assert_eq!(read_cts(&hevc_idr_x), 0);
+    let decorated_hevc = hevc.decorate_keyframe(&hevc_idr_x);
+    assert!(decorated_hevc.len() > hevc_idr_x.len());
+    assert!(tag_is_idr(&decorated_hevc, 4));
+
+    // PacketTypeCodedFrames (0x91) with 24-bit CTS = 67 ms and non-IRAP trail NAL (type 1 => 0x02).
+    let mut hevc_bframe = vec![0xA1, b'h', b'v', b'c', b'1', 0x00, 0x00, 0x43];
+    let trail_nal = [0x02u8, 0x01, 0x55];
+    hevc_bframe.extend_from_slice(&(trail_nal.len() as u32).to_be_bytes());
+    hevc_bframe.extend_from_slice(&trail_nal);
+    assert!(tag_is_video_coded_frame(&hevc_bframe));
+    assert!(!tag_is_idr(&hevc_bframe, 4));
+    assert_eq!(read_cts(&hevc_bframe), 67);
+
+    // PacketTypeMetadata (0xD4) must not be treated as a coded frame or sequence header.
+    let meta = [0xD4, b'h', b'v', b'c', b'1', 0x02, 0x00, 0x09];
+    assert!(!tag_is_video_seqhdr(&meta));
+    assert!(!tag_is_video_coded_frame(&meta));
+
+    let av1_seq: [u8; 22] = [
+        0x90, 0x61, 0x76, 0x30, 0x31, 0x81, 0x08, 0x0C, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00, 0x42,
+        0xAB, 0xBF, 0xC3, 0x70, 0x08, 0x66, 0x01,
+    ];
+    assert!(tag_is_video_seqhdr(&av1_seq));
+    let av1 = parse_video_seqhdr(&av1_seq).expect("parse av01 sequence header");
+    assert_eq!(av1.codec(), VideoCodec::Av1);
+    assert_eq!(av1.info.width, 1920);
+    assert_eq!(av1.info.height, 1080);
+    assert_eq!(av1.info.profile_idc, 0);
+    assert_eq!(av1.info.chroma_format_idc, 1);
+    assert_eq!(av1.info.bit_depth_luma_minus8, 0);
+    assert_eq!(seqhdr_video(&av1), av1_seq);
+    assert!(!hevc.semantically_eq(&av1));
+
+    let av1_key = [
+        0x91, b'a', b'v', b'0', b'1', 0x12, 0x00, 0x32, 0x02, 0xAA, 0xBB,
+    ];
+    assert!(tag_is_video_coded_frame(&av1_key));
+    assert!(tag_is_idr(&av1_key, 4));
+    let decorated_av1 = av1.decorate_keyframe(&av1_key);
+    assert!(
+        decorated_av1.len() > av1_key.len(),
+        "missing OBU_SEQUENCE_HEADER must be inserted after OBU_TEMPORAL_DELIMITER"
+    );
+    assert_eq!(&decorated_av1[5..7], &[0x12, 0x00]);
+    assert_eq!(decorated_av1[7], 0x0A);
+}
+
 // Optional integration tests require ffmpeg and ffprobe on PATH: cargo test --locked --lib splicer -- --ignored.
 
 use std::process::Command as PCommand;
@@ -137,12 +220,12 @@ fn read_video_tags(flv: &[u8]) -> (AvcC, Vec<FlvTag>) {
             continue;
         }
         if tag_is_video_seqhdr(&t.data) {
-            avcc = parse_avcc(&t.data[5..]);
-        } else {
+            avcc = parse_video_seqhdr(&t.data);
+        } else if tag_is_video_coded_frame(&t.data) {
             tags.push(t);
         }
     }
-    (avcc.expect("avcC in the OBS FLV"), tags)
+    (avcc.expect("video sequence header in the OBS FLV"), tags)
 }
 
 #[test]
@@ -626,4 +709,184 @@ fn e2e_video_slate_decodes_clean() {
         String::from_utf8_lossy(&probe.stdout).contains("aac"),
         "output must contain an AAC track"
     );
+}
+
+#[test]
+#[ignore]
+fn e2e_enhanced_rtmp_hevc_and_av1_splice_decodes_clean() {
+    let dir = std::env::temp_dir().join("corneta-splice-e2e-ertmp");
+    let _ = std::fs::create_dir_all(&dir);
+    let p = |n: &str| dir.join(n).to_string_lossy().to_string();
+
+    for (label, encoder, extra) in [
+        ("hevc", "hevc_nvenc", &["-bf", "0"][..]),
+        ("av1", "libsvtav1", &["-preset", "12"][..]),
+    ] {
+        let obs = p(&format!("obs_{label}.flv"));
+        let slate_flv = p(&format!("slate_{label}.flv"));
+        let out = p(&format!("out_{label}.flv"));
+
+        let mut obs_args = vec![
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=1280x720:rate=30",
+            "-t",
+            "4",
+            "-c:v",
+            encoder,
+            "-g",
+            "30",
+            "-pix_fmt",
+            "yuv420p",
+        ];
+        obs_args.extend_from_slice(extra);
+        obs_args.extend(["-an", "-f", "flv", &obs]);
+        assert!(ff(&obs_args), "generate {obs}");
+
+        let mut slate_args = vec![
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "color=c=navy:size=1280x720:rate=30",
+            "-t",
+            "2",
+            "-c:v",
+            encoder,
+            "-g",
+            "30",
+            "-pix_fmt",
+            "yuv420p",
+        ];
+        slate_args.extend_from_slice(extra);
+        slate_args.extend(["-an", "-f", "flv", &slate_flv]);
+        assert!(ff(&slate_args), "generate {slate_flv}");
+
+        let obs_flv = std::fs::read(&obs).unwrap();
+        let (avcc, obs_tags) = read_video_tags(&obs_flv);
+        let (slate_frames, _) =
+            extract_slate_media(&std::fs::read(&slate_flv).unwrap()).expect("slate frames");
+        assert!(
+            slate_frames[0].keyframe,
+            "{label} first slate frame keyframe"
+        );
+
+        let idrs: Vec<usize> = obs_tags
+            .iter()
+            .enumerate()
+            .filter(|(_, t)| tag_is_idr(&t.data, avcc.length_size))
+            .map(|(i, _)| i)
+            .collect();
+        assert!(
+            idrs.len() >= 2,
+            "{label} OBS fixture needs at least 2 keyframes"
+        );
+        let cut = idrs[1];
+
+        let mut clock = Clock::new(48000, 30);
+        let mut need_epoch = true;
+        let mut v_epoch = 0i64;
+        let mut ops: Vec<WriteOp> = Vec::new();
+        for t in &obs_tags[..cut] {
+            emit_copy_video(
+                t,
+                &avcc,
+                &mut clock,
+                &mut need_epoch,
+                &mut v_epoch,
+                &mut ops,
+            );
+        }
+        let slate_base = clock.out_dts;
+        for i in 0..30u32 {
+            let f = &slate_frames[(i as usize) % slate_frames.len()];
+            let dts = slate_base
+                .wrapping_add((((i + 1) as f64) * 1000.0 / SLATE_FPS as f64).round() as u32);
+            clock.out_dts = dts;
+            ops.push(WriteOp {
+                tag_type: 9,
+                ts: dts,
+                data: f.data.clone(),
+            });
+        }
+        let resume = idrs.iter().copied().find(|&i| i > cut).unwrap_or(cut);
+        need_epoch = true;
+        emit_resume_idr(
+            &obs_tags[resume],
+            &avcc,
+            &mut clock,
+            &mut need_epoch,
+            &mut v_epoch,
+            &mut ops,
+        );
+        for t in &obs_tags[resume + 1..] {
+            emit_copy_video(
+                t,
+                &avcc,
+                &mut clock,
+                &mut need_epoch,
+                &mut v_epoch,
+                &mut ops,
+            );
+        }
+
+        let mut buf = Vec::new();
+        write_preamble(&mut buf).unwrap();
+        write_tag(&mut buf, 9, 0, &seqhdr_video(&avcc)).unwrap();
+        assert!(write_ops(&mut buf, &ops));
+        std::fs::write(&out, &buf).unwrap();
+
+        let decode = PCommand::new("ffmpeg")
+            .args([
+                "-hide_banner",
+                "-v",
+                "error",
+                "-fflags",
+                "+genpts",
+                "-i",
+                &out,
+                "-f",
+                "framemd5",
+                "-",
+            ])
+            .output()
+            .expect("decode spliced enhanced rtmp");
+        let stderr = String::from_utf8_lossy(&decode.stderr);
+        assert!(
+            stderr.trim().is_empty(),
+            "spliced {label} output produced a decoding error:\n{stderr}"
+        );
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn extracts_av1_sequence_header_from_inband_keyframe_obu() {
+    use super::enhanced_flv::{is_mediamtx_synthetic_av1, parse_av1_keyframe_seqhdr};
+    let mtx_placeholder = [
+        0x90, b'a', b'v', b'0', b'1', 0x81, 0x08, 0x0C, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00, 0x42,
+        0xAB, 0xBF, 0xC3, 0x70, 0x0B, 0xE0, 0x01,
+    ];
+    let mtx_avcc = parse_video_seqhdr(&mtx_placeholder).expect("parse synthetic av1C");
+    assert!(is_mediamtx_synthetic_av1(&mtx_avcc));
+    assert_eq!((mtx_avcc.info.width, mtx_avcc.info.height), (1920, 1080));
+
+    let kf_720p = [
+        0x91, b'a', b'v', b'0', b'1', 0x12, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00, 0x2D, 0x4C, 0xFF,
+        0xB3, 0xC0, 0x21, 0x98, 0x04, 0x32, 0x02, 0xAA, 0xBB,
+    ];
+    let real_avcc = parse_av1_keyframe_seqhdr(&kf_720p).expect("extract 720p av1C from keyframe");
+    assert!(!is_mediamtx_synthetic_av1(&real_avcc));
+    assert_eq!((real_avcc.info.width, real_avcc.info.height), (1280, 720));
+    assert_eq!(real_avcc.info.profile_idc, 0);
+    assert_eq!(real_avcc.info.chroma_format_idc, 1);
+    assert_eq!(real_avcc.info.bit_depth_luma_minus8, 0);
 }

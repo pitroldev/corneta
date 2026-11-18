@@ -36,7 +36,31 @@ pub(super) struct AvcC {
     pub pps: Vec<Vec<u8>>,
     pub length_size: u8, // lengthSizeMinusOne + 1
     pub info: SpsInfo,
-    pub raw: Vec<u8>, // Original OBS avcC, re-emitted byte for byte.
+    pub raw: Vec<u8>, // Original OBS config record, re-emitted byte for byte.
+    pub enhanced: Option<super::enhanced_flv::EnhancedConfig>,
+}
+
+impl AvcC {
+    pub(super) fn codec(&self) -> crate::platforms::VideoCodec {
+        self.enhanced
+            .as_ref()
+            .map_or(crate::platforms::VideoCodec::H264, |e| e.codec())
+    }
+
+    pub(super) fn semantically_eq(&self, other: &Self) -> bool {
+        self.codec() == other.codec() && self.info.semantically_eq(&other.info)
+    }
+
+    pub(super) fn decorate_keyframe(&self, data: &[u8]) -> Vec<u8> {
+        if self.enhanced.is_some() {
+            super::enhanced_flv::decorate_enhanced_keyframe(data, self)
+        } else {
+            let mut d = data[..5].to_vec();
+            d.extend_from_slice(&prefix_param_sets(&self.sps, &self.pps, self.length_size));
+            d.extend_from_slice(&data[5..]);
+            d
+        }
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -56,14 +80,14 @@ impl Asc {
 }
 
 /// Big-endian bit reader for Exp-Golomb-coded SPS/ASC fields.
-struct BitReader<'a> {
+pub(super) struct BitReader<'a> {
     data: &'a [u8],
     byte: usize,
     bit: u8,
 }
 
 impl<'a> BitReader<'a> {
-    fn new(data: &'a [u8]) -> Self {
+    pub(super) fn new(data: &'a [u8]) -> Self {
         BitReader {
             data,
             byte: 0,
@@ -71,7 +95,7 @@ impl<'a> BitReader<'a> {
         }
     }
 
-    fn bit(&mut self) -> Option<u32> {
+    pub(super) fn bit(&mut self) -> Option<u32> {
         let b = *self.data.get(self.byte)?;
         let v = ((b >> (7 - self.bit)) & 1) as u32;
         self.bit += 1;
@@ -82,7 +106,7 @@ impl<'a> BitReader<'a> {
         Some(v)
     }
 
-    fn bits(&mut self, n: u32) -> Option<u32> {
+    pub(super) fn bits(&mut self, n: u32) -> Option<u32> {
         let mut v = 0u32;
         for _ in 0..n {
             v = (v << 1) | self.bit()?;
@@ -91,7 +115,7 @@ impl<'a> BitReader<'a> {
     }
 
     /// Unsigned Exp-Golomb code with a bounded leading-zero scan.
-    fn ue(&mut self) -> Option<u32> {
+    pub(super) fn ue(&mut self) -> Option<u32> {
         let mut zeros = 0u32;
         while self.bit()? == 0 {
             zeros += 1;
@@ -115,7 +139,7 @@ impl<'a> BitReader<'a> {
 }
 
 /// Remove NAL emulation-prevention bytes: 00 00 03 becomes 00 00.
-fn strip_emulation(nal: &[u8]) -> Vec<u8> {
+pub(super) fn strip_emulation(nal: &[u8]) -> Vec<u8> {
     let mut out = Vec::with_capacity(nal.len());
     let mut zeros = 0;
     let mut i = 0;
@@ -293,7 +317,19 @@ pub(super) fn parse_avcc(cfg: &[u8]) -> Option<AvcC> {
         length_size,
         info,
         raw: cfg.to_vec(),
+        enhanced: None,
     })
+}
+
+/// Parse either a classic AVC (`avcC`) or Enhanced RTMP (`hvc1`/`av01`) sequence-header video tag body.
+pub(super) fn parse_video_seqhdr(data: &[u8]) -> Option<AvcC> {
+    if super::enhanced_flv::is_ex_header(data) {
+        super::enhanced_flv::parse_enhanced_seqhdr(data)
+    } else if data.len() >= 5 && (data[0] & 0x0F) == 7 && data[1] == 0 {
+        parse_avcc(&data[5..])
+    } else {
+        None
+    }
 }
 
 /// Parse AudioSpecificConfig from the complete AAC sequence-header tag body.
@@ -349,8 +385,11 @@ pub(super) fn each_nalu(payload: &[u8], length_size: u8) -> Vec<&[u8]> {
     out
 }
 
-/// Require NAL type 5; the FLV keyframe flag alone does not prove an IDR.
+/// Require NAL type 5 (or Enhanced RTMP IRAP/keyframe); the FLV keyframe flag alone does not prove an IDR.
 pub(super) fn tag_is_idr(data: &[u8], length_size: u8) -> bool {
+    if super::enhanced_flv::is_ex_header(data) {
+        return super::enhanced_flv::tag_is_enhanced_keyframe(data, length_size);
+    }
     if data.len() < 5 || (data[0] & 0x0F) != 7 || data[1] != 1 {
         return false;
     }
@@ -372,8 +411,13 @@ pub(super) fn prefix_param_sets(sps: &[Vec<u8>], pps: &[Vec<u8>], length_size: u
 }
 
 pub(super) fn seqhdr_video(avcc: &AvcC) -> Vec<u8> {
-    // Preserve the original avcC exactly, including profile compatibility and High-profile extensions.
-    let mut v = vec![0x17, 0x00, 0x00, 0x00, 0x00];
+    let mut v = match &avcc.enhanced {
+        Some(enhanced) => {
+            let fourcc = enhanced.fourcc();
+            vec![0x90, fourcc[0], fourcc[1], fourcc[2], fourcc[3]]
+        }
+        None => vec![0x17, 0x00, 0x00, 0x00, 0x00],
+    };
     v.extend_from_slice(&avcc.raw);
     v
 }

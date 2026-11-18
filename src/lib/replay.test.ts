@@ -2,7 +2,9 @@ import { describe, it, expect } from "vitest";
 import {
   buildReplayIndex,
   denormalizeEpoch,
+  enhancedCodecLabel,
   epochAtGlobal,
+  firstEnhancedCodecLabel,
   fractionalIndexAt,
   globalAtEpoch,
   hasEstimatedAnchor,
@@ -174,6 +176,16 @@ describe("replay drift and anchors", () => {
         buildReplayIndex([seg(1, T0, 1_000, { codec: "hevc" })]),
       ),
     ).toBe(true);
+    expect(enhancedCodecLabel("h264")).toBeNull();
+    expect(enhancedCodecLabel("hevc")).toBe("HEVC");
+    expect(enhancedCodecLabel("hvc1")).toBe("HEVC");
+    expect(enhancedCodecLabel("av1")).toBe("AV1");
+    expect(enhancedCodecLabel("av01")).toBe("AV1");
+    expect(
+      firstEnhancedCodecLabel(
+        buildReplayIndex([seg(1, T0, 1_000, { codec: "av1" })]),
+      ),
+    ).toBe("AV1");
   });
 });
 

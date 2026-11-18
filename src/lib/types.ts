@@ -5,6 +5,8 @@ export type Protocol = "rtmp" | "rtmps";
 
 export type EncodingAction = "copy" | "transcode";
 
+export type VideoCodec = "h264" | "hevc" | "av1";
+
 export type EncodingMode = "per-platform" | "passthrough" | "hybrid";
 
 export type EncoderKind =
@@ -23,6 +25,7 @@ export interface CopyLimits {
   maxHeight: number;
   maxFps: number;
   maxKbps: number;
+  acceptedCodecs?: VideoCodec[];
 }
 
 export interface PlatformPreset {
@@ -211,6 +214,7 @@ export interface ObsVideo {
   fpsNumerator: number;
   fpsDenominator: number;
   simpleKbps: number | null;
+  videoCodec?: VideoCodec;
 }
 
 export interface ObsVideoCheck {
@@ -230,6 +234,7 @@ export interface ObsCheck {
   width: number;
   height: number;
   fps: number;
+  videoCodec?: VideoCodec;
   error?: string;
 }
 

@@ -2,9 +2,12 @@ use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 use tauri::{AppHandle, Manager};
 
-use super::avc::{parse_avcc, prefix_param_sets, tag_is_idr, AvcC, SpsInfo};
-use super::flv::{read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_seqhdr};
+use super::avc::{parse_video_seqhdr, tag_is_idr, AvcC};
+use super::flv::{
+    read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_coded_frame, tag_is_video_seqhdr,
+};
 use crate::compositor::Slate;
+use crate::platforms::VideoCodec;
 
 pub(super) const SLATE_FPS: u32 = 30;
 /// Cap cached slate duration to bound setup time and encoded-frame memory.
@@ -58,17 +61,95 @@ pub(super) fn kill(child: &mut Child) {
     let _ = child.wait();
 }
 
+fn slate_encoder_candidates(
+    obs: &AvcC,
+    hw_codec: Option<&str>,
+    gop: &str,
+) -> Option<Vec<Vec<String>>> {
+    match obs.codec() {
+        VideoCodec::H264 => {
+            let profile = map_profile(obs.info.profile_idc)?;
+            Some(vec![[
+                "-c:v",
+                "libx264",
+                "-profile:v",
+                profile,
+                "-preset",
+                "veryfast",
+                "-pix_fmt",
+                "yuv420p",
+                "-x264-params",
+                &format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
+                "-bf",
+                "0",
+            ]
+            .map(String::from)
+            .to_vec()])
+        }
+        // Use only hardware HEVC encoders; fall back to the H.264 compositor when unavailable.
+        VideoCodec::Hevc => {
+            let order = match hw_codec {
+                Some("h264_qsv") => ["hevc_qsv", "hevc_nvenc", "hevc_amf"],
+                Some("h264_amf") => ["hevc_amf", "hevc_nvenc", "hevc_qsv"],
+                _ => ["hevc_nvenc", "hevc_qsv", "hevc_amf"],
+            };
+            Some(
+                order
+                    .into_iter()
+                    .map(|enc| {
+                        ["-c:v", enc, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"]
+                            .map(String::from)
+                            .to_vec()
+                    })
+                    .collect(),
+            )
+        }
+        VideoCodec::Av1 => {
+            let hw_order = match hw_codec {
+                Some("h264_qsv") => ["av1_qsv", "av1_nvenc", "av1_amf"],
+                Some("h264_amf") => ["av1_amf", "av1_nvenc", "av1_qsv"],
+                _ => ["av1_nvenc", "av1_qsv", "av1_amf"],
+            };
+            let mut list: Vec<Vec<String>> = hw_order
+                .into_iter()
+                .map(|enc| {
+                    ["-c:v", enc, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"]
+                        .map(String::from)
+                        .to_vec()
+                })
+                .collect();
+            list.push(
+                [
+                    "-c:v",
+                    "libsvtav1",
+                    "-preset",
+                    "12",
+                    "-g",
+                    gop,
+                    "-pix_fmt",
+                    "yuv420p",
+                ]
+                .map(String::from)
+                .to_vec(),
+            );
+            Some(list)
+        }
+    }
+}
+
 /// Encode slate media once during setup; live forwarding remains stream copy.
 pub(super) fn build_slate_media(
     app: &AppHandle,
     ffmpeg: &Path,
     slate: &Slate,
-    obs: &SpsInfo,
+    obs: &AvcC,
+    hw_codec: Option<&str>,
     spec: &SlateMediaSpec,
 ) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
     match slate {
         Slate::Still(still) => {
-            let frames = build_slate_still(app, ffmpeg, still, spec.width, spec.height, obs)?;
+            let frames =
+                build_slate_still(app, ffmpeg, still, spec.width, spec.height, obs, hw_codec)?;
             Some((frames, Vec::new()))
         }
         Slate::Video { path, has_audio } => build_slate_video(
@@ -77,6 +158,7 @@ pub(super) fn build_slate_media(
             path,
             *has_audio,
             obs,
+            hw_codec,
             spec.sample_rate,
             spec.channels,
         ),
@@ -89,141 +171,146 @@ fn build_slate_still(
     still: &[u8],
     spec_w: u32,
     spec_h: u32,
-    obs: &SpsInfo,
+    obs: &AvcC,
+    hw_codec: Option<&str>,
 ) -> Option<Vec<SlateFrame>> {
-    let profile = map_profile(obs.profile_idc)?;
+    let gop = (SLATE_FPS * 2).to_string();
+    let candidates = slate_encoder_candidates(obs, hw_codec, &gop)?;
     let dir = app.path().app_config_dir().ok()?.join("splice-tmp");
     let _ = std::fs::create_dir_all(&dir);
     let src = dir.join("slate_src.yuv");
     let out = dir.join("slate.flv");
     std::fs::write(&src, still).ok()?;
-    let gop = (SLATE_FPS * 2).to_string();
-    let status = base_cmd(ffmpeg)
-        .args([
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-y",
-            "-f",
-            "rawvideo",
-            "-pix_fmt",
-            "yuv420p",
-            "-s",
-            &format!("{spec_w}x{spec_h}"),
-            "-framerate",
-            &SLATE_FPS.to_string(),
-            "-stream_loop",
-            "-1",
-            "-i",
-            &src.to_string_lossy(),
-            "-t",
-            "2",
-            "-vf",
-            &format!("scale={}:{}", obs.width, obs.height),
-            "-c:v",
-            "libx264",
-            "-profile:v",
-            profile,
-            "-preset",
-            "veryfast",
-            "-pix_fmt",
-            "yuv420p",
-            "-x264-params",
-            &format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
-            "-bf",
-            "0",
-            "-an",
-            "-f",
-            "flv",
-            &out.to_string_lossy(),
-        ])
-        .stdin(Stdio::null()) // Never prompt on inherited stdin when a temporary output already exists.
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
+    let mut frames_out = None;
+    for enc_args in candidates {
+        let mut args: Vec<String> = vec![
+            "-hide_banner".into(),
+            "-loglevel".into(),
+            "error".into(),
+            "-y".into(),
+            "-f".into(),
+            "rawvideo".into(),
+            "-pix_fmt".into(),
+            "yuv420p".into(),
+            "-s".into(),
+            format!("{spec_w}x{spec_h}"),
+            "-framerate".into(),
+            SLATE_FPS.to_string(),
+            "-stream_loop".into(),
+            "-1".into(),
+            "-i".into(),
+            src.to_string_lossy().to_string(),
+            "-t".into(),
+            "2".into(),
+            "-vf".into(),
+            format!("scale={}:{}", obs.info.width, obs.info.height),
+        ];
+        args.extend(enc_args);
+        args.extend([
+            "-an".into(),
+            "-f".into(),
+            "flv".into(),
+            out.to_string_lossy().to_string(),
+        ]);
+        let ok = base_cmd(ffmpeg)
+            .args(&args)
+            .stdin(Stdio::null()) // Never prompt on inherited stdin when a temporary output already exists.
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            continue;
+        }
+        if let Ok(flv) = std::fs::read(&out) {
+            if let Some((frames, _audio)) = extract_slate_media(&flv) {
+                if frames.first().is_some_and(|f| f.keyframe) {
+                    frames_out = Some(frames);
+                    break;
+                }
+            }
+        }
     }
-    let flv = std::fs::read(&out).ok()?;
-    let (frames, _audio) = extract_slate_media(&flv)?;
     let _ = std::fs::remove_file(&src);
     let _ = std::fs::remove_file(&out);
-    Some(frames)
+    frames_out
 }
 
 /// Disable B-frames to keep slate CTS zero across loop boundaries.
+#[allow(clippy::too_many_arguments)]
 fn build_slate_video(
     app: &AppHandle,
     ffmpeg: &Path,
     path: &str,
     has_audio: bool,
-    obs: &SpsInfo,
+    obs: &AvcC,
+    hw_codec: Option<&str>,
     sr: u32,
     ch: u8,
 ) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
-    let profile = map_profile(obs.profile_idc)?;
+    let gop = (SLATE_FPS * 2).to_string();
+    let candidates = slate_encoder_candidates(obs, hw_codec, &gop)?;
     let dir = app.path().app_config_dir().ok()?.join("splice-tmp");
     let _ = std::fs::create_dir_all(&dir);
     let out = dir.join("slate_vid.flv");
-    let gop = (SLATE_FPS * 2).to_string();
-    let mut args: Vec<String> = vec![
-        "-hide_banner".into(),
-        "-loglevel".into(),
-        "error".into(),
-        "-y".into(),
-        "-i".into(),
-        path.into(),
-        "-t".into(),
-        SLATE_VIDEO_MAX_SEC.to_string(),
-        "-vf".into(),
-        format!("scale={}:{},fps={}", obs.width, obs.height, SLATE_FPS),
-        "-c:v".into(),
-        "libx264".into(),
-        "-profile:v".into(),
-        profile.into(),
-        "-preset".into(),
-        "veryfast".into(),
-        "-pix_fmt".into(),
-        "yuv420p".into(),
-        "-x264-params".into(),
-        format!("keyint={gop}:min-keyint={gop}:scenecut=0"),
-        "-bf".into(),
-        "0".into(),
-    ];
-    if has_audio {
-        // Match OBS's out-of-band AAC-LC configuration, sample rate, and channel count.
-        args.extend(
-            [
-                "-c:a",
-                "aac",
-                "-ar",
-                &sr.to_string(),
-                "-ac",
-                &ch.to_string(),
-                "-b:a",
-                "160k",
-            ]
-            .map(String::from),
-        );
-    } else {
-        args.push("-an".into());
+    let mut media_out = None;
+    for enc_args in candidates {
+        let mut args: Vec<String> = vec![
+            "-hide_banner".into(),
+            "-loglevel".into(),
+            "error".into(),
+            "-y".into(),
+            "-i".into(),
+            path.into(),
+            "-t".into(),
+            SLATE_VIDEO_MAX_SEC.to_string(),
+            "-vf".into(),
+            format!(
+                "scale={}:{},fps={}",
+                obs.info.width, obs.info.height, SLATE_FPS
+            ),
+        ];
+        args.extend(enc_args);
+        if has_audio {
+            // Match OBS's out-of-band AAC-LC configuration, sample rate, and channel count.
+            args.extend(
+                [
+                    "-c:a",
+                    "aac",
+                    "-ar",
+                    &sr.to_string(),
+                    "-ac",
+                    &ch.to_string(),
+                    "-b:a",
+                    "160k",
+                ]
+                .map(String::from),
+            );
+        } else {
+            args.push("-an".into());
+        }
+        args.extend(["-f".into(), "flv".into(), out.to_string_lossy().to_string()]);
+        let ok = base_cmd(ffmpeg)
+            .args(&args)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status()
+            .is_ok_and(|s| s.success());
+        if !ok {
+            continue;
+        }
+        if let Ok(flv) = std::fs::read(&out) {
+            if let Some(media) = extract_slate_media(&flv) {
+                if media.0.first().is_some_and(|f| f.keyframe) {
+                    media_out = Some(media);
+                    break;
+                }
+            }
+        }
     }
-    args.extend(["-f".into(), "flv".into(), out.to_string_lossy().to_string()]);
-    let status = base_cmd(ffmpeg)
-        .args(&args)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .status()
-        .ok()?;
-    if !status.success() {
-        return None;
-    }
-    let flv = std::fs::read(&out).ok()?;
-    let media = extract_slate_media(&flv)?;
     let _ = std::fs::remove_file(&out);
-    Some(media)
+    media_out
 }
 
 pub(super) fn extract_slate_media(flv: &[u8]) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
@@ -243,17 +330,16 @@ pub(super) fn extract_slate_media(flv: &[u8]) -> Option<(Vec<SlateFrame>, Vec<Ve
             continue;
         }
         if tag_is_video_seqhdr(&tag.data) {
-            avcc = parse_avcc(&tag.data[5..]);
+            avcc = parse_video_seqhdr(&tag.data);
+            continue;
+        }
+        if !tag_is_video_coded_frame(&tag.data) {
             continue;
         }
         let Some(cfg) = &avcc else { continue };
         let is_key = tag_is_idr(&tag.data, cfg.length_size);
         let data = if is_key {
-            // Reassert slate SPS/PPS before each slate IDR.
-            let mut d = tag.data[..5].to_vec();
-            d.extend_from_slice(&prefix_param_sets(&cfg.sps, &cfg.pps, cfg.length_size));
-            d.extend_from_slice(&tag.data[5..]);
-            d
+            cfg.decorate_keyframe(&tag.data)
         } else {
             tag.data.clone()
         };

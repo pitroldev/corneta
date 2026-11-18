@@ -122,12 +122,14 @@ pub async fn run(
                             last_advance = Instant::now();
                         }
                         if let Some(anchor_out) = act.anchor_out_ms {
+                            let codec =
+                                crate::commands::mediamtx_source_codec(&source).unwrap_or_default();
                             session::record_recording(
                                 &session_path,
                                 seg,
                                 now_ms().saturating_sub(anchor_out),
                                 &out.to_string_lossy(),
-                                "h264",
+                                codec.as_str(),
                                 false,
                             );
                             budget.earned();
@@ -163,12 +165,14 @@ pub async fn run(
                         spawn_at.elapsed().as_millis(),
                         disk::file_len(&out),
                     ) {
+                        let codec =
+                            crate::commands::mediamtx_source_codec(&source).unwrap_or_default();
                         session::record_recording(
                             &session_path,
                             seg,
                             now_ms().saturating_sub(spawn_at.elapsed().as_millis() as u64),
                             &out.to_string_lossy(),
-                            "h264",
+                            codec.as_str(),
                             true,
                         );
                         progress.estimate_anchor();

@@ -1,7 +1,7 @@
 use super::encoders::detect_hw_encoder;
 use super::ingest_slate::{
     brb_slate_file, brb_slate_has_audio, first_unavailable_port, log_mediamtx_line,
-    mark_port_failure, mediamtx_api_answers, mediamtx_config_path, mediamtx_paths,
+    mark_port_failure, mediamtx_api_answers, mediamtx_config_path, mediamtx_paths_with_codec,
     wait_mediamtx_ready, EngineFailure, MEDIAMTX_READY_TIMEOUT,
 };
 use super::live_status::{
@@ -611,12 +611,31 @@ async fn start_engine_inner(
     let app_sig = app.clone();
     let ingest_name = engine::ingest_path_name(&config);
     let program_name = engine::program_path_name(&config);
+    let auto_reencode_targets: Vec<(String, String)> = if config.mode == "hybrid" {
+        enabled
+            .iter()
+            .filter(|t| {
+                t.encoding
+                    .hybrid_override
+                    .as_deref()
+                    .is_none_or(str::is_empty)
+                    && engine::effective_action(&config.mode, t) == "copy"
+            })
+            .map(|t| (t.id.clone(), t.platform_id.clone()))
+            .collect()
+    } else {
+        Vec::new()
+    };
+    let reencode_sig = reencode_flags.clone();
+    let brb_for_codec = config.settings.brb_enabled;
     tauri::async_runtime::spawn_blocking(move || {
         // Two polls without byte changes count as stalled even if MediaMTX still reports ready.
         let mut last_bytes = 0u64;
         let mut stalls = 0u32;
+        let mut checked_codec = false;
         while run_sig.load(Ordering::Relaxed) {
-            let (ready, bytes, prog) = mediamtx_paths(&ingest_name, &program_name);
+            let (ready, bytes, prog, source_codec) =
+                mediamtx_paths_with_codec(&ingest_name, &program_name, brb_for_codec);
             let flowing = bytes != last_bytes; // Counter resets also indicate activity.
             last_bytes = bytes;
             if ready && flowing {
@@ -625,6 +644,22 @@ async fn start_engine_inner(
                 stalls = stalls.saturating_add(1);
             }
             let live = ready && stalls < 2;
+            let source_ready = if brb_for_codec { prog } else { live };
+            if source_ready && !checked_codec {
+                if let Some(codec) = source_codec {
+                    checked_codec = true;
+                    if codec != crate::platforms::VideoCodec::H264 {
+                        for (tid, pid) in &auto_reencode_targets {
+                            if !engine::destination_accepts_codec(pid, codec) {
+                                if let Some(flag) = reencode_sig.get(tid) {
+                                    flag.store(true, Ordering::Relaxed);
+                                }
+                                let _ = reencode_target(app_sig.clone(), tid.clone());
+                            }
+                        }
+                    }
+                }
+            }
             sig.store(live, Ordering::Relaxed);
             prog_sig.store(prog, Ordering::Relaxed);
             set_ingest_live(&app_sig, live);

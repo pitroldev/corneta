@@ -1867,9 +1867,13 @@ export const en: Dict = {
   "encoding.target.bitrate.edit": "edit the number",
   "encoding.target.bitrate.range": "between {min} and {max}",
   "encoding.target.bitrate.useRecommended": "use recommended ({kbps})",
+  "encoding.target.codecReason":
+    "Converted to H.264 because {platform} doesn't take {codec}.",
   "encoding.target.copy.badge": "on copy",
   "encoding.target.copy.body":
     "The quality is set in OBS (bitrate, resolution, fps).",
+  "encoding.target.copy.codecWarn":
+    "⚠ {platform} doesn't take {codec} on copy — switch to “Convert”",
   "encoding.target.copy.headline": "goes out exactly as OBS sends it",
   "encoding.target.copy.resolution": "resolution and fps: whatever OBS sends",
   "encoding.target.copy.verticalWarn":
@@ -2500,6 +2504,8 @@ export const en: Dict = {
   "replay.volume": "Volume",
   "replay.warn.codec":
     "This recording is in a format the player can't play. Open it from the folder.",
+  "replay.warn.enhancedCodec":
+    "This recording is in {codec} (Enhanced RTMP) and needs the Windows video extension to play here. The file is intact — open the folder to watch it in VLC or MPV.",
   "replay.warn.estimated":
     "I estimated the sync — if the video is off from the chart, use the nudge.",
   "replay.warn.segments":

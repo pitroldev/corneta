@@ -54,6 +54,10 @@ export function modeTitleKey(mode: EncodingMode): MessageKey {
 export function useModeEstimates(): Map<EncodingMode, EngineEstimate> | null {
   const config = useStore((s) => s.config);
   const encoders = useStore((s) => s.encoders);
+  const sourceCodec = useStore(
+    (s) =>
+      (s.obs && s.obs !== "loading" ? s.obs.videoCodec : undefined) ?? "h264",
+  );
   const anyHw = encoders.some((e) => e.available && e.kind !== "software");
   return useMemo(
     () =>
@@ -61,11 +65,14 @@ export function useModeEstimates(): Map<EncodingMode, EngineEstimate> | null {
         ? new Map(
             QUALITY_MODES.map((mode) => [
               mode.id,
-              estimate({ ...config, mode: mode.id }, { anyHwAvailable: anyHw }),
+              estimate(
+                { ...config, mode: mode.id },
+                { anyHwAvailable: anyHw, sourceCodec },
+              ),
             ]),
           )
         : null,
-    [config, anyHw],
+    [config, anyHw, sourceCodec],
   );
 }
 

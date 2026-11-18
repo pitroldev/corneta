@@ -199,6 +199,13 @@ pub(crate) fn classify_target_line(line: &str) -> TargetLine {
         "end of file",
     ];
     let low = line.to_lowercase();
+    if low.contains("failed to parse temporal unit")
+        || low.contains("failed to read unit")
+        || low.contains("failed to read packet")
+        || low.contains("invalid data found when processing input")
+    {
+        return TargetLine::Ignore;
+    }
     if ERR_KEYS.iter().any(|k| low.contains(k)) {
         TargetLine::Error(low)
     } else {
@@ -344,6 +351,29 @@ pub(crate) fn parse_mediamtx_paths(
         }
     }
     (ingest_ready, bytes, prog_ready)
+}
+
+pub(crate) fn parse_mediamtx_path_codec(
+    body: &str,
+    path_name: &str,
+) -> Option<crate::platforms::VideoCodec> {
+    let v: serde_json::Value = serde_json::from_str(body).ok()?;
+    let arr = v.get("items")?.as_array()?;
+    for p in arr {
+        if p.get("name").and_then(|n| n.as_str()) != Some(path_name) {
+            continue;
+        }
+        let tracks = p.get("tracks").and_then(|t| t.as_array())?;
+        for track in tracks {
+            if let Some(codec) = track
+                .as_str()
+                .and_then(crate::platforms::VideoCodec::from_mediamtx_track)
+            {
+                return Some(codec);
+            }
+        }
+    }
+    None
 }
 
 /// Returns the local port MediaMTX could not bind, or `fallback_port` when the line omits it.
@@ -1426,5 +1456,42 @@ mod tests {
             parse_ingest_hostport("rtmp://host:1234:5/app").unwrap(),
             ("host:1234".into(), 5)
         );
+    }
+
+    #[test]
+    fn parses_mediamtx_path_video_codec_tracks() {
+        use crate::platforms::VideoCodec;
+        let body = r#"{
+            "items": [
+                {"name": "live/obs", "ready": true, "tracks": ["H265", "MPEG-4 Audio"]},
+                {"name": "live/av1", "ready": true, "tracks": ["AV1", "MPEG-4 Audio"]},
+                {"name": "live/h264", "ready": true, "tracks": ["H264"]}
+            ]
+        }"#;
+        assert_eq!(
+            parse_mediamtx_path_codec(body, "live/obs"),
+            Some(VideoCodec::Hevc)
+        );
+        assert_eq!(
+            parse_mediamtx_path_codec(body, "live/av1"),
+            Some(VideoCodec::Av1)
+        );
+        assert_eq!(
+            parse_mediamtx_path_codec(body, "live/h264"),
+            Some(VideoCodec::H264)
+        );
+        assert_eq!(parse_mediamtx_path_codec(body, "live/missing"), None);
+    }
+
+    #[test]
+    fn ignores_pre_keyframe_decoder_warnings_when_classifying_target_lines() {
+        for line in [
+            "[NULL @ 000001aec1d38bc0] Failed to read unit 2 (type 6): Invalid data found when processing input.",
+            "[libdav1d @ 000001aec1d38bc0] Failed to parse temporal unit.",
+            "[av1 @ 00000192158c8f80] Failed to read packet.",
+            "[vist#0:0/av1 @ 00000192158c8c00] [dec:av1 @ 00000192135cb600] Error submitting packet to decoder: Invalid data found when processing input",
+        ] {
+            assert_eq!(classify_target_line(line), TargetLine::Ignore, "{line}");
+        }
     }
 }

@@ -28,7 +28,9 @@ import { toast } from "../lib/toast";
 import { cn, errMsg } from "../lib/utils";
 import {
   buildReplayIndex,
+  enhancedCodecLabel,
   epochAtGlobal,
+  firstEnhancedCodecLabel,
   globalAtEpoch,
   hasEstimatedAnchor,
   hasUnplayableCodec,
@@ -154,6 +156,8 @@ export function ReplayPlayer({
 
   const segment = tuned.segments[segIndex];
   const codecUnsupported = segment ? !isPlayableCodec(segment.codec) : false;
+  const enhancedCodec =
+    enhancedCodecLabel(segment?.codec) ?? firstEnhancedCodecLabel(tuned);
   const source = useReplaySource(
     sessionId,
     codecUnsupported ? undefined : segment?.path,
@@ -529,7 +533,21 @@ export function ReplayPlayer({
               className="bg-night outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brass [&:fullscreen]:flex [&:fullscreen]:h-screen [&:fullscreen]:flex-col [&:fullscreen]:justify-center [&:fullscreen]:bg-night [&:fullscreen]:p-4 [&:fullscreen_video]:max-h-[calc(100vh-9rem)]"
             >
               {mediaState === "unsupported" ? (
-                <Note tone="bad">{t("replay.warn.codec")}</Note>
+                <div className="flex flex-col items-center gap-3 pb-3">
+                  <Note tone="bad">
+                    {enhancedCodec
+                      ? t("replay.warn.enhancedCodec", { codec: enhancedCodec })
+                      : t("replay.warn.codec")}
+                  </Note>
+                  <Button
+                    size="sm"
+                    variant="subtle"
+                    onClick={() => void api.openRecordingFolder()}
+                  >
+                    <FolderOpen className="size-4" />
+                    {t("replay.folder")}
+                  </Button>
+                </div>
               ) : (
                 <div className="relative flex min-h-48 items-center justify-center overflow-hidden bg-black xl:min-h-72">
                   {/* eslint-disable-next-line jsx-a11y/media-has-caption */}
@@ -931,7 +949,11 @@ export function ReplayPlayer({
               <Note tone="warn">{t("replay.warn.estimated")}</Note>
             )}
             {hasUnplayableCodec(tuned) && !codecUnsupported && (
-              <Note tone="bad">{t("replay.warn.codec")}</Note>
+              <Note tone="bad">
+                {enhancedCodec
+                  ? t("replay.warn.enhancedCodec", { codec: enhancedCodec })
+                  : t("replay.warn.codec")}
+              </Note>
             )}
             {truncated && <Note tone="warn">{t("replay.warn.truncated")}</Note>}
             {tuned.segments.length > 1 && (

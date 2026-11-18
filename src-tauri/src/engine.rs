@@ -15,7 +15,8 @@ pub use args::{
 pub use hybrid::copy_limits;
 pub(crate) use hybrid::effective_preset;
 pub use hybrid::{
-    apply_source_signal, effective_action, strictest_copy_limits, CopyLimits, SourceSignal,
+    apply_source_signal, destination_accepts_codec, effective_action, strictest_copy_limits,
+    CopyLimits, SourceSignal,
 };
 pub use runtime::{
     EngineActivityGuard, EngineRuntime, EngineSnapshot, ObsStats, PlatformCheck,

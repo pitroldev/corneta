@@ -20,7 +20,7 @@ const BLACK_SHARE: f64 = 0.98;
 const ALERT_AFTER: Duration = Duration::from_secs(10);
 
 pub fn probe_args(ingest_url: &str) -> Vec<String> {
-    vec![
+    let mut args: Vec<String> = vec![
         "-hide_banner".into(),
         "-loglevel".into(),
         "error".into(),
@@ -28,6 +28,11 @@ pub fn probe_args(ingest_url: &str) -> Vec<String> {
         "1".into(),
         "-skip_frame".into(),
         "nokey".into(),
+    ];
+    if ingest_url.starts_with("rtmp://") || ingest_url.starts_with("rtmps://") {
+        args.extend(["-rtmp_enhanced_codecs", "hvc1,av01"].map(String::from));
+    }
+    args.extend([
         "-i".into(),
         ingest_url.into(),
         "-map".into(),
@@ -44,7 +49,8 @@ pub fn probe_args(ingest_url: &str) -> Vec<String> {
         "-pix_fmt".into(),
         "yuv420p".into(),
         "-".into(),
-    ]
+    ]);
+    args
 }
 
 pub fn is_black(luma: &[u8]) -> bool {

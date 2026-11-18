@@ -4,6 +4,7 @@
 //! Use binary process pipes rather than the line-oriented Tauri shell.
 
 mod avc;
+mod enhanced_flv;
 mod flv;
 mod pump;
 mod slate;

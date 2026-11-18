@@ -120,6 +120,95 @@ pub(crate) fn read_settings_from(config_dir: &Path) -> Option<WebSocketSettings>
     read_small(&config_dir.join("global.ini")).and_then(|raw| parse_global_ini(&raw))
 }
 
+fn parse_active_profile_dir(global_ini: &str) -> Option<String> {
+    let mut in_basic = false;
+    for line in global_ini.trim_start_matches('\u{feff}').lines() {
+        let line = line.trim_end_matches('\r');
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            in_basic = trimmed.eq_ignore_ascii_case("[Basic]");
+            continue;
+        }
+        if !in_basic {
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        if key.trim().eq_ignore_ascii_case("ProfileDir") {
+            let dir = value.trim();
+            if !dir.is_empty() && !dir.contains(['/', '\\', ':']) && dir != "." && dir != ".." {
+                return Some(dir.to_string());
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn parse_profile_ini_codec(basic_ini: &str) -> Option<crate::platforms::VideoCodec> {
+    let mut section = "";
+    let mut mode = "Simple";
+    let mut simple_enc: Option<&str> = None;
+    let mut adv_enc: Option<&str> = None;
+    for line in basic_ini.trim_start_matches('\u{feff}').lines() {
+        let line = line.trim_end_matches('\r');
+        let trimmed = line.trim();
+        if trimmed.starts_with('[') && trimmed.ends_with(']') {
+            section = trimmed;
+            continue;
+        }
+        let Some((key, value)) = line.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        let value = value.trim();
+        if section.eq_ignore_ascii_case("[Output]") && key.eq_ignore_ascii_case("Mode") {
+            mode = value;
+        } else if section.eq_ignore_ascii_case("[SimpleOutput]")
+            && key.eq_ignore_ascii_case("StreamEncoder")
+        {
+            simple_enc = Some(value);
+        } else if section.eq_ignore_ascii_case("[AdvOut]") && key.eq_ignore_ascii_case("Encoder") {
+            adv_enc = Some(value);
+        }
+    }
+    let chosen = if mode.eq_ignore_ascii_case("Advanced") {
+        adv_enc.or(simple_enc)
+    } else {
+        simple_enc.or(adv_enc)
+    }?;
+    (!chosen.is_empty()).then(|| crate::platforms::VideoCodec::from_obs_encoder(chosen))
+}
+
+pub(crate) fn parse_stream_encoder_json(raw: &str) -> Option<crate::platforms::VideoCodec> {
+    let value: serde_json::Value = serde_json::from_str(raw.trim_start_matches('\u{feff}')).ok()?;
+    let obj = value.as_object()?;
+    for key in ["encoder", "codec", "type"] {
+        if let Some(s) = obj.get(key).and_then(serde_json::Value::as_str) {
+            if !s.trim().is_empty() {
+                return Some(crate::platforms::VideoCodec::from_obs_encoder(s));
+            }
+        }
+    }
+    None
+}
+
+pub(crate) fn read_profile_codec_from(config_dir: &Path) -> Option<crate::platforms::VideoCodec> {
+    let global = read_small(&config_dir.join("global.ini"))?;
+    let profile_dir = parse_active_profile_dir(&global)?;
+    let dir = config_dir.join("basic").join("profiles").join(profile_dir);
+    if let Some(codec) =
+        read_small(&dir.join("basic.ini")).and_then(|raw| parse_profile_ini_codec(&raw))
+    {
+        return Some(codec);
+    }
+    read_small(&dir.join("streamEncoder.json")).and_then(|raw| parse_stream_encoder_json(&raw))
+}
+
+pub fn profile_video_codec() -> Option<crate::platforms::VideoCodec> {
+    config_dir().and_then(|dir| read_profile_codec_from(&dir))
+}
+
 fn config_dir() -> Option<PathBuf> {
     std::env::var_os("APPDATA").map(|dir| PathBuf::from(dir).join("obs-studio"))
 }
@@ -431,5 +520,41 @@ mod tests {
         assert!(is_obs_process("obs"));
         assert!(!is_obs_process("obs-browser-page.exe"));
         assert!(!is_obs_process("corneta.exe"));
+    }
+
+    #[test]
+    fn reads_obs_profile_video_codec_from_basic_ini_and_stream_encoder_json() {
+        use crate::platforms::VideoCodec;
+
+        assert_eq!(
+            parse_profile_ini_codec(
+                "[Output]\nMode=Simple\n[SimpleOutput]\nStreamEncoder=nvenc_hevc\n[AdvOut]\nEncoder=obs_x264\n"
+            ),
+            Some(VideoCodec::Hevc)
+        );
+        assert_eq!(
+            parse_profile_ini_codec(
+                "[Output]\nMode=Advanced\n[SimpleOutput]\nStreamEncoder=nvenc\n[AdvOut]\nEncoder=jim_av1_nvenc\n"
+            ),
+            Some(VideoCodec::Av1)
+        );
+        assert_eq!(
+            parse_stream_encoder_json(r#"{"bitrate":6500,"encoder":"jim_hevc_nvenc"}"#),
+            Some(VideoCodec::Hevc)
+        );
+
+        let dir =
+            std::env::temp_dir().join(format!("corneta-obs-profile-codec-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let prof = dir.join("basic").join("profiles").join("Sem_nome");
+        std::fs::create_dir_all(&prof).unwrap();
+        std::fs::write(dir.join("global.ini"), "[Basic]\nProfileDir=Sem_nome\n").unwrap();
+        std::fs::write(
+            prof.join("basic.ini"),
+            "[Output]\nMode=Simple\n[SimpleOutput]\nStreamEncoder=qsv_av1\n",
+        )
+        .unwrap();
+        assert_eq!(read_profile_codec_from(&dir), Some(VideoCodec::Av1));
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

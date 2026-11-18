@@ -17,7 +17,8 @@
   "copyLimits": {
     "maxHeight": 2160,
     "maxFps": 60,
-    "maxKbps": 51000
+    "maxKbps": 51000,
+    "acceptedCodecs": ["h264", "hevc", "av1"]
   },
   "keyUrl": "https://studio.youtube.com/channel/live/streaming",
   "liveUrl": "https://studio.youtube.com/channel/live",

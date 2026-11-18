@@ -100,7 +100,7 @@ pub async fn obs_video_undo(app: AppHandle) -> Result<(), crate::obs::ObsFailure
     .map_err(crate::obs::ObsFailure::from)
 }
 
-/// Smart reads what OBS sends before planning outputs; an unreachable OBS keeps the plain choice.
+/// Smart reads what OBS sends before planning outputs; when WebSocket is off, local profile codec still routes legacy platforms.
 pub(super) async fn pin_smart_choices(config: &mut AppConfig) {
     if config.mode != "hybrid" {
         return;
@@ -110,17 +110,29 @@ pub(super) async fn pin_smart_choices(config: &mut AppConfig) {
         crate::obs::read_video(OBS_WS_HOST, crate::obs_env::port(), &password)
     });
     // A hung OBS must not hold the live back.
-    let Ok(Ok(Ok(video))) = tokio::time::timeout(std::time::Duration::from_secs(2), read).await
-    else {
+    let signal = match tokio::time::timeout(std::time::Duration::from_secs(2), read).await {
+        Ok(Ok(Ok(video))) => Some(video.signal()),
+        _ => crate::obs_env::profile_video_codec()
+            .filter(|codec| *codec != crate::platforms::VideoCodec::H264)
+            .map(|video_codec| engine::SourceSignal {
+                width: 1920,
+                height: 1080,
+                fps: 60.0,
+                video_kbps: None,
+                video_codec,
+            }),
+    };
+    let Some(signal) = signal else {
         return;
     };
-    let pinned = engine::apply_source_signal(config, &video.signal());
+    let pinned = engine::apply_source_signal(config, &signal);
     if !pinned.is_empty() {
         log::info!(
-            "smart mode: transcoding {} for the OBS signal {}x{}",
+            "smart mode: transcoding {} for the OBS signal {}x{} ({})",
             pinned.join(", "),
-            video.output_width,
-            video.output_height
+            signal.width,
+            signal.height,
+            signal.video_codec.as_str()
         );
     }
 }

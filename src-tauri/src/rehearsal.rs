@@ -305,6 +305,8 @@ async fn grab_frame(app: &AppHandle, config: &AppConfig) -> Option<String> {
         "-loglevel",
         "error",
         "-y",
+        "-rtmp_enhanced_codecs",
+        "hvc1,av01",
         "-i",
         &engine::ingest_url(config),
         "-frames:v",

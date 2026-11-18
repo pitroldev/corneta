@@ -9,10 +9,10 @@ use std::time::{Duration, Instant};
 
 use tauri::{AppHandle, Manager};
 
-use super::avc::{parse_asc, parse_avcc, prefix_param_sets, seqhdr_video, tag_is_idr, Asc, AvcC};
+use super::avc::{parse_asc, parse_video_seqhdr, seqhdr_video, tag_is_idr, Asc, AvcC};
 use super::flv::{
-    read_cts, read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_seqhdr, write_ops,
-    write_preamble, write_tag, FlvTag, WriteOp,
+    read_cts, read_flv_header, read_tag, tag_is_audio_seqhdr, tag_is_video_coded_frame,
+    tag_is_video_seqhdr, write_ops, write_preamble, write_tag, FlvTag, WriteOp,
 };
 use super::slate::{
     base_cmd, build_silence, build_slate_media, ffmpeg_path, kill, map_profile, SlateMediaSpec,
@@ -53,6 +53,8 @@ fn spawn_input(ffmpeg: &Path, ingest: &str) -> std::io::Result<Child> {
             "error",
             "-fflags",
             "+genpts",
+            "-rtmp_enhanced_codecs",
+            "hvc1,av01",
             "-i",
             ingest,
             "-c",
@@ -245,9 +247,16 @@ fn setup_and_pump(
 
     let mut avcc: Option<AvcC> = None;
     let mut asc: Option<Asc> = None;
+    let mut saw_av1_keyframe = false;
     let mut pending: VecDeque<FlvTag> = VecDeque::new();
     let deadline = Instant::now() + Duration::from_millis(SETUP_DEADLINE_MS);
-    while avcc.is_none() || asc.is_none() {
+    while avcc.is_none()
+        || asc.is_none()
+        || (avcc
+            .as_ref()
+            .is_some_and(|a| a.codec() == crate::platforms::VideoCodec::Av1)
+            && !saw_av1_keyframe)
+    {
         if !running.load(Ordering::Relaxed) {
             kill(&mut in_child);
             drain_and_join(&rx, Some(reader));
@@ -264,6 +273,9 @@ fn setup_and_pump(
                 });
                 break;
             }
+            if avcc.is_some() && asc.is_some() {
+                break;
+            }
             log::warn!(
                 "splicer: no OBS sequence header within {SETUP_DEADLINE_MS}ms; falling back"
             );
@@ -274,9 +286,15 @@ fn setup_and_pump(
         match rx.try_recv() {
             Ok((_, tag)) => {
                 if tag.tag_type == 9 && tag_is_video_seqhdr(&tag.data) {
-                    avcc = parse_avcc(&tag.data[5..]);
+                    avcc = parse_video_seqhdr(&tag.data);
                     if avcc.is_none() {
-                        return fail_setup(&mut in_child, &rx, reader, opts, "unreadable avcC");
+                        return fail_setup(
+                            &mut in_child,
+                            &rx,
+                            reader,
+                            opts,
+                            "unreadable video sequence header",
+                        );
                     }
                 } else if tag.tag_type == 8 && tag_is_audio_seqhdr(&tag.data) {
                     asc = parse_asc(&tag.data);
@@ -284,6 +302,19 @@ fn setup_and_pump(
                         return fail_setup(&mut in_child, &rx, reader, opts, "unreadable ASC");
                     }
                 } else if (tag.tag_type == 9 || tag.tag_type == 8) && pending.len() < 512 {
+                    if tag.tag_type == 9
+                        && avcc
+                            .as_ref()
+                            .is_some_and(|a| a.codec() == crate::platforms::VideoCodec::Av1)
+                        && tag_is_idr(&tag.data, 4)
+                    {
+                        if let Some(real_avcc) =
+                            super::enhanced_flv::parse_av1_keyframe_seqhdr(&tag.data)
+                        {
+                            avcc = Some(real_avcc);
+                        }
+                        saw_av1_keyframe = true;
+                    }
                     pending.push_back(tag);
                 }
             }
@@ -302,14 +333,19 @@ fn setup_and_pump(
     let avcc = avcc.unwrap();
     let asc = asc.unwrap();
 
-    // Stream-copy splicing supports progressive 8-bit H.264 4:2:0 baseline/main/high.
+    // Stream-copy splicing supports progressive 8-bit 4:2:0 H.264, HEVC, and AV1.
     let i = &avcc.info;
+    let profile_ok = match avcc.codec() {
+        crate::platforms::VideoCodec::H264 => map_profile(i.profile_idc).is_some(),
+        crate::platforms::VideoCodec::Hevc => matches!(i.profile_idc, 1 | 2),
+        crate::platforms::VideoCodec::Av1 => i.profile_idc == 0,
+    };
     let gate_ok = i.chroma_format_idc == 1
         && i.frame_mbs_only == 1
         && avcc.length_size == 4
         && i.bit_depth_luma_minus8 == 0
         && i.bit_depth_chroma_minus8 == 0
-        && map_profile(i.profile_idc).is_some()
+        && profile_ok
         && i.width > 0
         && i.height > 0
         && asc.object_type == 2; // Generated silence is AAC-LC; delegate HE/SBR during setup.
@@ -327,7 +363,8 @@ fn setup_and_pump(
         app,
         &ffmpeg,
         &opts.slate,
-        &avcc.info,
+        &avcc,
+        opts.hw_codec.as_deref(),
         &SlateMediaSpec {
             width: opts.spec.w,
             height: opts.spec.h,
@@ -419,15 +456,29 @@ fn setup_and_pump(
     let mut publisher_down_since: Option<Instant> = None;
     let mut publisher_wait_ms = 0u64;
 
-    // Discard pre-IDR tags; copying may begin only at a real IDR.
-    pending.clear();
-
     loop {
         if !running.load(Ordering::Relaxed) {
             break;
         }
         let forced = opts.force_slate.load(Ordering::Relaxed);
         let mut ops: Vec<WriteOp> = Vec::new();
+
+        while let Some(tag) = pending.pop_front() {
+            handle_input_tag(
+                tag,
+                forced,
+                &avcc,
+                &asc,
+                &mut video_ok,
+                &mut audio_ok,
+                &mut state,
+                &mut clock,
+                &mut need_copy_epoch,
+                &mut v_epoch,
+                &mut last_video_at,
+                &mut ops,
+            );
+        }
 
         let mut got_disconnect = false;
         loop {
@@ -616,8 +667,13 @@ fn handle_input_tag(
 ) {
     // Output extradata is fixed: incompatible reconnects must hold the slate, not replace the publisher.
     if tag.tag_type == 9 && tag_is_video_seqhdr(&tag.data) {
-        if let Some(new) = parse_avcc(&tag.data[5..]) {
-            *video_ok = new.info.semantically_eq(&avcc.info);
+        if let Some(new) = parse_video_seqhdr(&tag.data) {
+            if avcc.codec() == crate::platforms::VideoCodec::Av1
+                && super::enhanced_flv::is_mediamtx_synthetic_av1(&new)
+            {
+                return;
+            }
+            *video_ok = new.semantically_eq(avcc);
             if !*video_ok {
                 if *state != State::HoldIncompat {
                     log::warn!(
@@ -637,6 +693,32 @@ fn handle_input_tag(
             }
         }
         return;
+    }
+    if tag.tag_type == 9
+        && avcc.codec() == crate::platforms::VideoCodec::Av1
+        && tag_is_idr(&tag.data, avcc.length_size)
+    {
+        if let Some(kf_avcc) = super::enhanced_flv::parse_av1_keyframe_seqhdr(&tag.data) {
+            *video_ok = kf_avcc.semantically_eq(avcc);
+            if !*video_ok {
+                if *state != State::HoldIncompat {
+                    log::warn!(
+                        "splicer: OBS video changed ({}x{} to {}x{}); holding BRB",
+                        avcc.info.width,
+                        avcc.info.height,
+                        kf_avcc.info.width,
+                        kf_avcc.info.height
+                    );
+                }
+                *state = State::HoldIncompat;
+                return;
+            } else if *state == State::HoldIncompat && *audio_ok {
+                log::info!(
+                    "splicer: compatible OBS configuration restored; resuming at the next IDR"
+                );
+                *state = State::Slate;
+            }
+        }
     }
     if tag.tag_type == 8 && tag_is_audio_seqhdr(&tag.data) {
         // Both audio and video must match before leaving HoldIncompat, regardless of header arrival order.
@@ -680,8 +762,10 @@ fn handle_input_tag(
             }
             match tag.tag_type {
                 9 => {
-                    emit_copy_video(&tag, avcc, clock, need_copy_epoch, v_epoch, ops);
-                    *last_video_at = Instant::now();
+                    if tag_is_video_coded_frame(&tag.data) {
+                        emit_copy_video(&tag, avcc, clock, need_copy_epoch, v_epoch, ops);
+                        *last_video_at = Instant::now();
+                    }
                 }
                 8 => {
                     let ts = clock.audio_ts();
@@ -749,9 +833,7 @@ pub(super) fn emit_resume_idr(
         dts = clock.out_dts.wrapping_add(1);
     }
     let cts = read_cts(&tag.data);
-    let mut data = tag.data[..5].to_vec();
-    data.extend_from_slice(&prefix_param_sets(&avcc.sps, &avcc.pps, avcc.length_size));
-    data.extend_from_slice(&tag.data[5..]);
+    let data = avcc.decorate_keyframe(&tag.data);
     clock.out_dts = dts;
     clock.out_pts_hwm = clock.out_pts_hwm.max(dts.wrapping_add(cts as u32));
     clock.started = true;

@@ -3,7 +3,7 @@ use crate::config::{self, AppConfig};
 use crate::engine;
 use crate::engine_policy::{
     brb_slate_is_video, is_brb_slate_path, is_loopback_host, mediamtx_port_conflict,
-    parse_mediamtx_paths,
+    parse_mediamtx_path_codec, parse_mediamtx_paths,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
@@ -90,6 +90,15 @@ pub(crate) async fn start_rehearsal_ingest(
 // Match exact paths: the compositor publisher must not count as OBS input.
 // Byte counts reveal stalled input while MediaMTX still reports the publisher as ready.
 pub(super) fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u64, bool) {
+    let (ready, bytes, prog, _) = mediamtx_paths_with_codec(ingest_name, program_name, false);
+    (ready, bytes, prog)
+}
+
+pub(crate) fn mediamtx_paths_with_codec(
+    ingest_name: &str,
+    program_name: &str,
+    use_program: bool,
+) -> (bool, u64, bool, Option<crate::platforms::VideoCodec>) {
     let url = format!(
         "http://127.0.0.1:{}/v3/paths/list",
         engine::MEDIAMTX_API_PORT
@@ -99,9 +108,36 @@ pub(super) fn mediamtx_paths(ingest_name: &str, program_name: &str) -> (bool, u6
         .call()
     {
         Ok(r) => r.into_string().unwrap_or_default(),
-        Err(_) => return (false, 0, false),
+        Err(_) => return (false, 0, false, None),
     };
-    parse_mediamtx_paths(&body, ingest_name, program_name)
+    let (ready, bytes, prog) = parse_mediamtx_paths(&body, ingest_name, program_name);
+    let codec_path = if use_program {
+        program_name
+    } else {
+        ingest_name
+    };
+    let codec = parse_mediamtx_path_codec(&body, codec_path);
+    (ready, bytes, prog, codec)
+}
+
+pub(crate) fn mediamtx_source_codec(source_url: &str) -> Option<crate::platforms::VideoCodec> {
+    let after_scheme = source_url.split("://").nth(1).unwrap_or(source_url);
+    let (_, path_name) = after_scheme.split_once('/')?;
+    let path_name = path_name.trim_matches('/');
+    if path_name.is_empty() {
+        return None;
+    }
+    let url = format!(
+        "http://127.0.0.1:{}/v3/paths/list",
+        engine::MEDIAMTX_API_PORT
+    );
+    let body = ureq::get(&url)
+        .timeout(std::time::Duration::from_millis(500))
+        .call()
+        .ok()?
+        .into_string()
+        .ok()?;
+    parse_mediamtx_path_codec(&body, path_name)
 }
 
 // Retain publisher lifecycle failures without frame-grab noise.
@@ -383,6 +419,8 @@ async fn grab_frame_named(app: &AppHandle, name: &str) -> Result<Vec<u8>, String
         "error".into(),
         "-rw_timeout".into(),
         "5000000".into(),
+        "-rtmp_enhanced_codecs".into(),
+        "hvc1,av01".into(),
         "-i".into(),
         ingest,
         "-frames:v".into(),

@@ -218,3 +218,20 @@ export const isPlayableCodec = (codec: string): boolean =>
   PLAYABLE.has(codec.toLowerCase());
 export const hasUnplayableCodec = (idx: ReplayIndex): boolean =>
   idx.segments.some((s) => s.codec && !isPlayableCodec(s.codec));
+
+export function enhancedCodecLabel(codec?: string): "HEVC" | "AV1" | null {
+  const low = (codec ?? "").trim().toLowerCase();
+  if (low === "hevc" || low === "h265" || low === "hvc1") return "HEVC";
+  if (low === "av1" || low === "av01") return "AV1";
+  return null;
+}
+
+export function firstEnhancedCodecLabel(
+  idx: ReplayIndex,
+): "HEVC" | "AV1" | null {
+  for (const s of idx.segments) {
+    const label = enhancedCodecLabel(s.codec);
+    if (label) return label;
+  }
+  return null;
+}

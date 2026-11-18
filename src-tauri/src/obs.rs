@@ -303,6 +303,8 @@ pub struct ObsCheck {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
+    #[serde(default)]
+    pub video_codec: crate::platforms::VideoCodec,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// Distinguish authentication failure from an unreachable OBS without parsing translated text.
@@ -320,6 +322,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
                 auth_failed: e.failure.is_auth(),
                 error_code: Some(e.failure),
                 error: Some(e.msg),
+                video_codec: crate::obs_env::profile_video_codec().unwrap_or_default(),
                 ..Default::default()
             };
         }
@@ -348,6 +351,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
     } else {
         0.0
     };
+    let video_codec = read_socket_codec(&mut socket, None);
     let _ = socket.close(None);
 
     ObsCheck {
@@ -356,6 +360,7 @@ pub fn check(host: &str, port: u16, password: &str, expected_server: &str) -> Ob
         width: g("outputWidth") as u32,
         height: g("outputHeight") as u32,
         fps,
+        video_codec,
         error: None,
         auth_failed: false,
         error_code: None,
@@ -403,6 +408,8 @@ pub struct ObsVideo {
     pub fps_denominator: u32,
     /// The advanced output mode keeps the bitrate where obs-websocket cannot reach it.
     pub simple_kbps: Option<u32>,
+    #[serde(default)]
+    pub video_codec: crate::platforms::VideoCodec,
 }
 
 impl ObsVideo {
@@ -412,6 +419,7 @@ impl ObsVideo {
             height: self.output_height,
             fps: f64::from(self.fps_numerator) / f64::from(self.fps_denominator.max(1)),
             video_kbps: self.simple_kbps,
+            video_codec: self.video_codec,
         }
     }
 }
@@ -462,7 +470,17 @@ fn profile_value(v: &Value) -> Option<&str> {
         .map(str::trim)
 }
 
+#[cfg(test)]
 fn parse_obs_video(video: &Value, mode: &Value, bitrate: &Value) -> Option<ObsVideo> {
+    parse_obs_video_with_encoder(video, mode, bitrate, None)
+}
+
+fn parse_obs_video_with_encoder(
+    video: &Value,
+    mode: &Value,
+    bitrate: &Value,
+    encoder: Option<&Value>,
+) -> Option<ObsVideo> {
     let number = |key: &str| {
         video
             .get(key)?
@@ -471,6 +489,10 @@ fn parse_obs_video(video: &Value, mode: &Value, bitrate: &Value) -> Option<ObsVi
             .filter(|n| *n > 0)
     };
     let simple = profile_value(mode) == Some("Simple");
+    let video_codec = encoder
+        .and_then(profile_value)
+        .map(crate::platforms::VideoCodec::from_obs_encoder)
+        .unwrap_or_default();
     Some(ObsVideo {
         output_width: number("outputWidth")?,
         output_height: number("outputHeight")?,
@@ -481,7 +503,32 @@ fn parse_obs_video(video: &Value, mode: &Value, bitrate: &Value) -> Option<ObsVi
         } else {
             None
         },
+        video_codec,
     })
+}
+
+fn read_socket_codec(socket: &mut Socket, mode: Option<&Value>) -> crate::platforms::VideoCodec {
+    let owned_mode;
+    let mode_val = match mode {
+        Some(m) => Some(m),
+        None => {
+            owned_mode = profile_parameter(socket, "Output", "Mode").ok();
+            owned_mode.as_ref()
+        }
+    };
+    let simple = mode_val.and_then(profile_value) == Some("Simple");
+    let (cat, name) = if simple {
+        ("SimpleOutput", "StreamEncoder")
+    } else {
+        ("AdvOut", "Encoder")
+    };
+    profile_parameter(socket, cat, name)
+        .ok()
+        .as_ref()
+        .and_then(profile_value)
+        .map(crate::platforms::VideoCodec::from_obs_encoder)
+        .or_else(crate::obs_env::profile_video_codec)
+        .unwrap_or_default()
 }
 
 pub fn read_video(host: &str, port: u16, password: &str) -> Result<ObsVideo, ConnErr> {
@@ -493,8 +540,21 @@ pub fn read_video(host: &str, port: u16, password: &str) -> Result<ObsVideo, Con
         )?;
         let mode = profile_parameter(&mut socket, "Output", "Mode")?;
         let bitrate = profile_parameter(&mut socket, "SimpleOutput", "VBitrate")?;
-        parse_obs_video(&video, &mode, &bitrate)
-            .ok_or_else(|| ConnErr::from(Msg::ObsVideoUnreadable.now()))
+        let simple = profile_value(&mode) == Some("Simple");
+        let (enc_cat, enc_name) = if simple {
+            ("SimpleOutput", "StreamEncoder")
+        } else {
+            ("AdvOut", "Encoder")
+        };
+        let encoder = profile_parameter(&mut socket, enc_cat, enc_name).ok();
+        let mut parsed = parse_obs_video_with_encoder(&video, &mode, &bitrate, encoder.as_ref())
+            .ok_or_else(|| ConnErr::from(Msg::ObsVideoUnreadable.now()))?;
+        if encoder.is_none() {
+            if let Some(fallback) = crate::obs_env::profile_video_codec() {
+                parsed.video_codec = fallback;
+            }
+        }
+        Ok(parsed)
     })();
     let _ = socket.close(None);
     result
@@ -1355,6 +1415,7 @@ mod tests {
             fps_numerator: fps.0,
             fps_denominator: fps.1,
             simple_kbps,
+            video_codec: crate::platforms::VideoCodec::H264,
         }
     }
 
@@ -1380,6 +1441,15 @@ mod tests {
         assert_eq!(
             parse_obs_video(&json!({ "outputWidth": 0 }), &simple, &unset_bitrate),
             None
+        );
+        let hevc_enc = json!({ "parameterValue": "jim_hevc_nvenc" });
+        let parsed_hevc =
+            parse_obs_video_with_encoder(&settings, &advanced, &unset_bitrate, Some(&hevc_enc))
+                .unwrap();
+        assert_eq!(parsed_hevc.video_codec, crate::platforms::VideoCodec::Hevc);
+        assert_eq!(
+            parsed_hevc.signal().video_codec,
+            crate::platforms::VideoCodec::Hevc
         );
     }
 

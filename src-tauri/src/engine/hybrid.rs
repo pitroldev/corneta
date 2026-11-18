@@ -1,5 +1,5 @@
 use crate::config::{AppConfig, Target, VideoPreset};
-use crate::platforms::recommended_preset;
+use crate::platforms::{accepts_codec, recommended_preset, VideoCodec};
 pub use crate::platforms::{copy_limits, CopyLimits};
 
 // Imported presets are untrusted; bound derived bitrate/GOP arithmetic and FFmpeg arguments.
@@ -31,27 +31,38 @@ fn smart_hybrid_action(platform_id: &str) -> &'static str {
     }
 }
 
-/// What OBS is set to send, read over obs-websocket.
+/// What OBS is set to send, read over obs-websocket or local profile settings.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct SourceSignal {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
-    /// Known only in OBS's simple output mode.
+    /// Known in OBS's simple output mode or from `streamEncoder.json`.
     pub video_kbps: Option<u32>,
+    pub video_codec: VideoCodec,
 }
 
 fn exceeds(signal: &SourceSignal, limits: &CopyLimits) -> bool {
-    signal.width.min(signal.height) > limits.max_height
+    !limits.accepts_codec(signal.video_codec)
+        || signal.width.min(signal.height) > limits.max_height
         || signal.fps > f64::from(limits.max_fps) + 0.5
         || signal.video_kbps.is_some_and(|kbps| kbps > limits.max_kbps)
 }
 
-/// Smart copies what a destination accepts and transcodes only where the OBS signal exceeds it.
+/// Smart copies what a destination accepts and transcodes where the source codec or dimensions exceed it.
 fn signal_hybrid_action(platform_id: &str, signal: Option<&SourceSignal>) -> &'static str {
     let action = smart_hybrid_action(platform_id);
-    match (action, signal, copy_limits(platform_id)) {
-        ("copy", Some(signal), Some(limits)) if exceeds(signal, &limits) => "transcode",
+    if action != "copy" {
+        return action;
+    }
+    let Some(signal) = signal else {
+        return action;
+    };
+    if !accepts_codec(platform_id, signal.video_codec) {
+        return "transcode";
+    }
+    match copy_limits(platform_id) {
+        Some(limits) if exceeds(signal, &limits) => "transcode",
         _ => action,
     }
 }
@@ -92,7 +103,12 @@ pub fn strictest_copy_limits(config: &AppConfig) -> Option<CopyLimits> {
             max_height: a.max_height.min(b.max_height),
             max_fps: a.max_fps.min(b.max_fps),
             max_kbps: a.max_kbps.min(b.max_kbps),
+            accepted_codecs: a.accepted_codecs.intersect(b.accepted_codecs),
         })
+}
+
+pub fn destination_accepts_codec(platform_id: &str, codec: VideoCodec) -> bool {
+    accepts_codec(platform_id, codec)
 }
 
 pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
@@ -147,6 +163,23 @@ mod tests {
             height,
             fps,
             video_kbps,
+            video_codec: VideoCodec::H264,
+        }
+    }
+
+    fn codec_signal(
+        video_codec: VideoCodec,
+        width: u32,
+        height: u32,
+        fps: f64,
+        video_kbps: Option<u32>,
+    ) -> SourceSignal {
+        SourceSignal {
+            width,
+            height,
+            fps,
+            video_kbps,
+            video_codec,
         }
     }
 
@@ -275,7 +308,8 @@ mod tests {
             Some(CopyLimits {
                 max_height: 1080,
                 max_fps: 60,
-                max_kbps: 8000
+                max_kbps: 8000,
+                accepted_codecs: crate::platforms::AcceptedCodecs::H264_ONLY,
             })
         );
         config.targets.push(tgt("twitch", None));
@@ -285,5 +319,57 @@ mod tests {
         );
         config.mode = "per-platform".into();
         assert_eq!(strictest_copy_limits(&config), None, "nothing is copied");
+    }
+
+    #[test]
+    fn smart_mode_copies_enhanced_rtmp_to_youtube_and_shares_one_h264_rendition_for_legacy_targets()
+    {
+        for codec in [VideoCodec::Hevc, VideoCodec::Av1] {
+            let obs = codec_signal(codec, 2560, 1440, 60.0, Some(7000));
+            assert_eq!(signal_hybrid_action("youtube", Some(&obs)), "copy");
+            assert_eq!(signal_hybrid_action("custom", Some(&obs)), "copy");
+            for legacy in ["twitch", "kick", "facebook", "x", "tiktok", "instagram"] {
+                assert_eq!(
+                    signal_hybrid_action(legacy, Some(&obs)),
+                    "transcode",
+                    "{legacy} must transcode {codec:?}"
+                );
+            }
+
+            let mut yt = tgt("youtube", None);
+            yt.id = "yt".into();
+            let mut tw = tgt("twitch", None);
+            tw.id = "tw".into();
+            let mut kk = tgt("kick", None);
+            kk.id = "kk".into();
+            let mut config = AppConfig {
+                mode: "hybrid".into(),
+                targets: vec![yt, tw, kk],
+                ..Default::default()
+            };
+            let pinned = apply_source_signal(&mut config, &obs);
+            assert_eq!(pinned, ["twitch", "kick"]);
+            assert_eq!(effective_action(&config.mode, &config.targets[0]), "copy");
+            assert_eq!(
+                effective_action(&config.mode, &config.targets[1]),
+                "transcode"
+            );
+            assert_eq!(
+                effective_action(&config.mode, &config.targets[2]),
+                "transcode"
+            );
+
+            let plans = crate::renditions::plan(
+                &config,
+                "rtmp://127.0.0.1:1935/live/obs",
+                Some("h264_nvenc"),
+            );
+            assert_eq!(
+                plans.len(),
+                1,
+                "Twitch and Kick must share one H.264 rendition"
+            );
+            assert_eq!(plans[0].targets, ["tw", "kk"]);
+        }
     }
 }

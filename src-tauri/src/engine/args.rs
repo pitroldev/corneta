@@ -125,9 +125,11 @@ pub fn ffmpeg_args_for_target(
         "-loglevel".into(),
         "warning".into(),
         "-stats".into(),
-        "-i".into(),
-        ingest,
     ];
+    if ingest.starts_with("rtmp://") || ingest.starts_with("rtmps://") {
+        args.extend(["-rtmp_enhanced_codecs", "hvc1,av01"].map(String::from));
+    }
+    args.extend(["-i".into(), ingest]);
 
     if action == "copy" {
         args.extend(["-map", "0:v", "-c:v", "copy"].map(String::from));
@@ -313,6 +315,8 @@ pub fn ffmpeg_args_for_decoder(config: &AppConfig, spec: &ProgramSpec) -> Vec<St
         // `auto` permits software fallback when hardware decoding is unavailable.
         "-hwaccel".into(),
         "auto".into(),
+        "-rtmp_enhanced_codecs".into(),
+        "hvc1,av01".into(),
         "-i".into(),
         ingest_url(config),
         "-map".into(),
