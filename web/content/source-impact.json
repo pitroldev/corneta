@@ -28,8 +28,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; what happens when one platform drops during a live did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -64,8 +64,8 @@
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "21871719d79d42566ff1fae8ba95af1a6ae86868",
-      "reason": "splicer.rs only restarts a crashed BE RIGHT BACK publisher; the protection the article describes still works the same way."
+      "sourceBlob": "001947226d2389acebbeb474bd2528cb99bf86d5",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/guides/operations/unified-chat-rules.mdx",
@@ -82,8 +82,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; copying and re-encoding work as the article describes."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -94,8 +94,8 @@
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the encoder choices and session limits the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -160,26 +160,26 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; auto-bitrate works as the article describes."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the metrics the article explains did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the upload test the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the diagnostic file and what it leaves out did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -220,8 +220,8 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the reconnects, the ingest recovery during a live and the platform checks the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -232,14 +232,14 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the reconnects and the ingest recovery the article describes did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the statuses, the ingest recovery during a live and Fix it now work as the article describes."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
@@ -286,8 +286,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; what happens when one platform drops during a live did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -328,8 +328,8 @@
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "21871719d79d42566ff1fae8ba95af1a6ae86868",
-      "reason": "splicer.rs only restarts a crashed BE RIGHT BACK publisher; the protection the article describes still works the same way."
+      "sourceBlob": "001947226d2389acebbeb474bd2528cb99bf86d5",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
@@ -346,8 +346,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; copying and re-encoding work as the article describes."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -358,8 +358,8 @@
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the encoder choices and session limits the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
@@ -478,8 +478,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; auto-bitrate works as the article describes."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -496,20 +496,20 @@
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the metrics the article explains did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the upload test the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the diagnostic file and what it leaves out did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -562,8 +562,8 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the reconnects, the ingest recovery during a live and the platform checks the article describes did not change."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
@@ -574,14 +574,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "dbca8f4198353c6b50bbad4ccf803f7a48d3423f",
-      "reason": "engine.rs only gained the error code a failed start reports and the flag that refuses a start during a rehearsal; the reconnects and the ingest recovery the article describes did not change."
+      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "1732fa7c6933c93b9741c67df7038a1675e363eb",
-      "reason": "commands.rs only added the OBS environment check, the rehearsal and the move to a free ingest port after a failed start; the statuses, the ingest recovery during a live and Fix it now work as the article describes."
+      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
+      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
