@@ -238,8 +238,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs_env.rs",
-      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "2fd66ebfc6200d53f581c96b63dfa9d585126d58",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
@@ -250,8 +250,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "1a4b2a6d74c11aa1d62a5c56572887c91f150002",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "d3d62a90cafb719e31ecda2c36da3d248690d726",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -268,8 +268,8 @@
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs_env.rs",
-      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "2fd66ebfc6200d53f581c96b63dfa9d585126d58",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
@@ -586,8 +586,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs_env.rs",
-      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "2fd66ebfc6200d53f581c96b63dfa9d585126d58",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -604,8 +604,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "1a4b2a6d74c11aa1d62a5c56572887c91f150002",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "d3d62a90cafb719e31ecda2c36da3d248690d726",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -622,8 +622,8 @@
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs_env.rs",
-      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "2fd66ebfc6200d53f581c96b63dfa9d585126d58",
+      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
