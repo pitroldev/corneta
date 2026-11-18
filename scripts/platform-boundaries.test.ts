@@ -19,7 +19,7 @@ const ALLOWED: { file: string; text?: string; why: string }[] = [
     why: "chat recordings from before multi-platform chat carry no platform",
   },
   {
-    file: "src-tauri/src/commands.rs",
+    file: "src-tauri/src/commands/chat_alerts.rs",
     text: 'platform: "twitch".into()',
     why: "sample alert for the overlay preview",
   },

@@ -2,6 +2,7 @@
 /src-tauri/src/auth.rs @pitroldev
 /src-tauri/src/keys.rs @pitroldev
 /src-tauri/src/engine.rs @pitroldev
+/src-tauri/src/engine/ @pitroldev
 /src-tauri/src/session/ @pitroldev
 /web/lib/server/ @pitroldev
 /compliance/ @pitroldev
