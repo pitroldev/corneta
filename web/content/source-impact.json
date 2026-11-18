@@ -14,6 +14,12 @@
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
+      "article": "en/guides/multistream/horizontal-and-vertical-live.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
       "article": "en/guides/multistream/local-vs-cloud.mdx",
       "source": "web/PRODUCT.md",
       "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
@@ -28,8 +34,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
@@ -64,8 +70,8 @@
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "001947226d2389acebbeb474bd2528cb99bf86d5",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "f5016e5a7688c7483328286b981c75e194bcb152",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/guides/operations/unified-chat-rules.mdx",
@@ -82,8 +88,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
@@ -96,6 +102,36 @@
       "source": "src-tauri/src/commands.rs",
       "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
       "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+    },
+    {
+      "article": "en/guides/quality/multistream-low-end-pc.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/guides/quality/multistream-upload-speed.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/guides/quality/resolution-and-fps.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
+      "source": "src/screens/EncodingScreen.tsx",
+      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -160,14 +196,26 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/help/quality/quality-modes.mdx",
+      "source": "src/lib/estimates.ts",
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/help/quality/quality-modes.mdx",
+      "source": "src/screens/EncodingScreen.tsx",
+      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
@@ -189,15 +237,21 @@
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src-tauri/src/obs_env.rs",
+      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
-      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
+      "sourceBlob": "66ffad2bad4319980d484bc0ca5254f80b1bd3ab",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d23aff9600592b4db6577e124ecf787c45c0b917",
-      "reason": "pt.ts only added the notices for settings that could not be saved or read; the automatic OBS setup labels the article quotes did not change."
+      "sourceBlob": "1a4b2a6d74c11aa1d62a5c56572887c91f150002",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -213,9 +267,15 @@
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
+      "source": "src-tauri/src/obs_env.rs",
+      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "en/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
-      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
+      "sourceBlob": "66ffad2bad4319980d484bc0ca5254f80b1bd3ab",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -226,14 +286,14 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
-      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
+      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
@@ -244,8 +304,8 @@
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
-      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
+      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -262,8 +322,8 @@
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
@@ -286,8 +346,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
@@ -328,8 +388,8 @@
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
       "source": "src-tauri/src/splicer.rs",
-      "sourceBlob": "001947226d2389acebbeb474bd2528cb99bf86d5",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "f5016e5a7688c7483328286b981c75e194bcb152",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
@@ -346,8 +406,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
@@ -364,20 +424,20 @@
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/streaming-glossary.mdx",
@@ -388,8 +448,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -400,8 +460,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
-      "reason": "The mode cards and load bar now use m, with the animation loaded on demand, and a variable was renamed; the cited modes, bitrate defaults and cards did not change."
+      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/guides/quality/why-stream-lags.mdx",
@@ -478,26 +538,26 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "886e18b879204f1b3a24d6631f5380cc78ad4b65",
-      "reason": "The upload and load calculations now read the presets from the per-folder catalog, with the same values; the article is still correct."
+      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "cd49460ee4a67c1d13cd0ac7acc662f2781f8fdf",
-      "reason": "The mode cards and load bar now use m, with the animation loaded on demand; the cited modes, fine-tuning, cards and live metrics did not change."
+      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
@@ -525,9 +585,15 @@
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
+      "source": "src-tauri/src/obs_env.rs",
+      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
-      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
+      "sourceBlob": "66ffad2bad4319980d484bc0ca5254f80b1bd3ab",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
@@ -538,8 +604,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d23aff9600592b4db6577e124ecf787c45c0b917",
-      "reason": "pt.ts only added the notices for settings that could not be saved or read; the automatic OBS setup labels the article quotes did not change."
+      "sourceBlob": "1a4b2a6d74c11aa1d62a5c56572887c91f150002",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -555,9 +621,15 @@
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
+      "source": "src-tauri/src/obs_env.rs",
+      "sourceBlob": "3d88611a870528142c98882b11c81e72c3f78ba6",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+    },
+    {
+      "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
       "source": "src-tauri/src/obs.rs",
-      "sourceBlob": "b3d0e9442fb12f994374ce3c020929d71df656bc",
-      "reason": "obs.rs only stopped sending crash reports when OBS is closed or rejects the password; the connection steps, messages and port 4455 the article describes did not change."
+      "sourceBlob": "66ffad2bad4319980d484bc0ca5254f80b1bd3ab",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
@@ -568,14 +640,14 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
-      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
+      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "38e826c63e7cf8f53276e6a170befff6865c8892",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
@@ -586,8 +658,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
-      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
+      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
+      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
     }
   ]
 }
