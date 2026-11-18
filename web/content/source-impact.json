@@ -226,8 +226,8 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
-      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
+      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
+      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -244,8 +244,8 @@
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
-      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
+      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
+      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -568,8 +568,8 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
-      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
+      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
+      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
@@ -586,8 +586,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "510b8530c940f2fadf34f2c51b6256ed00dc258a",
-      "reason": "engine_policy.rs only fills the new error-code field in a test fixture; the states, the reconnect timings and the x264 fallback the article describes did not change."
+      "sourceBlob": "29cf9ea99ac8ef3f1540bdd42f5ea3994e424a24",
+      "reason": "engine_policy.rs only added healthy_run tracking on ProgressWatch and skipped input decoder flags in video_codec; the destination states, reconnect timings and x264 fallback the article describes did not change."
     }
   ]
 }
