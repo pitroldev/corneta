@@ -462,11 +462,16 @@ pub(crate) const TARGET_STALL_MS: u64 = 15_000;
 /// otherwise hold it forever, since FFmpeg sets no timeout there.
 pub(crate) const TARGET_OPEN_MS: u64 = 25_000;
 
+/// Sustained output growth needed before a restart counts as a mid-stream interruption rather than
+/// a startup failure.
+pub(crate) const HEALTHY_RUN_MS: u64 = 30_000;
+
 /// Follows the bytes a destination's FFmpeg reports as written in its stats lines.
 #[derive(Debug)]
 pub(crate) struct ProgressWatch {
     started_ms: u64,
     written_kb: Option<f64>,
+    first_growth_ms: Option<u64>,
     last_growth_ms: Option<u64>,
 }
 
@@ -475,6 +480,7 @@ impl ProgressWatch {
         Self {
             started_ms,
             written_kb: None,
+            first_growth_ms: None,
             last_growth_ms: None,
         }
     }
@@ -484,6 +490,10 @@ impl ProgressWatch {
             return;
         };
         if self.written_kb.is_none_or(|last| kb > last) {
+            if self.stalled(now_ms) {
+                self.first_growth_ms = None;
+            }
+            self.first_growth_ms.get_or_insert(now_ms);
             self.written_kb = Some(kb);
             self.last_growth_ms = Some(now_ms);
         }
@@ -494,6 +504,17 @@ impl ProgressWatch {
             Some(at) => now_ms.saturating_sub(at) >= TARGET_STALL_MS,
             None => now_ms.saturating_sub(self.started_ms) >= TARGET_OPEN_MS,
         }
+    }
+
+    pub(crate) fn wrote_any(&self) -> bool {
+        self.written_kb.is_some()
+    }
+
+    pub(crate) fn healthy_run(&self) -> bool {
+        matches!(
+            (self.first_growth_ms, self.last_growth_ms),
+            (Some(first), Some(last)) if last.saturating_sub(first) >= HEALTHY_RUN_MS
+        )
     }
 }
 
@@ -559,7 +580,13 @@ pub(crate) fn stats_written_kb(line: &str) -> Option<f64> {
 
 /// The video codec an FFmpeg command line encodes with, or `copy`.
 pub(crate) fn video_codec(args: &[String]) -> Option<&str> {
-    args.windows(2)
+    let start = args
+        .iter()
+        .position(|arg| arg == "-i")
+        .map_or(0, |index| index + 2);
+    args.get(start..)
+        .unwrap_or(args)
+        .windows(2)
         .find(|pair| pair[0] == "-c:v")
         .map(|pair| pair[1].as_str())
 }
@@ -1293,6 +1320,31 @@ mod tests {
         assert!(!watch.stalled(18_500 + TARGET_STALL_MS - 1));
         // Stats that stop altogether count the same way.
         assert!(watch.stalled(18_500 + TARGET_STALL_MS));
+        assert!(watch.wrote_any());
+        // The stall before 18_500 reset the streak; 30 s of steady growth restores it.
+        assert!(!watch.healthy_run());
+        watch.on_stats(Some(1_200.0), 30_000);
+        watch.on_stats(Some(1_300.0), 42_000);
+        watch.on_stats(Some(1_400.0), 18_500 + HEALTHY_RUN_MS);
+        assert!(watch.healthy_run());
+    }
+
+    #[test]
+    fn video_codec_skips_input_decoder_before_input_flag() {
+        let args: Vec<String> = [
+            "-hwaccel",
+            "cuda",
+            "-c:v",
+            "h264_cuvid",
+            "-i",
+            "in",
+            "-c:v",
+            "h264_nvenc",
+            "out",
+        ]
+        .map(String::from)
+        .to_vec();
+        assert_eq!(video_codec(&args), Some("h264_nvenc"));
     }
 
     #[test]

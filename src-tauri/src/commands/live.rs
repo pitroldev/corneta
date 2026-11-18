@@ -930,10 +930,16 @@ async fn start_engine_inner(
                     )
                 };
                 let accelerated = if gpu_pipeline {
-                    crate::gpu_pipeline::candidate(&args)
+                    crate::gpu_pipeline::candidate_for_live(&app_t, &args, &run_flag).await
                 } else {
                     None
                 };
+                if !run_flag.load(Ordering::Relaxed) {
+                    break;
+                }
+                if pause_flag.load(Ordering::Relaxed) || !signal.load(Ordering::Relaxed) {
+                    continue;
+                }
                 let used_gpu_pipeline = accelerated.is_some();
                 if let Some(accelerated) = accelerated {
                     args = accelerated;
@@ -1097,8 +1103,17 @@ async fn start_engine_inner(
                 if !run_flag.load(Ordering::Relaxed) {
                     break;
                 }
-                if used_gpu_pipeline && !killed {
+                let unexpected_exit =
+                    !rebitrate && !signal_lost && !paused_kill && !reencode_restart;
+                let mut gpu_fallback_retry = false;
+                if used_gpu_pipeline && unexpected_exit && !progress.healthy_run() {
                     gpu_pipeline = false;
+                    if !progress.wrote_any() && !stalled && !auth_flag.load(Ordering::Relaxed) {
+                        log::info!(
+                            "target GPU pipeline exited before output; retrying on standard decode"
+                        );
+                        gpu_fallback_retry = true;
+                    }
                 }
                 if encoder_failed && !killed && !software_encoder {
                     software_encoder = true;
@@ -1117,7 +1132,10 @@ async fn start_engine_inner(
                     continue;
                 }
                 // Bitrate, encoder and re-encode changes do not need the network-reconnect backoff.
-                if rebitrate || reencode_restart || (encoder_failed && software_encoder && !stalled)
+                if rebitrate
+                    || reencode_restart
+                    || gpu_fallback_retry
+                    || (encoder_failed && software_encoder && !stalled)
                 {
                     continue;
                 }

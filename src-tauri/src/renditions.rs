@@ -161,10 +161,16 @@ pub(crate) fn start(
                     continue;
                 }
                 let accelerated = if gpu_pipeline {
-                    crate::gpu_pipeline::candidate(&plan.args)
+                    crate::gpu_pipeline::candidate_for_live(&app, &plan.args, &running).await
                 } else {
                     None
                 };
+                if !running.load(Ordering::Relaxed)
+                    || !signal.load(Ordering::Relaxed)
+                    || rendition.demand.load(Ordering::Relaxed) == 0
+                {
+                    continue;
+                }
                 let used_gpu_pipeline = accelerated.is_some();
                 let args = accelerated.unwrap_or_else(|| plan.args.clone());
                 let spawned = app
@@ -224,8 +230,10 @@ pub(crate) fn start(
                     .await;
                 }
                 if !expected_stop {
-                    if used_gpu_pipeline {
+                    if used_gpu_pipeline && !progress.healthy_run() {
                         gpu_pipeline = false;
+                        log::info!("shared GPU pipeline exited before a healthy run; retrying on standard decode");
+                        continue;
                     }
                     if record_failure(&mut failures, &progress) {
                         rendition.failed.store(true, Ordering::Relaxed);
