@@ -263,8 +263,12 @@ fn setup_and_pump(
             return SetupOutcome::Done;
         }
         if Instant::now() > deadline {
+            // AV1 needs a keyframe: the connect-time av1C from MediaMTX is a placeholder.
+            let video_ready = avcc.as_ref().is_some_and(|a| {
+                a.codec() != crate::platforms::VideoCodec::Av1 || saw_av1_keyframe
+            });
             // Synthesize a 48 kHz stereo ASC when the destination still needs an audio track.
-            if avcc.is_some() && asc.is_none() {
+            if video_ready && asc.is_none() {
                 asc = Some(Asc {
                     bytes: vec![0xAF, 0x00, 0x11, 0x90, 0x56, 0xE5, 0x00],
                     sample_rate: 48000,
@@ -273,11 +277,8 @@ fn setup_and_pump(
                 });
                 break;
             }
-            if avcc.is_some() && asc.is_some() {
-                break;
-            }
             log::warn!(
-                "splicer: no OBS sequence header within {SETUP_DEADLINE_MS}ms; falling back"
+                "splicer: no usable OBS video header within {SETUP_DEADLINE_MS}ms; falling back"
             );
             kill(&mut in_child);
             drain_and_join(&rx, Some(reader));
@@ -301,8 +302,10 @@ fn setup_and_pump(
                     if asc.is_none() {
                         return fail_setup(&mut in_child, &rx, reader, opts, "unreadable ASC");
                     }
-                } else if (tag.tag_type == 9 || tag.tag_type == 8) && pending.len() < 512 {
+                } else if tag.tag_type == 9 || tag.tag_type == 8 {
+                    // Detect the AV1 keyframe even when `pending` is full.
                     if tag.tag_type == 9
+                        && !saw_av1_keyframe
                         && avcc
                             .as_ref()
                             .is_some_and(|a| a.codec() == crate::platforms::VideoCodec::Av1)
@@ -314,8 +317,12 @@ fn setup_and_pump(
                             avcc = Some(real_avcc);
                         }
                         saw_av1_keyframe = true;
+                        // The slate ignores tags before the first keyframe, so they need no replay.
+                        pending.clear();
                     }
-                    pending.push_back(tag);
+                    if pending.len() < 512 {
+                        pending.push_back(tag);
+                    }
                 }
             }
             Err(TryRecvError::Empty) => std::thread::sleep(Duration::from_millis(20)),
@@ -332,6 +339,16 @@ fn setup_and_pump(
     }
     let avcc = avcc.unwrap();
     let asc = asc.unwrap();
+    // Without the in-band header the real AV1 size is unknown and the slate would not match.
+    if super::enhanced_flv::is_mediamtx_synthetic_av1(&avcc) {
+        return fail_setup(
+            &mut in_child,
+            &rx,
+            reader,
+            opts,
+            "AV1 keyframe without a sequence header",
+        );
+    }
 
     // Stream-copy splicing supports progressive 8-bit 4:2:0 H.264, HEVC, and AV1.
     let i = &avcc.info;
@@ -451,6 +468,7 @@ fn setup_and_pump(
     let mut primed = false;
     let mut video_ok = true;
     let mut audio_ok = true;
+    let mut skip_rasl = false;
     let pump_started = Instant::now();
     let mut publisher_budget = RestartBudget::new(u32::MAX, PUBLISHER_QUIET_MS);
     let mut publisher_down_since: Option<Instant> = None;
@@ -476,6 +494,7 @@ fn setup_and_pump(
                 &mut need_copy_epoch,
                 &mut v_epoch,
                 &mut last_video_at,
+                &mut skip_rasl,
                 &mut ops,
             );
         }
@@ -499,6 +518,7 @@ fn setup_and_pump(
                         &mut need_copy_epoch,
                         &mut v_epoch,
                         &mut last_video_at,
+                        &mut skip_rasl,
                         &mut ops,
                     );
                 }
@@ -663,6 +683,7 @@ fn handle_input_tag(
     need_copy_epoch: &mut bool,
     v_epoch: &mut i64,
     last_video_at: &mut Instant,
+    skip_rasl: &mut bool,
     ops: &mut Vec<WriteOp>,
 ) {
     // Output extradata is fixed: incompatible reconnects must hold the slate, not replace the publisher.
@@ -751,6 +772,8 @@ fn handle_input_tag(
             if tag.tag_type == 9 && !forced && tag_is_idr(&tag.data, avcc.length_size) {
                 // Reassert OBS SPS/PPS before the return IDR.
                 emit_resume_idr(&tag, avcc, clock, need_copy_epoch, v_epoch, ops);
+                *skip_rasl = avcc.codec() == crate::platforms::VideoCodec::Hevc
+                    && super::enhanced_flv::hevc_is_cra(&tag.data, avcc.length_size);
                 *state = State::Copy;
                 *last_video_at = Instant::now();
             }
@@ -762,7 +785,13 @@ fn handle_input_tag(
             }
             match tag.tag_type {
                 9 => {
-                    if tag_is_video_coded_frame(&tag.data) {
+                    if tag_is_video_coded_frame(&tag.data)
+                        && !super::enhanced_flv::drop_rasl_after_cra(
+                            skip_rasl,
+                            &tag.data,
+                            avcc.length_size,
+                        )
+                    {
                         emit_copy_video(&tag, avcc, clock, need_copy_epoch, v_epoch, ops);
                         *last_video_at = Instant::now();
                     }

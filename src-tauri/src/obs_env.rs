@@ -120,9 +120,9 @@ pub(crate) fn read_settings_from(config_dir: &Path) -> Option<WebSocketSettings>
     read_small(&config_dir.join("global.ini")).and_then(|raw| parse_global_ini(&raw))
 }
 
-fn parse_active_profile_dir(global_ini: &str) -> Option<String> {
+fn parse_active_profile_dir(ini: &str) -> Option<String> {
     let mut in_basic = false;
-    for line in global_ini.trim_start_matches('\u{feff}').lines() {
+    for line in ini.trim_start_matches('\u{feff}').lines() {
         let line = line.trim_end_matches('\r');
         let trimmed = line.trim();
         if trimmed.starts_with('[') && trimmed.ends_with(']') {
@@ -145,7 +145,8 @@ fn parse_active_profile_dir(global_ini: &str) -> Option<String> {
     None
 }
 
-pub(crate) fn parse_profile_ini_codec(basic_ini: &str) -> Option<crate::platforms::VideoCodec> {
+/// OBS writes only changed values; a missing encoder key means OBS's H.264 default for that mode.
+pub(crate) fn parse_profile_ini_codec(basic_ini: &str) -> crate::platforms::VideoCodec {
     let mut section = "";
     let mut mode = "Simple";
     let mut simple_enc: Option<&str> = None;
@@ -173,36 +174,28 @@ pub(crate) fn parse_profile_ini_codec(basic_ini: &str) -> Option<crate::platform
         }
     }
     let chosen = if mode.eq_ignore_ascii_case("Advanced") {
-        adv_enc.or(simple_enc)
+        adv_enc
     } else {
-        simple_enc.or(adv_enc)
-    }?;
-    (!chosen.is_empty()).then(|| crate::platforms::VideoCodec::from_obs_encoder(chosen))
+        simple_enc
+    };
+    chosen
+        .filter(|encoder| !encoder.is_empty())
+        .map_or(crate::platforms::VideoCodec::H264, |encoder| {
+            crate::platforms::VideoCodec::from_obs_encoder(encoder)
+        })
 }
 
-pub(crate) fn parse_stream_encoder_json(raw: &str) -> Option<crate::platforms::VideoCodec> {
-    let value: serde_json::Value = serde_json::from_str(raw.trim_start_matches('\u{feff}')).ok()?;
-    let obj = value.as_object()?;
-    for key in ["encoder", "codec", "type"] {
-        if let Some(s) = obj.get(key).and_then(serde_json::Value::as_str) {
-            if !s.trim().is_empty() {
-                return Some(crate::platforms::VideoCodec::from_obs_encoder(s));
-            }
-        }
-    }
-    None
-}
-
+/// OBS 31 moved the active profile to `user.ini`; the `global.ini` copy goes stale after migrating.
 pub(crate) fn read_profile_codec_from(config_dir: &Path) -> Option<crate::platforms::VideoCodec> {
-    let global = read_small(&config_dir.join("global.ini"))?;
-    let profile_dir = parse_active_profile_dir(&global)?;
-    let dir = config_dir.join("basic").join("profiles").join(profile_dir);
-    if let Some(codec) =
-        read_small(&dir.join("basic.ini")).and_then(|raw| parse_profile_ini_codec(&raw))
-    {
-        return Some(codec);
-    }
-    read_small(&dir.join("streamEncoder.json")).and_then(|raw| parse_stream_encoder_json(&raw))
+    let profile_dir = ["user.ini", "global.ini"].iter().find_map(|name| {
+        read_small(&config_dir.join(name)).and_then(|raw| parse_active_profile_dir(&raw))
+    })?;
+    let basic_ini = config_dir
+        .join("basic")
+        .join("profiles")
+        .join(profile_dir)
+        .join("basic.ini");
+    read_small(&basic_ini).map(|raw| parse_profile_ini_codec(&raw))
 }
 
 pub fn profile_video_codec() -> Option<crate::platforms::VideoCodec> {
@@ -523,38 +516,53 @@ mod tests {
     }
 
     #[test]
-    fn reads_obs_profile_video_codec_from_basic_ini_and_stream_encoder_json() {
+    fn reads_obs_profile_video_codec_from_the_active_profile() {
         use crate::platforms::VideoCodec;
 
         assert_eq!(
             parse_profile_ini_codec(
                 "[Output]\nMode=Simple\n[SimpleOutput]\nStreamEncoder=nvenc_hevc\n[AdvOut]\nEncoder=obs_x264\n"
             ),
-            Some(VideoCodec::Hevc)
+            VideoCodec::Hevc
         );
         assert_eq!(
             parse_profile_ini_codec(
                 "[Output]\nMode=Advanced\n[SimpleOutput]\nStreamEncoder=nvenc\n[AdvOut]\nEncoder=jim_av1_nvenc\n"
             ),
-            Some(VideoCodec::Av1)
+            VideoCodec::Av1
+        );
+        // A missing key is OBS's H.264 default, not the other output mode's encoder.
+        assert_eq!(
+            parse_profile_ini_codec(
+                "[Output]\nMode=Advanced\n[SimpleOutput]\nStreamEncoder=nvenc_hevc\n"
+            ),
+            VideoCodec::H264
         );
         assert_eq!(
-            parse_stream_encoder_json(r#"{"bitrate":6500,"encoder":"jim_hevc_nvenc"}"#),
-            Some(VideoCodec::Hevc)
+            parse_profile_ini_codec("[SimpleOutput]\n[AdvOut]\nEncoder=jim_av1_nvenc\n"),
+            VideoCodec::H264
         );
 
         let dir =
             std::env::temp_dir().join(format!("corneta-obs-profile-codec-{}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
-        let prof = dir.join("basic").join("profiles").join("Sem_nome");
-        std::fs::create_dir_all(&prof).unwrap();
+        let profiles = dir.join("basic").join("profiles");
+        for (name, encoder) in [("Sem_nome", "qsv_av1"), ("Novo", "nvenc_hevc")] {
+            std::fs::create_dir_all(profiles.join(name)).unwrap();
+            std::fs::write(
+                profiles.join(name).join("basic.ini"),
+                format!("[Output]\nMode=Simple\n[SimpleOutput]\nStreamEncoder={encoder}\n"),
+            )
+            .unwrap();
+        }
         std::fs::write(dir.join("global.ini"), "[Basic]\nProfileDir=Sem_nome\n").unwrap();
-        std::fs::write(
-            prof.join("basic.ini"),
-            "[Output]\nMode=Simple\n[SimpleOutput]\nStreamEncoder=qsv_av1\n",
-        )
-        .unwrap();
         assert_eq!(read_profile_codec_from(&dir), Some(VideoCodec::Av1));
+        std::fs::write(dir.join("user.ini"), "[Basic]\nProfileDir=Novo\n").unwrap();
+        assert_eq!(
+            read_profile_codec_from(&dir),
+            Some(VideoCodec::Hevc),
+            "OBS 31 user.ini wins over the stale global.ini copy"
+        );
         std::fs::remove_dir_all(&dir).unwrap();
     }
 }

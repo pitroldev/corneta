@@ -2505,7 +2505,7 @@ export const en: Dict = {
   "replay.warn.codec":
     "This recording is in a format the player can't play. Open it from the folder.",
   "replay.warn.enhancedCodec":
-    "This recording is in {codec} (Enhanced RTMP) and needs the Windows video extension to play here. The file is intact — open the folder to watch it in VLC or MPV.",
+    "This recording is in {codec} (Enhanced RTMP), which the player here doesn't play yet. The file is intact — open the folder to watch it in VLC or MPV.",
   "replay.warn.estimated":
     "I estimated the sync — if the video is off from the chart, use the nudge.",
   "replay.warn.segments":

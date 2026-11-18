@@ -36,6 +36,16 @@ fn toast(app: &AppHandle, kind: &str, detail: Option<String>) {
     );
 }
 
+/// The lookup is a blocking local HTTP call; keep it off the async worker.
+async fn source_codec(source: &str) -> crate::platforms::VideoCodec {
+    let source = source.to_string();
+    tauri::async_runtime::spawn_blocking(move || crate::commands::mediamtx_source_codec(&source))
+        .await
+        .ok()
+        .flatten()
+        .unwrap_or_default()
+}
+
 fn now_ms() -> u64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
@@ -122,12 +132,12 @@ pub async fn run(
                             last_advance = Instant::now();
                         }
                         if let Some(anchor_out) = act.anchor_out_ms {
-                            let codec =
-                                crate::commands::mediamtx_source_codec(&source).unwrap_or_default();
+                            let anchor_ms = now_ms().saturating_sub(anchor_out);
+                            let codec = source_codec(&source).await;
                             session::record_recording(
                                 &session_path,
                                 seg,
-                                now_ms().saturating_sub(anchor_out),
+                                anchor_ms,
                                 &out.to_string_lossy(),
                                 codec.as_str(),
                                 false,
@@ -165,12 +175,13 @@ pub async fn run(
                         spawn_at.elapsed().as_millis(),
                         disk::file_len(&out),
                     ) {
-                        let codec =
-                            crate::commands::mediamtx_source_codec(&source).unwrap_or_default();
+                        let anchor_ms =
+                            now_ms().saturating_sub(spawn_at.elapsed().as_millis() as u64);
+                        let codec = source_codec(&source).await;
                         session::record_recording(
                             &session_path,
                             seg,
-                            now_ms().saturating_sub(spawn_at.elapsed().as_millis() as u64),
+                            anchor_ms,
                             &out.to_string_lossy(),
                             codec.as_str(),
                             true,

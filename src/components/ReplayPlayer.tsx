@@ -156,8 +156,8 @@ export function ReplayPlayer({
 
   const segment = tuned.segments[segIndex];
   const codecUnsupported = segment ? !isPlayableCodec(segment.codec) : false;
-  const enhancedCodec =
-    enhancedCodecLabel(segment?.codec) ?? firstEnhancedCodecLabel(tuned);
+  const segmentEnhancedCodec = enhancedCodecLabel(segment?.codec);
+  const sessionEnhancedCodec = firstEnhancedCodecLabel(tuned);
   const source = useReplaySource(
     sessionId,
     codecUnsupported ? undefined : segment?.path,
@@ -535,8 +535,10 @@ export function ReplayPlayer({
               {mediaState === "unsupported" ? (
                 <div className="flex flex-col items-center gap-3 pb-3">
                   <Note tone="bad">
-                    {enhancedCodec
-                      ? t("replay.warn.enhancedCodec", { codec: enhancedCodec })
+                    {segmentEnhancedCodec
+                      ? t("replay.warn.enhancedCodec", {
+                          codec: segmentEnhancedCodec,
+                        })
                       : t("replay.warn.codec")}
                   </Note>
                   <Button
@@ -950,8 +952,10 @@ export function ReplayPlayer({
             )}
             {hasUnplayableCodec(tuned) && !codecUnsupported && (
               <Note tone="bad">
-                {enhancedCodec
-                  ? t("replay.warn.enhancedCodec", { codec: enhancedCodec })
+                {sessionEnhancedCodec
+                  ? t("replay.warn.enhancedCodec", {
+                      codec: sessionEnhancedCodec,
+                    })
                   : t("replay.warn.codec")}
               </Note>
             )}

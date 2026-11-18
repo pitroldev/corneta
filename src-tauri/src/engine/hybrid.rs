@@ -37,7 +37,7 @@ pub struct SourceSignal {
     pub width: u32,
     pub height: u32,
     pub fps: f64,
-    /// Known in OBS's simple output mode or from `streamEncoder.json`.
+    /// Known only in OBS's simple output mode.
     pub video_kbps: Option<u32>,
     pub video_codec: VideoCodec,
 }

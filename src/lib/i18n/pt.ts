@@ -2496,7 +2496,7 @@ export const pt = {
   "replay.warn.codec":
     "Essa gravação está num formato que o player não toca. Abra na pasta.",
   "replay.warn.enhancedCodec":
-    "Esta gravação está em {codec} (Enhanced RTMP) e depende da extensão de vídeo do Windows pra tocar aqui. O arquivo está intacto — abra na pasta pra ver no VLC ou MPV.",
+    "Essa gravação está em {codec} (Enhanced RTMP), que o player daqui ainda não toca. O arquivo está intacto — abra na pasta pra ver no VLC ou MPV.",
   "replay.warn.estimated":
     "Estimei a sincronia — se o vídeo estiver fora do gráfico, use o ajuste.",
   "replay.warn.segments":

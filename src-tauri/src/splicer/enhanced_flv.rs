@@ -511,23 +511,25 @@ pub(super) fn parse_av1_keyframe_seqhdr(data: &[u8]) -> Option<AvcC> {
     let (seq_obu, payload) = find_av1_seq_obu(&data[5..])?;
     let info = parse_av1_sequence_header_payload(payload)?;
     let mut raw = Vec::with_capacity(4 + seq_obu.len());
-    raw.push(0x81);
-    raw.push(
-        ((info.seq_profile & 0x07) << 5)
-            | ((info.seq_tier_0 & 1) << 4)
-            | (info.seq_level_idx_0 & 0x1F),
-    );
-    raw.push(
-        ((info.high_bitdepth & 1) << 6)
+    raw.extend_from_slice(&av1c_fixed_header(&info));
+    raw.extend_from_slice(seq_obu);
+    parse_av1c(&raw)
+}
+
+/// The first four `av1C` bytes; `seq_tier_0` is the top bit of the third byte, not part of the level.
+fn av1c_fixed_header(info: &Av1SeqHeaderInfo) -> [u8; 4] {
+    [
+        0x81,
+        ((info.seq_profile & 0x07) << 5) | (info.seq_level_idx_0 & 0x1F),
+        ((info.seq_tier_0 & 1) << 7)
+            | ((info.high_bitdepth & 1) << 6)
             | ((info.twelve_bit & 1) << 5)
             | ((info.monochrome & 1) << 4)
             | ((info.subsampling_x & 1) << 3)
             | ((info.subsampling_y & 1) << 2)
             | (info.chroma_sample_position & 0x03),
-    );
-    raw.push(0x00);
-    raw.extend_from_slice(seq_obu);
-    parse_av1c(&raw)
+        0x00,
+    ]
 }
 
 /// Verify both the FLV keyframe nibble and an in-band IRAP NAL (`hvc1`) or OBU payload (`av01`).
@@ -553,6 +555,46 @@ pub(super) fn tag_is_enhanced_keyframe(data: &[u8], length_size: u8) -> bool {
         }
         b"av01" => data.len() > 5,
         _ => false,
+    }
+}
+
+fn hevc_first_vcl_type(data: &[u8], length_size: u8) -> Option<u8> {
+    if data.len() <= 5 || !is_ex_header(data) || &data[1..5] != b"hvc1" {
+        return None;
+    }
+    let hdr_len = if (data[0] & 0x0F) == PKT_CODED_FRAMES {
+        8
+    } else {
+        5
+    };
+    if data.len() <= hdr_len {
+        return None;
+    }
+    each_nalu(&data[hdr_len..], length_size)
+        .iter()
+        .find_map(|n| {
+            let nal_type = (*n.first()? >> 1) & 0x3F;
+            (nal_type < 32).then_some(nal_type)
+        })
+}
+
+pub(super) fn hevc_is_cra(data: &[u8], length_size: u8) -> bool {
+    hevc_first_vcl_type(data, length_size) == Some(21)
+}
+
+/// After resuming at a CRA, RASL pictures reference frames from before the splice; drop them
+/// until the first non-leading picture. Returns whether this frame must be dropped.
+pub(super) fn drop_rasl_after_cra(skipping: &mut bool, data: &[u8], length_size: u8) -> bool {
+    if !*skipping {
+        return false;
+    }
+    match hevc_first_vcl_type(data, length_size) {
+        Some(8 | 9) => true,
+        Some(6 | 7) => false,
+        _ => {
+            *skipping = false;
+            false
+        }
     }
 }
 
@@ -623,5 +665,77 @@ pub(super) fn decorate_enhanced_keyframe(data: &[u8], avcc: &AvcC) -> Vec<u8> {
             }
             out
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn hevc_frame(first_byte: u8, nal_types: &[u8]) -> Vec<u8> {
+        let mut tag = vec![first_byte, b'h', b'v', b'c', b'1'];
+        for &nal_type in nal_types {
+            let nal = [nal_type << 1, 0x01, 0xAA];
+            tag.extend_from_slice(&(nal.len() as u32).to_be_bytes());
+            tag.extend_from_slice(&nal);
+        }
+        tag
+    }
+
+    #[test]
+    fn av1c_keeps_the_tier_out_of_the_level_field() {
+        let info = Av1SeqHeaderInfo {
+            width: 1920,
+            height: 1080,
+            seq_profile: 0,
+            seq_level_idx_0: 13,
+            seq_tier_0: 1,
+            high_bitdepth: 0,
+            twelve_bit: 0,
+            monochrome: 0,
+            subsampling_x: 1,
+            subsampling_y: 1,
+            chroma_sample_position: 0,
+        };
+        assert_eq!(av1c_fixed_header(&info), [0x81, 0x0D, 0x8C, 0x00]);
+    }
+
+    #[test]
+    fn resuming_at_a_cra_drops_rasl_but_keeps_radl_and_trailing_pictures() {
+        // AUD (35) precedes the CRA slice (21); only VCL NAL types decide.
+        let cra = hevc_frame(0x93, &[35, 21]);
+        assert!(hevc_is_cra(&cra, 4));
+        assert!(!hevc_is_cra(&hevc_frame(0x93, &[19]), 4));
+
+        let mut skipping = true;
+        assert!(drop_rasl_after_cra(
+            &mut skipping,
+            &hevc_frame(0xA3, &[8]),
+            4
+        ));
+        assert!(drop_rasl_after_cra(
+            &mut skipping,
+            &hevc_frame(0xA3, &[39, 9]),
+            4
+        ));
+        assert!(!drop_rasl_after_cra(
+            &mut skipping,
+            &hevc_frame(0xA3, &[7]),
+            4
+        ));
+        assert!(
+            skipping,
+            "RADL pictures are decodable and keep the RASL window open"
+        );
+        assert!(!drop_rasl_after_cra(
+            &mut skipping,
+            &hevc_frame(0xA3, &[1]),
+            4
+        ));
+        assert!(!skipping);
+        assert!(
+            !drop_rasl_after_cra(&mut skipping, &hevc_frame(0xA3, &[9]), 4),
+            "RASL after the first trailing picture belongs to a later CRA that was copied whole"
+        );
     }
 }

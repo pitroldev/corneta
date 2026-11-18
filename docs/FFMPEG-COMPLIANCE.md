@@ -54,7 +54,7 @@ For the pinned build, check the conditional selection of `nv-codec-headers`; the
 
 If the vendor's correspondence cannot be proven, a controlled build requires an explicit decision, preserved inputs and new media/performance tests. Do not swap the binary or silently remove codecs to make the gate pass. See the [FFmpeg distribution terms](https://ffmpeg.org/legal.html).
 
-For Enhanced RTMP inputs (`hvc1` HEVC and `av01` AV1), Corneta either copies the incoming OBS bitstream (`-c:v copy`) to destinations whose `copyLimits.acceptedCodecs` allow it, or decodes the input and re-encodes to H.264 for legacy destinations. When pre-encoding the BE RIGHT BACK slate to splice an incoming HEVC stream, Corneta invokes only the user's GPU hardware encoders (`hevc_nvenc`, `hevc_qsv`, `hevc_amf`) and falls back to the H.264 compositor when none is available, never invoking `libx265` at runtime.
+For Enhanced RTMP inputs (`hvc1` HEVC and `av01` AV1), Corneta either copies the incoming OBS bitstream (`-c:v copy`) to destinations whose `copyLimits.acceptedCodecs` allow it, or decodes the input and re-encodes to H.264 for legacy destinations. When pre-encoding the BE RIGHT BACK slate to splice an incoming HEVC stream, Corneta invokes only the user's GPU hardware encoders (`hevc_nvenc`, `hevc_qsv`, `hevc_amf`) and falls back to the H.264 compositor when none is available, never invoking `libx265` at runtime. For an incoming AV1 stream, the slate tries the GPU AV1 encoders (`av1_nvenc`, `av1_qsv`, `av1_amf`) first and then the bundled software `libsvtav1` encoder, before the same H.264 compositor fallback.
 
 ## Packaging and availability
 
