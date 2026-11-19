@@ -1,4 +1,4 @@
-use super::hybrid::{effective_action, effective_preset};
+use super::hybrid::{effective_action, effective_preset, strictest_copy_limits};
 use crate::config::{AppConfig, Reframe, Target};
 
 /// `auto_codec` must pass a real encode probe; `-encoders` does not prove hardware availability.
@@ -288,7 +288,7 @@ fn program_resolution(config: &AppConfig) -> (u32, u32) {
     }
 }
 
-// Copy targets inherit the program bitrate.
+/// Copy targets inherit the program bitrate, so it stays within the strictest of them.
 pub fn program_spec(config: &AppConfig) -> ProgramSpec {
     let mut max_fps = 30u32;
     let mut max_kbps = 4500u32;
@@ -302,7 +302,9 @@ pub fn program_spec(config: &AppConfig) -> ProgramSpec {
         w,
         h,
         fps: max_fps.clamp(30, 60),
-        video_kbps: max_kbps.clamp(2500, 12_000),
+        video_kbps: max_kbps
+            .clamp(2500, 12_000)
+            .min(strictest_copy_limits(config).map_or(u32::MAX, |l| l.max_kbps)),
     }
 }
 
@@ -712,6 +714,26 @@ mod tests {
             vec![tgt("facebook", Some(preset(1280, 720, 30, 1000)))],
         );
         assert!(program_spec(&low).video_kbps >= 2500);
+    }
+
+    #[test]
+    fn program_bitrate_stays_within_the_strictest_copy_destination() {
+        let targets = || {
+            vec![
+                tgt("youtube", Some(preset(1920, 1080, 60, 9000))),
+                tgt("twitch", Some(preset(1920, 1080, 60, 6000))),
+            ]
+        };
+        assert_eq!(
+            program_spec(&cfg("hybrid", targets())).video_kbps,
+            6000,
+            "Twitch copies the program, so a 9000 kbps YouTube preset must not reach it"
+        );
+        assert_eq!(
+            program_spec(&cfg("per-platform", targets())).video_kbps,
+            9000,
+            "every destination re-encodes, so the program keeps the highest preset"
+        );
     }
 
     #[test]

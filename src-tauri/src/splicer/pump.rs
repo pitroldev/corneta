@@ -387,6 +387,7 @@ fn setup_and_pump(
             height: opts.spec.h,
             sample_rate: asc.sample_rate,
             channels: asc.channels,
+            video_kbps: opts.spec.video_kbps,
         },
     ) {
         Some(m) => m,

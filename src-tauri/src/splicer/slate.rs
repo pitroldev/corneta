@@ -23,6 +23,8 @@ pub(super) struct SlateMediaSpec {
     pub height: u32,
     pub sample_rate: u32,
     pub channels: u8,
+    /// Peak video bitrate; copy destinations receive the slate's packets unchanged.
+    pub video_kbps: u32,
 }
 
 pub(super) fn map_profile(profile_idc: u8) -> Option<&'static str> {
@@ -61,15 +63,36 @@ pub(super) fn kill(child: &mut Child) {
     let _ = child.wait();
 }
 
-fn slate_encoder_candidates(
+/// Cap every encoder at the program bitrate with a one-second buffer. Hardware encoders aim at
+/// half of it so they stay in VBR instead of padding a still slate up to the cap.
+fn rate_args(encoder: &str, kbps: u32) -> Vec<String> {
+    let mut args: Vec<String> = match encoder {
+        "libx264" => vec!["-crf".into(), "23".into()],
+        "libsvtav1" => vec!["-crf".into(), "35".into()],
+        _ => vec!["-b:v".into(), format!("{}k", (kbps / 2).max(1))],
+    };
+    let peak = format!("{kbps}k");
+    args.extend(["-maxrate".into(), peak.clone(), "-bufsize".into(), peak]);
+    args
+}
+
+pub(super) fn slate_encoder_candidates(
     obs: &AvcC,
     hw_codec: Option<&str>,
     gop: &str,
+    kbps: u32,
 ) -> Option<Vec<Vec<String>>> {
+    let hardware = |enc: &str| -> Vec<String> {
+        let mut args: Vec<String> = ["-c:v", enc, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"]
+            .map(String::from)
+            .to_vec();
+        args.extend(rate_args(enc, kbps));
+        args
+    };
     match obs.codec() {
         VideoCodec::H264 => {
             let profile = map_profile(obs.info.profile_idc)?;
-            Some(vec![[
+            let mut args: Vec<String> = [
                 "-c:v",
                 "libx264",
                 "-profile:v",
@@ -84,7 +107,9 @@ fn slate_encoder_candidates(
                 "0",
             ]
             .map(String::from)
-            .to_vec()])
+            .to_vec();
+            args.extend(rate_args("libx264", kbps));
+            Some(vec![args])
         }
         // Use only hardware HEVC encoders; fall back to the H.264 compositor when unavailable.
         VideoCodec::Hevc => {
@@ -93,16 +118,7 @@ fn slate_encoder_candidates(
                 Some("h264_amf") => ["hevc_amf", "hevc_nvenc", "hevc_qsv"],
                 _ => ["hevc_nvenc", "hevc_qsv", "hevc_amf"],
             };
-            Some(
-                order
-                    .into_iter()
-                    .map(|enc| {
-                        ["-c:v", enc, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"]
-                            .map(String::from)
-                            .to_vec()
-                    })
-                    .collect(),
-            )
+            Some(order.into_iter().map(hardware).collect())
         }
         VideoCodec::Av1 => {
             let hw_order = match hw_codec {
@@ -110,28 +126,21 @@ fn slate_encoder_candidates(
                 Some("h264_amf") => ["av1_amf", "av1_nvenc", "av1_qsv"],
                 _ => ["av1_nvenc", "av1_qsv", "av1_amf"],
             };
-            let mut list: Vec<Vec<String>> = hw_order
-                .into_iter()
-                .map(|enc| {
-                    ["-c:v", enc, "-g", gop, "-bf", "0", "-pix_fmt", "yuv420p"]
-                        .map(String::from)
-                        .to_vec()
-                })
-                .collect();
-            list.push(
-                [
-                    "-c:v",
-                    "libsvtav1",
-                    "-preset",
-                    "12",
-                    "-g",
-                    gop,
-                    "-pix_fmt",
-                    "yuv420p",
-                ]
-                .map(String::from)
-                .to_vec(),
-            );
+            let mut list: Vec<Vec<String>> = hw_order.into_iter().map(hardware).collect();
+            let mut software: Vec<String> = [
+                "-c:v",
+                "libsvtav1",
+                "-preset",
+                "12",
+                "-g",
+                gop,
+                "-pix_fmt",
+                "yuv420p",
+            ]
+            .map(String::from)
+            .to_vec();
+            software.extend(rate_args("libsvtav1", kbps));
+            list.push(software);
             Some(list)
         }
     }
@@ -148,20 +157,12 @@ pub(super) fn build_slate_media(
 ) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
     match slate {
         Slate::Still(still) => {
-            let frames =
-                build_slate_still(app, ffmpeg, still, spec.width, spec.height, obs, hw_codec)?;
+            let frames = build_slate_still(app, ffmpeg, still, spec, obs, hw_codec)?;
             Some((frames, Vec::new()))
         }
-        Slate::Video { path, has_audio } => build_slate_video(
-            app,
-            ffmpeg,
-            path,
-            *has_audio,
-            obs,
-            hw_codec,
-            spec.sample_rate,
-            spec.channels,
-        ),
+        Slate::Video { path, has_audio } => {
+            build_slate_video(app, ffmpeg, path, *has_audio, obs, hw_codec, spec)
+        }
     }
 }
 
@@ -169,13 +170,12 @@ fn build_slate_still(
     app: &AppHandle,
     ffmpeg: &Path,
     still: &[u8],
-    spec_w: u32,
-    spec_h: u32,
+    spec: &SlateMediaSpec,
     obs: &AvcC,
     hw_codec: Option<&str>,
 ) -> Option<Vec<SlateFrame>> {
     let gop = (SLATE_FPS * 2).to_string();
-    let candidates = slate_encoder_candidates(obs, hw_codec, &gop)?;
+    let candidates = slate_encoder_candidates(obs, hw_codec, &gop, spec.video_kbps)?;
     let dir = app.path().app_config_dir().ok()?.join("splice-tmp");
     let _ = std::fs::create_dir_all(&dir);
     let src = dir.join("slate_src.yuv");
@@ -193,7 +193,7 @@ fn build_slate_still(
             "-pix_fmt".into(),
             "yuv420p".into(),
             "-s".into(),
-            format!("{spec_w}x{spec_h}"),
+            format!("{}x{}", spec.width, spec.height),
             "-framerate".into(),
             SLATE_FPS.to_string(),
             "-stream_loop".into(),
@@ -237,7 +237,6 @@ fn build_slate_still(
 }
 
 /// Disable B-frames to keep slate CTS zero across loop boundaries.
-#[allow(clippy::too_many_arguments)]
 fn build_slate_video(
     app: &AppHandle,
     ffmpeg: &Path,
@@ -245,11 +244,11 @@ fn build_slate_video(
     has_audio: bool,
     obs: &AvcC,
     hw_codec: Option<&str>,
-    sr: u32,
-    ch: u8,
+    spec: &SlateMediaSpec,
 ) -> Option<(Vec<SlateFrame>, Vec<Vec<u8>>)> {
+    let (sr, ch) = (spec.sample_rate, spec.channels);
     let gop = (SLATE_FPS * 2).to_string();
-    let candidates = slate_encoder_candidates(obs, hw_codec, &gop)?;
+    let candidates = slate_encoder_candidates(obs, hw_codec, &gop, spec.video_kbps)?;
     let dir = app.path().app_config_dir().ok()?.join("splice-tmp");
     let _ = std::fs::create_dir_all(&dir);
     let out = dir.join("slate_vid.flv");

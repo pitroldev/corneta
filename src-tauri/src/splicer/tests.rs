@@ -6,7 +6,24 @@ use super::flv::{
     tag_is_video_seqhdr, write_ops, write_preamble, write_tag, FlvTag, WriteOp,
 };
 use super::pump::{emit_copy_video, emit_resume_idr, Clock};
-use super::slate::{extract_slate_media, SLATE_FPS};
+use super::slate::{extract_slate_media, slate_encoder_candidates, SLATE_FPS};
+
+const HEVC_SEQHDR: [u8; 132] = [
+    0x90, 0x68, 0x76, 0x63, 0x31, 0x01, 0x01, 0x60, 0x00, 0x00, 0x00, 0x90, 0x00, 0x00, 0x00, 0x00,
+    0x00, 0x78, 0xF0, 0x00, 0xFC, 0xFD, 0xF8, 0xF8, 0x00, 0x00, 0x0F, 0x03, 0x20, 0x00, 0x01, 0x00,
+    0x18, 0x40, 0x01, 0x0C, 0x01, 0xFF, 0xFF, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00,
+    0x03, 0x00, 0x00, 0x03, 0x00, 0x78, 0x97, 0x02, 0x40, 0x21, 0x00, 0x01, 0x00, 0x3A, 0x42, 0x01,
+    0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x78,
+    0xA0, 0x03, 0xC0, 0x80, 0x11, 0x07, 0xCB, 0x96, 0x5D, 0x29, 0x08, 0x46, 0x45, 0xFD, 0x0C, 0x04,
+    0x04, 0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03, 0x00, 0x79, 0x80, 0x17, 0x79, 0x44, 0x00,
+    0x02, 0xDC, 0x6C, 0x00, 0x00, 0xF4, 0x24, 0x04, 0x22, 0x00, 0x01, 0x00, 0x07, 0x44, 0x01, 0xC0,
+    0xAD, 0xF0, 0x33, 0x24,
+];
+
+const AV1_SEQHDR: [u8; 22] = [
+    0x90, 0x61, 0x76, 0x30, 0x31, 0x81, 0x08, 0x0C, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00, 0x42, 0xAB,
+    0xBF, 0xC3, 0x70, 0x08, 0x66, 0x01,
+];
 
 fn sample_avcc() -> Vec<u8> {
     let sps = [
@@ -121,17 +138,7 @@ fn each_nalu_rejects_oversized_prefix() {
 fn enhanced_rtmp_hevc_and_av1_headers_and_keyframes_parse() {
     use crate::platforms::VideoCodec;
 
-    let hevc_seq: [u8; 132] = [
-        0x90, 0x68, 0x76, 0x63, 0x31, 0x01, 0x01, 0x60, 0x00, 0x00, 0x00, 0x90, 0x00, 0x00, 0x00,
-        0x00, 0x00, 0x78, 0xF0, 0x00, 0xFC, 0xFD, 0xF8, 0xF8, 0x00, 0x00, 0x0F, 0x03, 0x20, 0x00,
-        0x01, 0x00, 0x18, 0x40, 0x01, 0x0C, 0x01, 0xFF, 0xFF, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00,
-        0x90, 0x00, 0x00, 0x03, 0x00, 0x00, 0x03, 0x00, 0x78, 0x97, 0x02, 0x40, 0x21, 0x00, 0x01,
-        0x00, 0x3A, 0x42, 0x01, 0x01, 0x01, 0x60, 0x00, 0x00, 0x03, 0x00, 0x90, 0x00, 0x00, 0x03,
-        0x00, 0x00, 0x03, 0x00, 0x78, 0xA0, 0x03, 0xC0, 0x80, 0x11, 0x07, 0xCB, 0x96, 0x5D, 0x29,
-        0x08, 0x46, 0x45, 0xFD, 0x0C, 0x04, 0x04, 0x00, 0x00, 0x03, 0x00, 0x04, 0x00, 0x00, 0x03,
-        0x00, 0x79, 0x80, 0x17, 0x79, 0x44, 0x00, 0x02, 0xDC, 0x6C, 0x00, 0x00, 0xF4, 0x24, 0x04,
-        0x22, 0x00, 0x01, 0x00, 0x07, 0x44, 0x01, 0xC0, 0xAD, 0xF0, 0x33, 0x24,
-    ];
+    let hevc_seq = HEVC_SEQHDR;
     assert!(tag_is_video_seqhdr(&hevc_seq));
     assert!(!tag_is_video_coded_frame(&hevc_seq));
     let hevc = parse_video_seqhdr(&hevc_seq).expect("parse hvc1 sequence header");
@@ -169,10 +176,7 @@ fn enhanced_rtmp_hevc_and_av1_headers_and_keyframes_parse() {
     assert!(!tag_is_video_seqhdr(&meta));
     assert!(!tag_is_video_coded_frame(&meta));
 
-    let av1_seq: [u8; 22] = [
-        0x90, 0x61, 0x76, 0x30, 0x31, 0x81, 0x08, 0x0C, 0x00, 0x0A, 0x0B, 0x00, 0x00, 0x00, 0x42,
-        0xAB, 0xBF, 0xC3, 0x70, 0x08, 0x66, 0x01,
-    ];
+    let av1_seq = AV1_SEQHDR;
     assert!(tag_is_video_seqhdr(&av1_seq));
     let av1 = parse_video_seqhdr(&av1_seq).expect("parse av01 sequence header");
     assert_eq!(av1.codec(), VideoCodec::Av1);
@@ -889,4 +893,138 @@ fn extracts_av1_sequence_header_from_inband_keyframe_obu() {
     assert_eq!(real_avcc.info.profile_idc, 0);
     assert_eq!(real_avcc.info.chroma_format_idc, 1);
     assert_eq!(real_avcc.info.bit_depth_luma_minus8, 0);
+}
+
+fn slate_configs() -> [AvcC; 3] {
+    [
+        parse_avcc(&sample_avcc()).expect("parseable avcC"),
+        parse_video_seqhdr(&HEVC_SEQHDR).expect("parse hvc1 sequence header"),
+        parse_video_seqhdr(&AV1_SEQHDR).expect("parse av01 sequence header"),
+    ]
+}
+
+#[test]
+fn every_slate_encoder_is_capped_at_the_program_bitrate() {
+    for obs in slate_configs() {
+        let candidates =
+            slate_encoder_candidates(&obs, Some("h264_nvenc"), "60", 6000).expect("candidates");
+        assert!(!candidates.is_empty());
+        for args in candidates {
+            let s = args.join(" ");
+            assert!(
+                s.contains("-maxrate 6000k -bufsize 6000k"),
+                "{:?} slate must not exceed the copy limit: {s}",
+                obs.codec()
+            );
+            let software = s.contains("libx264") || s.contains("libsvtav1");
+            assert_eq!(
+                s.contains("-crf"),
+                software,
+                "software encoders keep CRF quality under the cap: {s}"
+            );
+            if !software {
+                assert!(
+                    s.contains("-b:v 3000k"),
+                    "hardware encoders aim below the peak so a still slate is not padded: {s}"
+                );
+            }
+        }
+    }
+}
+
+/// Peak bitrate over any one-second window of SLATE_FPS frames.
+fn peak_kbps(frames: &[super::slate::SlateFrame]) -> u64 {
+    let window = SLATE_FPS as usize;
+    frames
+        .windows(window.min(frames.len()))
+        .map(|w| w.iter().map(|f| f.data.len() as u64).sum::<u64>() * 8 / 1000)
+        .max()
+        .unwrap_or(0)
+}
+
+/// The slate loops, so its average over one loop is what a destination receives sustained.
+fn average_kbps(frames: &[super::slate::SlateFrame]) -> u64 {
+    let bits = frames.iter().map(|f| f.data.len() as u64).sum::<u64>() * 8;
+    bits * u64::from(SLATE_FPS) / frames.len().max(1) as u64 / 1000
+}
+
+#[test]
+#[ignore]
+fn e2e_slate_encoders_stay_under_the_bitrate_cap_on_high_motion_video() {
+    let dir = std::env::temp_dir().join("corneta-slate-cap-e2e");
+    let _ = std::fs::create_dir_all(&dir);
+    let src = dir.join("noise.mp4").to_string_lossy().to_string();
+    assert!(
+        ff(&[
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-f",
+            "lavfi",
+            "-i",
+            "testsrc2=size=1920x1080:rate=30,noise=alls=60:allf=t+u",
+            "-t",
+            "10",
+            "-c:v",
+            "libx264",
+            "-crf",
+            "10",
+            "-preset",
+            "ultrafast",
+            "-pix_fmt",
+            "yuv420p",
+            &src
+        ]),
+        "generate a high-motion source (is ffmpeg on PATH?)"
+    );
+    const CAP: u64 = 3000;
+    let mut software_checked = 0;
+    for obs in slate_configs() {
+        let gop = (SLATE_FPS * 2).to_string();
+        for enc_args in slate_encoder_candidates(&obs, None, &gop, CAP as u32).unwrap() {
+            let software = enc_args.iter().any(|a| a == "libx264" || a == "libsvtav1");
+            let out = dir.join("slate.flv").to_string_lossy().to_string();
+            let mut args: Vec<String> = [
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                &src,
+                "-vf",
+                &format!("scale=1920:1080,fps={SLATE_FPS}"),
+            ]
+            .map(String::from)
+            .to_vec();
+            args.extend(enc_args.clone());
+            args.extend(["-an", "-f", "flv", &out].map(String::from));
+            let ran = PCommand::new("ffmpeg")
+                .args(&args)
+                .output()
+                .is_ok_and(|o| o.status.success());
+            if !ran {
+                assert!(!software, "software slate encoder must run: {enc_args:?}");
+                continue;
+            }
+            let flv = std::fs::read(&out).expect("read slate");
+            let (frames, _) = extract_slate_media(&flv).expect("slate frames");
+            let peak = peak_kbps(&frames);
+            let average = average_kbps(&frames);
+            assert!(
+                average <= CAP * 105 / 100,
+                "{enc_args:?} averaged {average} kbps over the loop, above the {CAP} kbps cap"
+            );
+            // A one-second VBV lets any second carry at most maxrate plus a full buffer.
+            // SVT-AV1 enforces its cap over longer spans, so only its average is bounded.
+            if enc_args[1] != "libsvtav1" {
+                assert!(
+                    peak <= CAP * 2,
+                    "{enc_args:?} peaked at {peak} kbps, beyond the VBV bound"
+                );
+            }
+            software_checked += usize::from(software);
+        }
+    }
+    assert_eq!(software_checked, 2, "libx264 and libsvtav1 both ran");
 }
