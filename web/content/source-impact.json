@@ -40,8 +40,8 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "463012636c55653914681e698517b37291d811aa",
-      "reason": "GoLiveScreen.tsx only changed how a failed start is explained and added the rehearsal and the phone offer; the per-platform recovery during a live that the article describes did not change."
+      "sourceBlob": "29c2b7dac024717e8fb7dc1b8e9706b20e715340",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
@@ -82,8 +82,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
-      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the quality modes and limits the article describes did not change."
+      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
@@ -94,8 +94,8 @@
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "b4da8e694ef3121014ce9196cab7b45ba61394c1",
-      "reason": "factory.ts only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the local ingest defaults the article relies on did not change."
+      "sourceBlob": "847d71efc87fddb4a7052c3d95f38221633bfb9c",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
@@ -190,8 +190,8 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
-      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the auto-bitrate settings the article describes did not change."
+      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
@@ -250,8 +250,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d3d62a90cafb719e31ecda2c36da3d248690d726",
-      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
+      "sourceBlob": "97e70b2e2efa233ededa23ce7271b0d67d969b34",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -262,8 +262,8 @@
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "daafd159c9c41534582ddb5d02307cf475def51a",
-      "reason": "Only the internal tab ids became English; the Settings screen and the BE RIGHT BACK setup the article describes did not change."
+      "sourceBlob": "dba10d640a70a88039702b3a74cf95fc0202c275",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
@@ -286,8 +286,8 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -304,8 +304,8 @@
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -352,8 +352,8 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "463012636c55653914681e698517b37291d811aa",
-      "reason": "GoLiveScreen.tsx only changed how a failed start is explained and added the rehearsal and the phone offer; the per-platform recovery during a live that the article describes did not change."
+      "sourceBlob": "29c2b7dac024717e8fb7dc1b8e9706b20e715340",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -400,8 +400,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
-      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the quality modes and limits the article describes did not change."
+      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -412,8 +412,8 @@
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "b4da8e694ef3121014ce9196cab7b45ba61394c1",
-      "reason": "factory.ts only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the local ingest defaults the article relies on did not change."
+      "sourceBlob": "847d71efc87fddb4a7052c3d95f38221633bfb9c",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
@@ -532,8 +532,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "a2c47aa3bb8905bd140905ab0cd457e85f6dfc17",
-      "reason": "config.rs only added the streaming-program answer and the pasted-by-hand mark, and turns BE RIGHT BACK on in new installs; the auto-bitrate settings the article describes did not change."
+      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -604,8 +604,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "d3d62a90cafb719e31ecda2c36da3d248690d726",
-      "reason": "Enhanced RTMP review fixes (OBS 31 profile lookup, encoder defaults, replay copy) leave the article guidance unchanged."
+      "sourceBlob": "97e70b2e2efa233ededa23ce7271b0d67d969b34",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -616,8 +616,8 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "daafd159c9c41534582ddb5d02307cf475def51a",
-      "reason": "Only the internal tab ids became English; the Settings screen and the BE RIGHT BACK setup the article describes did not change."
+      "sourceBlob": "dba10d640a70a88039702b3a74cf95fc0202c275",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
@@ -640,8 +640,8 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
@@ -658,8 +658,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "5716107584756272198567c8b369564fbb60c8d9",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
+      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
     }
   ]
 }
