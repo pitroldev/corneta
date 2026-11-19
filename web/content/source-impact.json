@@ -286,8 +286,8 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
+      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
@@ -304,8 +304,8 @@
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
+      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -640,8 +640,8 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
+      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
@@ -658,8 +658,8 @@
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "9549dc1fe5abe8334be12885df13051dce31a529",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
+      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
     }
   ]
 }
