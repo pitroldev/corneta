@@ -82,8 +82,8 @@
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "901806e76b24a262a1c1abf209718e6517cd2a8b",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
@@ -106,26 +106,26 @@
     {
       "article": "en/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -190,8 +190,8 @@
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "901806e76b24a262a1c1abf209718e6517cd2a8b",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
@@ -202,8 +202,8 @@
     {
       "article": "en/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/help/quality/quality-modes.mdx",
@@ -250,8 +250,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "97e70b2e2efa233ededa23ce7271b0d67d969b34",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "36093b1736e794b3be10633ab3525f3ce8d8f44f",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -400,8 +400,8 @@
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "901806e76b24a262a1c1abf209718e6517cd2a8b",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
@@ -424,20 +424,20 @@
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/guides/quality/streaming-glossary.mdx",
@@ -448,8 +448,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -532,8 +532,8 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "6d9efe1060f429abceecc9178bf10e5a993e2f5f",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "901806e76b24a262a1c1abf209718e6517cd2a8b",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
@@ -544,8 +544,8 @@
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
@@ -604,8 +604,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "97e70b2e2efa233ededa23ce7271b0d67d969b34",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "36093b1736e794b3be10633ab3525f3ce8d8f44f",
+      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
