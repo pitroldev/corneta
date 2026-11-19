@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { bold, useI18n } from "../lib/i18n";
 import { Camera, Check, Crosshair, X } from "lucide-react";
 import { api } from "../lib/api";
@@ -458,14 +458,13 @@ export function ReframeEditor({
   );
 }
 
-/** Dims the stage outside every crop; one shadow per box would also dim the other box. */
+/**
+ * Dims the stage outside every crop. A mask keeps the overlap of two crops clear; one shadow
+ * per box would dim the other box, and an even-odd path would dim their overlap.
+ */
 function OutsideShade({ boxes }: { boxes: Geometry[] }) {
-  const holes = boxes
-    .map(
-      (b) =>
-        `M${b.left * 100} ${b.top * 100}h${b.w * 100}v${b.h * 100}h${-b.w * 100}Z`,
-    )
-    .join("");
+  // useId yields characters that a url(#…) reference does not accept.
+  const maskId = `reframe-shade-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
     <svg
       viewBox="0 0 100 100"
@@ -473,10 +472,26 @@ function OutsideShade({ boxes }: { boxes: Geometry[] }) {
       className="pointer-events-none absolute inset-0 size-full"
       aria-hidden
     >
-      <path
-        d={`M0 0H100V100H0Z${holes}`}
-        fillRule="evenodd"
+      <defs>
+        <mask id={maskId}>
+          <rect width="100" height="100" fill="white" />
+          {boxes.map((b, i) => (
+            <rect
+              key={i}
+              x={b.left * 100}
+              y={b.top * 100}
+              width={b.w * 100}
+              height={b.h * 100}
+              fill="black"
+            />
+          ))}
+        </mask>
+      </defs>
+      <rect
+        width="100"
+        height="100"
         fill="rgba(11,8,5,0.55)"
+        mask={`url(#${maskId})`}
       />
     </svg>
   );
