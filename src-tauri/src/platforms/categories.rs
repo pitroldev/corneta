@@ -29,6 +29,11 @@ pub fn cache_key(query: &str) -> Option<String> {
         .then(|| collapsed.to_lowercase())
 }
 
+/// Signing in or out of a platform changes what the same words find.
+pub fn search_key(signed_in: &[&str], query_key: &str) -> String {
+    format!("{}|{query_key}", signed_in.join(","))
+}
+
 /// Category names from a Twitch or Kick `data` array, best match first.
 pub fn names_in_data(v: &Value) -> Vec<String> {
     let mut names: Vec<String> = Vec::new();
@@ -125,6 +130,14 @@ mod tests {
         assert_eq!(cache_key("   "), None);
         assert_eq!(cache_key(&"x".repeat(101)), None);
         assert_eq!(cache_key("FC"), Some("fc".into()));
+    }
+
+    #[test]
+    fn the_same_words_under_other_accounts_are_another_search() {
+        let both = search_key(&["twitch", "kick"], "valorant");
+        assert_ne!(both, search_key(&["twitch"], "valorant"));
+        assert_ne!(both, search_key(&["twitch", "kick"], "minecraft"));
+        assert_eq!(both, search_key(&["twitch", "kick"], "valorant"));
     }
 
     #[test]

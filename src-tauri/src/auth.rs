@@ -718,19 +718,25 @@ pub async fn search_stream_categories(
     query: String,
 ) -> Result<Vec<crate::platforms::categories::CategorySuggestion>, String> {
     use crate::platforms::categories;
-    let Some(key) = categories::cache_key(&query) else {
+    let Some(query_key) = categories::cache_key(&query) else {
         return Ok(Vec::new());
     };
-    if let Some(hit) = categories::cached(&key) {
-        return Ok(hit);
-    }
     let query = query.split_whitespace().collect::<Vec<_>>().join(" ");
-    let (answered, merged) = tauri::async_runtime::spawn_blocking(move || {
+    tauri::async_runtime::spawn_blocking(move || {
+        let signed_in: Vec<_> = account_providers()
+            .iter()
+            .copied()
+            .filter(|provider| provider.signed_in())
+            .collect();
+        let ids: Vec<&str> = signed_in.iter().map(|provider| provider.id()).collect();
+        let key = categories::search_key(&ids, &query_key);
+        if let Some(hit) = categories::cached(&key) {
+            return hit;
+        }
         let results: Vec<Option<(&'static str, Vec<String>)>> = std::thread::scope(|scope| {
-            let searches: Vec<_> = account_providers()
+            let searches: Vec<_> = signed_in
                 .iter()
-                .filter(|provider| provider.signed_in())
-                .map(|provider| {
+                .map(|&provider| {
                     let (app, query) = (&app, query.as_str());
                     scope.spawn(move || match provider.search_categories(app, query)? {
                         Ok(names) => Some((provider.id(), names)),
@@ -747,15 +753,15 @@ pub async fn search_stream_categories(
                 .collect()
         });
         let answered: Vec<(&'static str, Vec<String>)> = results.into_iter().flatten().collect();
-        (!answered.is_empty(), categories::merge(&answered))
+        let merged = categories::merge(&answered);
+        // A search no platform answered is not an empty result; the next keystroke may get through.
+        if !answered.is_empty() {
+            categories::remember(key, merged.clone());
+        }
+        merged
     })
     .await
-    .map_err(|e| e.to_string())?;
-    // A search no platform answered is not an empty result; the next keystroke may get through.
-    if answered {
-        categories::remember(key, merged.clone());
-    }
-    Ok(merged)
+    .map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
