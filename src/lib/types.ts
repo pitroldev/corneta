@@ -148,6 +148,10 @@ export interface AppSettings {
   loudnessTargetLufs: number;
   /** Opt-in: a dark game scene can look like a failed capture. */
   blackScreenAlert: boolean;
+  /** Opt-in: holding scenes and menus sit still on purpose. */
+  frozenFrameAlert: boolean;
+  /** Opt-in: a quiet stretch behind a noise gate can read as no sound. */
+  silentAudioAlert: boolean;
   brbEnabled: boolean;
   brbSlateKind: "auto" | "image" | "video";
   /** Original filename for display only; the backend stores brb-slate.*. */
@@ -591,6 +595,10 @@ export interface EngineSnapshot {
   forcedBrb?: boolean;
   /** The OBS picture has stayed fully black long enough to warn. */
   blackScreen?: boolean;
+  /** The OBS picture has not moved long enough to warn. */
+  frozenScreen?: boolean;
+  /** OBS has sent no audible sound long enough to warn. */
+  silentAudio?: boolean;
 }
 
 /** What a platform did with a moment marked during the live. */

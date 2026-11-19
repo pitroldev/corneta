@@ -749,6 +749,9 @@ export const en: Dict = {
   "deck.alert.black.body":
     "The OBS picture has been all black for a few seconds.",
   "deck.alert.black.title": "Your stream is showing a black screen",
+  "deck.alert.frozen.action": "Switch scene",
+  "deck.alert.frozen.body": "The OBS picture hasn't moved for over 20 s.",
+  "deck.alert.frozen.title": "Your stream picture is frozen",
   "deck.alert.close": "Dismiss: {title}",
   "deck.alert.mic.action": "Unmute mic",
   "deck.alert.mic.body": "Your mic is muted in OBS and you're live.",
@@ -756,6 +759,8 @@ export const en: Dict = {
   "deck.alert.reconnecting.body":
     "It comes back on its own. The other platforms stay live.",
   "deck.alert.reconnecting.title": "Reconnecting: {platforms}",
+  "deck.alert.silent.body": "No sound has come out of OBS for over 30 s.",
+  "deck.alert.silent.title": "Your stream has no sound",
   "deck.alert.signal.body":
     "Corneta isn't receiving anything from OBS. Check that it's still streaming.",
   "deck.alert.signal.bodyBrb": "BE RIGHT BACK took over until OBS comes back.",
@@ -922,6 +927,10 @@ export const en: Dict = {
     "Warns here if the picture goes black",
   "deck.health.protect.brb": "BE RIGHT BACK",
   "deck.health.protect.brb.desc": "If OBS drops, the break screen steps in",
+  "deck.health.protect.frozen": "Frozen picture alert",
+  "deck.health.protect.frozen.desc": "Warns here if the picture freezes",
+  "deck.health.protect.silent": "No-sound alert",
+  "deck.health.protect.silent.desc": "Warns here if the sound drops out",
   "deck.health.protections": "Protections",
   "deck.health.watching": "{n} watching",
   "deck.how.control": "You're in charge",
@@ -2065,11 +2074,28 @@ export const en: Dict = {
   "golive.security.brb.desc.off":
     "if OBS drops, everyone's staring at a frozen frame",
   "golive.security.brb.label": "BE RIGHT BACK",
+  "golive.security.frozen.desc":
+    "I'll warn you if the OBS picture stays still for over 20 s",
+  "golive.security.frozen.desc.off":
+    "if your capture gets stuck, nobody tells you the picture froze",
+  "golive.security.frozen.label": "Frozen picture alert",
   "golive.security.loudness.desc": "I level your volume on my own",
   "golive.security.loudness.label": "Audio normalizer",
+  "golive.security.silent.desc":
+    "I'll warn you if no sound comes out of OBS for over 30 s",
+  "golive.security.silent.desc.off":
+    "if your mic gets muted on its cable, nobody tells you the stream has no sound",
+  "golive.security.silent.label": "No-sound alert",
   "golive.blackScreen.body":
     "The OBS picture has been fully black for over 10 seconds. Check your scene and your game or screen capture — this goes away on its own when the picture comes back.",
   "golive.blackScreen.title": "Your stream is showing a black screen",
+  "golive.frozen.body":
+    "The OBS picture hasn't moved for over 20 seconds. Check your game or camera capture — this goes away on its own when the picture moves again.",
+  "golive.frozen.title": "Your stream picture is frozen",
+  "golive.silent.body":
+    "No sound has come out of OBS for over 30 seconds. Check your mic (the switch on the cable too) and your game audio — this goes away on its own when the sound comes back.",
+  "golive.silent.title": "Your stream has no sound",
+  "golive.watch.dismiss": "It's on purpose",
   "golive.signalLost.body":
     "Your viewers are staring at a frozen screen. Check OBS (did it close? did it stop streaming?) — when the signal comes back, I'll pick it up on my own.",
   "golive.signalLost.title":
@@ -3048,9 +3074,15 @@ export const en: Dict = {
   "settings.safety.brb.title": "Drop protection (BE RIGHT BACK)",
   "settings.safety.desc":
     "What holds your stream up when OBS drops or your internet chokes.",
+  "settings.safety.frozen.desc":
+    "If the picture coming out of OBS stays still for over 20 s — a game capture stuck after Alt+Tab, a camera that froze — Corneta warns you here and with a Windows notification. A “starting soon” screen sits still too, so it starts off.",
+  "settings.safety.frozen.title": "Frozen picture alert",
   "settings.safety.loudness.desc":
     "Corneta evens out your audio before it goes out — no “can't hear you” from chat, no blown-out ears when you switch scenes. If you already normalize in OBS, leave this off so the two don't fight.",
   "settings.safety.loudness.title": "Audio normalizer",
+  "settings.safety.silent.desc":
+    "If no sound at all comes out of OBS for over 30 s — a headset muted on its cable, the wrong mic picked in Windows — Corneta warns you here and with a Windows notification. Going quiet for a while behind a noise gate can set off a false alarm, so it starts off.",
+  "settings.safety.silent.title": "No-sound alert",
   "settings.safety.state.armed": "Armed",
   "settings.safety.state.off": "off",
   "settings.safety.title": "Safety nets",

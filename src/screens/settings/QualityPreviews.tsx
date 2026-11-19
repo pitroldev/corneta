@@ -1,4 +1,4 @@
-import { AudioLines, BellRing } from "lucide-react";
+import { AudioLines, BellRing, Snowflake, VolumeX } from "lucide-react";
 import { useId } from "react";
 import { useT } from "../../lib/i18n";
 import { useStore } from "../../lib/store";
@@ -58,6 +58,34 @@ export function BlackScreenPreview() {
     <div className="absolute inset-0 bg-surface-2 p-2">
       <div className="h-full w-full rounded-sm bg-black ring-1 ring-border" />
       <BellRing
+        className="absolute right-1.5 top-1.5 size-3.5 text-brass"
+        strokeWidth={2.4}
+      />
+    </div>
+  );
+}
+
+export function FrozenPreview() {
+  return (
+    <div className="absolute inset-0 bg-surface-2 p-2">
+      <div className="flex h-full w-full items-end gap-1 rounded-sm bg-night p-1.5 ring-1 ring-border">
+        <div className="h-2/5 w-1/4 rounded-[2px] bg-ink-faint/40" />
+        <div className="h-3/5 w-1/4 rounded-[2px] bg-ink-faint/40" />
+        <div className="h-1/3 w-1/4 rounded-[2px] bg-ink-faint/40" />
+      </div>
+      <Snowflake
+        className="absolute right-1.5 top-1.5 size-3.5 text-brass"
+        strokeWidth={2.4}
+      />
+    </div>
+  );
+}
+
+export function SilentPreview() {
+  return (
+    <div className="absolute inset-0 flex items-center justify-center bg-surface-2 px-2.5">
+      <div className="h-0.5 w-4/5 rounded-full bg-ink-faint/50" />
+      <VolumeX
         className="absolute right-1.5 top-1.5 size-3.5 text-brass"
         strokeWidth={2.4}
       />

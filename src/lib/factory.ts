@@ -68,6 +68,8 @@ export function defaultConfig(): AppConfig {
       loudnessNormalize: false,
       loudnessTargetLufs: -14,
       blackScreenAlert: false,
+      frozenFrameAlert: false,
+      silentAudioAlert: false,
       youtubeAutoLive: true,
       youtubePrivacy: "public",
       youtubeMadeForKids: false,

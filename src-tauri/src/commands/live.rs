@@ -6,9 +6,9 @@ use super::ingest_slate::{
 };
 use super::live_status::{
     capture_engine_error, emit, platform_check_plan, read_gpu, reaffirm_auth_error,
-    set_black_screen, set_ingest_live, set_target_reconnecting, set_target_state,
-    set_target_waiting, slate_forced, spawn_platform_checks, telemetry_encoder_kind,
-    update_obs_stats, update_target_metrics, update_usage,
+    set_ingest_live, set_target_reconnecting, set_target_state, set_target_waiting,
+    set_watch_alert, slate_forced, spawn_platform_checks, telemetry_encoder_kind, update_obs_stats,
+    update_target_metrics, update_usage, WatchAlert,
 };
 use super::obs::pin_smart_choices;
 use super::{capture_native_error, get_config, kill_sidecar, notify, now_ms, OBS_WS_HOST};
@@ -667,12 +667,14 @@ async fn start_engine_inner(
         }
     });
 
-    let black_screen_ffmpeg = config
-        .settings
-        .black_screen_alert
+    let picture_alerts = crate::black_screen::Alerts {
+        black: config.settings.black_screen_alert,
+        frozen: config.settings.frozen_frame_alert,
+    };
+    let watch_ffmpeg = (picture_alerts.any() || config.settings.silent_audio_alert)
         .then(crate::compositor::ffmpeg_path)
         .flatten();
-    if let Some(ffmpeg) = black_screen_ffmpeg {
+    if let Some(ffmpeg) = watch_ffmpeg.clone().filter(|_| picture_alerts.any()) {
         let (app_b, run_b, sig_b) = (app.clone(), running.clone(), has_signal.clone());
         let url = engine::ingest_url(&config);
         tauri::async_runtime::spawn_blocking(move || {
@@ -682,8 +684,24 @@ async fn start_engine_inner(
                 run_b,
                 sig_b,
                 url,
+                picture_alerts,
                 move || slate_forced(&app_p),
-                move |on| set_black_screen(&app_b, on),
+                move |alert, on| set_watch_alert(&app_b, alert.into(), on),
+            );
+        });
+    }
+    if let Some(ffmpeg) = watch_ffmpeg.filter(|_| config.settings.silent_audio_alert) {
+        let (app_s, run_s, sig_s) = (app.clone(), running.clone(), has_signal.clone());
+        let url = engine::ingest_url(&config);
+        tauri::async_runtime::spawn_blocking(move || {
+            let app_p = app_s.clone();
+            crate::silence_watch::run(
+                &ffmpeg,
+                run_s,
+                sig_s,
+                url,
+                move || slate_forced(&app_p),
+                move |on| set_watch_alert(&app_s, WatchAlert::Silent, on),
             );
         });
     }

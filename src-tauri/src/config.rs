@@ -277,6 +277,12 @@ pub struct Settings {
     /// Opt-in: a dark game scene can look like a failed capture.
     #[serde(default)]
     pub black_screen_alert: bool,
+    /// Opt-in: holding scenes and menus sit still on purpose.
+    #[serde(default)]
+    pub frozen_frame_alert: bool,
+    /// Opt-in: a quiet stretch behind a noise gate can read as no sound.
+    #[serde(default)]
+    pub silent_audio_alert: bool,
     #[serde(default = "default_true")]
     pub youtube_auto_live: bool,
     /// Privacy of the broadcast the auto-live creates; one of `YOUTUBE_PRIVACY`.
@@ -490,6 +496,8 @@ impl Default for Settings {
             loudness_normalize: false,
             loudness_target_lufs: -14.0,
             black_screen_alert: false,
+            frozen_frame_alert: false,
+            silent_audio_alert: false,
             youtube_auto_live: true,
             youtube_privacy: default_youtube_privacy(),
             youtube_made_for_kids: false,

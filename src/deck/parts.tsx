@@ -10,7 +10,9 @@ import {
   MicOff,
   MonitorX,
   RefreshCw,
+  Snowflake,
   TriangleAlert,
+  VolumeX,
   WifiOff,
   X,
   EllipsisVertical,
@@ -234,6 +236,8 @@ export function Alerts({
 export const ALERT_ICONS = {
   link: <WifiOff className="ic" aria-hidden />,
   black: <MonitorX className="ic" aria-hidden />,
+  frozen: <Snowflake className="ic" aria-hidden />,
+  silent: <VolumeX className="ic" aria-hidden />,
   signal: <TriangleAlert className="ic" aria-hidden />,
   mic: <MicOff className="ic" aria-hidden />,
   reconnecting: <Activity className="ic" aria-hidden />,

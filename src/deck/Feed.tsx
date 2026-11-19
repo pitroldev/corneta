@@ -255,6 +255,18 @@ export function Health({
       name: t("deck.health.protect.blackScreen"),
       desc: t("deck.health.protect.blackScreen.desc"),
     },
+    {
+      id: "frozenScreen",
+      on: state.protections.frozenScreen,
+      name: t("deck.health.protect.frozen"),
+      desc: t("deck.health.protect.frozen.desc"),
+    },
+    {
+      id: "silentAudio",
+      on: state.protections.silentAudio,
+      name: t("deck.health.protect.silent"),
+      desc: t("deck.health.protect.silent.desc"),
+    },
   ];
   return (
     <>

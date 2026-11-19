@@ -126,6 +126,8 @@ fn snapshot(cpu: Option<f64>) -> crate::engine::EngineSnapshot {
         obs: None,
         forced_brb: false,
         black_screen: false,
+        frozen_screen: false,
+        silent_audio: false,
     }
 }
 

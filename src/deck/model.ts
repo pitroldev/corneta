@@ -32,6 +32,8 @@ export interface DeckState {
     forcedBrb: boolean;
     brbArmed: boolean;
     blackScreen: boolean;
+    frozenScreen: boolean;
+    silentAudio: boolean;
     signalLost: boolean;
     ingestLive: boolean;
     message?: string | null;
@@ -53,6 +55,8 @@ export interface DeckState {
     brb: boolean;
     autoBitrate: boolean;
     blackScreen: boolean;
+    frozenScreen: boolean;
+    silentAudio: boolean;
   };
   title: string;
   layout: string[];

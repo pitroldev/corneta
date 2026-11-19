@@ -739,6 +739,9 @@ export const pt = {
   "deck.alert.black.body":
     "Faz alguns segundos que a imagem do OBS tá toda preta.",
   "deck.alert.black.title": "Sua live tá com a tela preta",
+  "deck.alert.frozen.action": "Trocar cena",
+  "deck.alert.frozen.body": "Faz mais de 20 s que a imagem do OBS não mexe.",
+  "deck.alert.frozen.title": "A imagem da sua live congelou",
   "deck.alert.close": "Fechar o aviso: {title}",
   "deck.alert.mic.action": "Abrir microfone",
   "deck.alert.mic.body": "O microfone tá mutado no OBS e a live tá no ar.",
@@ -746,6 +749,8 @@ export const pt = {
   "deck.alert.reconnecting.body":
     "Volta sozinho. As outras plataformas seguem no ar.",
   "deck.alert.reconnecting.title": "Reconectando: {platforms}",
+  "deck.alert.silent.body": "Faz mais de 30 s que não sai som nenhum do OBS.",
+  "deck.alert.silent.title": "Sua live tá sem som",
   "deck.alert.signal.body":
     "A Corneta não tá recebendo nada do OBS. Vê se ele ainda tá transmitindo.",
   "deck.alert.signal.bodyBrb": "O JÁ VOLTO entrou no lugar até o OBS voltar.",
@@ -912,6 +917,10 @@ export const pt = {
   "deck.health.protect.blackScreen.desc": "Avisa aqui se a imagem ficar preta",
   "deck.health.protect.brb": "JÁ VOLTO",
   "deck.health.protect.brb.desc": "Se o OBS cair, a tela de pausa entra",
+  "deck.health.protect.frozen": "Alerta de imagem congelada",
+  "deck.health.protect.frozen.desc": "Avisa aqui se a imagem travar",
+  "deck.health.protect.silent": "Alerta de live sem som",
+  "deck.health.protect.silent.desc": "Avisa aqui se o som sumir",
   "deck.health.protections": "Proteções",
   "deck.health.watching": "{n} vendo",
   "deck.how.control": "Você manda",
@@ -2053,11 +2062,28 @@ export const pt = {
   "golive.security.brb.desc.off":
     "se o OBS cair, a galera fica olhando uma tela congelada",
   "golive.security.brb.label": "JÁ VOLTO",
+  "golive.security.frozen.desc":
+    "te aviso se a imagem do OBS ficar parada por mais de 20 s",
+  "golive.security.frozen.desc.off":
+    "se a captura travar, ninguém te avisa que a imagem congelou",
+  "golive.security.frozen.label": "Alerta de imagem congelada",
   "golive.security.loudness.desc": "acerto o seu volume sozinha",
   "golive.security.loudness.label": "Normalizador de áudio",
+  "golive.security.silent.desc":
+    "te aviso se não sair som nenhum do OBS por mais de 30 s",
+  "golive.security.silent.desc.off":
+    "se o microfone mutar no fio, ninguém te avisa que a live tá sem som",
+  "golive.security.silent.label": "Alerta de live sem som",
   "golive.blackScreen.body":
     "Faz mais de 10 s que a imagem do OBS tá toda preta. Confira a cena e a captura do jogo ou da tela — quando a imagem voltar, este aviso some sozinho.",
   "golive.blackScreen.title": "Sua live tá com a tela preta",
+  "golive.frozen.body":
+    "Faz mais de 20 s que a imagem do OBS não mexe. Confira a captura do jogo ou da câmera — quando a imagem voltar a mexer, este aviso some sozinho.",
+  "golive.frozen.title": "A imagem da sua live congelou",
+  "golive.silent.body":
+    "Faz mais de 30 s que não sai som nenhum do OBS. Confira o microfone (o botão no fio também) e o áudio do jogo — quando o som voltar, este aviso some sozinho.",
+  "golive.silent.title": "Sua live tá sem som",
+  "golive.watch.dismiss": "É de propósito",
   "golive.signalLost.body":
     "Pros espectadores a tela congelou. Confira o OBS (fechou? parou de transmitir?) — quando o sinal voltar, eu retomo sozinha.",
   "golive.signalLost.title": "O sinal do OBS sumiu — sua live tá sem imagem",
@@ -3043,9 +3069,15 @@ export const pt = {
   "settings.safety.brb.title": "Proteção contra quedas (JÁ VOLTO)",
   "settings.safety.desc":
     "O que segura a sua live quando o OBS cai ou a internet aperta.",
+  "settings.safety.frozen.desc":
+    "Se a imagem que sai do OBS ficar parada por mais de 20 s — uma captura de jogo que travou no Alt+Tab, uma câmera que congelou —, a Corneta te avisa aqui e numa notificação do Windows. Tela de “começando em breve” também fica parada, por isso vem desligado.",
+  "settings.safety.frozen.title": "Alerta de imagem congelada",
   "settings.safety.loudness.desc":
     "A Corneta acerta o volume do seu som antes de enviar — sem “tá baixo” nem estourando na troca de cena. Se você já normaliza no OBS, deixe desligado pra não brigar.",
   "settings.safety.loudness.title": "Normalizador de áudio",
+  "settings.safety.silent.desc":
+    "Se não sair som nenhum do OBS por mais de 30 s — headset mutado no fio, microfone errado no Windows —, a Corneta te avisa aqui e numa notificação do Windows. Quem fica um tempo calado com filtro de ruído pode ter alarme falso, por isso vem desligado.",
+  "settings.safety.silent.title": "Alerta de live sem som",
   "settings.safety.state.armed": "Armado",
   "settings.safety.state.off": "desligado",
   "settings.safety.title": "Segurança ao vivo",

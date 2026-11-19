@@ -417,6 +417,18 @@ messages! {
     NotifyBlackScreenBody = "rust.notify.blackScreen.body" =>
         pt: "A imagem do OBS tá toda preta há mais de 10 s — confira a cena e a captura.",
         en: "The OBS picture has been fully black for over 10 s — check your scene and capture.";
+    NotifyFrozenScreenTitle = "rust.notify.frozenScreen.title" =>
+        pt: "A imagem da sua live congelou",
+        en: "Your stream picture is frozen";
+    NotifyFrozenScreenBody = "rust.notify.frozenScreen.body" =>
+        pt: "A imagem do OBS não mexe há mais de 20 s — confira a captura do jogo ou da câmera.",
+        en: "The OBS picture hasn't moved for over 20 s — check your game or camera capture.";
+    NotifySilentAudioTitle = "rust.notify.silentAudio.title" =>
+        pt: "Sua live tá sem som",
+        en: "Your stream has no sound";
+    NotifySilentAudioBody = "rust.notify.silentAudio.body" =>
+        pt: "Não sai som nenhum do OBS há mais de 30 s — confira o microfone e o áudio do jogo.",
+        en: "No sound has come out of OBS for over 30 s — check your mic and game audio.";
     NotifyYoutubeAutoFailedTitle = "rust.notify.youtubeAutoFailed.title" =>
         pt: "YouTube automático falhou",
         en: "YouTube autopilot failed";

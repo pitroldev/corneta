@@ -112,6 +112,12 @@ export function GoLiveScreen({
     [liveSignature, configTargets],
   );
   const blackScreen = useStore((s) => s.snapshot.blackScreen ?? false);
+  const [frozenShown, dismissFrozen] = useDismissible(
+    useStore((s) => s.snapshot.frozenScreen ?? false),
+  );
+  const [silentShown, dismissSilent] = useDismissible(
+    useStore((s) => s.snapshot.silentAudio ?? false),
+  );
 
   const deckEnabled = useStore((s) => s.config?.settings.deckEnabled ?? false);
   const [deckOffer, setDeckOffer] = useState(() => deckOfferDue(deckEnabled));
@@ -517,6 +523,28 @@ export function GoLiveScreen({
               body={t("golive.blackScreen.body")}
             />
           )}
+          {live && frozenShown && !signalLost && (
+            <AlertCard
+              tone="bad"
+              title={t("golive.frozen.title")}
+              body={t("golive.frozen.body")}
+            >
+              <Button variant="subtle" size="sm" onClick={dismissFrozen}>
+                {t("golive.watch.dismiss")}
+              </Button>
+            </AlertCard>
+          )}
+          {live && silentShown && !signalLost && (
+            <AlertCard
+              tone="bad"
+              title={t("golive.silent.title")}
+              body={t("golive.silent.body")}
+            >
+              <Button variant="subtle" size="sm" onClick={dismissSilent}>
+                {t("golive.watch.dismiss")}
+              </Button>
+            </AlertCard>
+          )}
           {starting && !ingestLive && rescue && (
             <AlertCard
               tone="warn"
@@ -659,6 +687,17 @@ export function GoLiveScreen({
       )}
     </div>
   );
+}
+
+/** A dismissed alert stays hidden until its problem clears, then comes back the next time. */
+function useDismissible(active: boolean) {
+  const [dismissed, setDismissed] = useState(false);
+  const [wasActive, setWasActive] = useState(active);
+  if (active !== wasActive) {
+    setWasActive(active);
+    if (!active) setDismissed(false);
+  }
+  return [active && !dismissed, () => setDismissed(true)] as const;
 }
 
 function AlertCard({

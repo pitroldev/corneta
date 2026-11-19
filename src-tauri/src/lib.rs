@@ -28,6 +28,7 @@ mod replay_media;
 mod resources;
 mod session;
 mod shortcut;
+mod silence_watch;
 mod splicer;
 #[cfg(windows)]
 mod store_updater;

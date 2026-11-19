@@ -152,6 +152,8 @@ export function Shell({
   const [event, setEvent] = useState<Banner | null>(null);
   const [dismissed, setDismissed] = useState<{
     black?: boolean;
+    frozen?: boolean;
+    silent?: boolean;
     mic?: boolean;
   }>({});
   const [seen, setSeen] = useState(conn.chatSeq);
@@ -291,7 +293,7 @@ export function Shell({
     (name: string) =>
       run("scene", async () => {
         await command("scene", { name });
-        setDismissed((d) => ({ ...d, black: false }));
+        setDismissed((d) => ({ ...d, black: false, frozen: false }));
         confirm("actions", "ok", t("deck.toast.scene", { scene: name }));
       }),
     [command, confirm, run, t],
@@ -620,8 +622,11 @@ export function Shell({
   }, [event, alertMs]);
 
   const blackOn = live && state.live.blackScreen;
+  const frozenOn = live && state.live.frozenScreen;
   const micMutedLive =
     live && !state.live.forcedBrb && !!mic?.muted && prefs.notify.micMuted;
+  // A mic muted in OBS has its own, more precise alert with the fix on it.
+  const silentOn = live && state.live.silentAudio && !micMutedLive;
   const signalLost = live && state.live.signalLost;
 
   // A dismissed alarm comes back the next time the problem starts.
@@ -629,11 +634,19 @@ export function Shell({
     if (!blackOn) setDismissed((d) => (d.black ? { ...d, black: false } : d));
   }, [blackOn]);
   useEffect(() => {
+    if (!frozenOn)
+      setDismissed((d) => (d.frozen ? { ...d, frozen: false } : d));
+  }, [frozenOn]);
+  useEffect(() => {
+    if (!silentOn)
+      setDismissed((d) => (d.silent ? { ...d, silent: false } : d));
+  }, [silentOn]);
+  useEffect(() => {
     if (!micMutedLive) setDismissed((d) => (d.mic ? { ...d, mic: false } : d));
   }, [micMutedLive]);
   useEffect(() => {
-    if (blackOn || signalLost) buzz(70);
-  }, [blackOn, signalLost]);
+    if (blackOn || frozenOn || silentOn || signalLost) buzz(70);
+  }, [blackOn, frozenOn, silentOn, signalLost]);
 
   const banners = useMemo(() => {
     const list: Banner[] = [];
@@ -665,6 +678,32 @@ export function Shell({
                 run: () => setSheet({ kind: "scene" }),
               }
             : undefined,
+        dismissible: true,
+      });
+    if (frozenOn && !blackOn && !dismissed.frozen)
+      list.push({
+        id: "frozen",
+        tone: "bad",
+        icon: ALERT_ICONS.frozen,
+        title: t("deck.alert.frozen.title"),
+        body: t("deck.alert.frozen.body"),
+        action:
+          state.obs.connected && state.obs.scenes.length
+            ? {
+                label: t("deck.alert.frozen.action"),
+                icon: ALERT_ICONS.scene,
+                run: () => setSheet({ kind: "scene" }),
+              }
+            : undefined,
+        dismissible: true,
+      });
+    if (silentOn && !dismissed.silent)
+      list.push({
+        id: "silent",
+        tone: "bad",
+        icon: ALERT_ICONS.silent,
+        title: t("deck.alert.silent.title"),
+        body: t("deck.alert.silent.body"),
         dismissible: true,
       });
     if (signalLost)
@@ -714,18 +753,20 @@ export function Shell({
     conn.reconnect,
     dismissed,
     event,
+    frozenOn,
     live,
     micMutedLive,
     offline,
     setMic,
     signalLost,
+    silentOn,
     state,
     t,
   ]);
 
   const dismiss = (id: string) => {
     if (id === "event") setEvent(null);
-    if (id === "black" || id === "mic")
+    if (id === "black" || id === "frozen" || id === "silent" || id === "mic")
       setDismissed((d) => ({ ...d, [id]: true }));
   };
 

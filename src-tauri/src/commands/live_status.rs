@@ -127,26 +127,64 @@ pub(super) fn slate_forced(app: &AppHandle) -> bool {
     eng.snapshot.as_ref().is_some_and(|snap| snap.forced_brb)
 }
 
-pub(super) fn set_black_screen(app: &AppHandle, on: bool) {
+/// The opt-in watches over what OBS sends.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum WatchAlert {
+    Black,
+    Frozen,
+    Silent,
+}
+
+impl From<crate::black_screen::PictureAlert> for WatchAlert {
+    fn from(alert: crate::black_screen::PictureAlert) -> Self {
+        match alert {
+            crate::black_screen::PictureAlert::Black => Self::Black,
+            crate::black_screen::PictureAlert::Frozen => Self::Frozen,
+        }
+    }
+}
+
+pub(super) fn set_watch_alert(app: &AppHandle, alert: WatchAlert, on: bool) {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
-    if snap.state == "stopped" || snap.black_screen == on {
+    if snap.state == "stopped" {
         return;
     }
-    snap.black_screen = on;
+    let flag = match alert {
+        WatchAlert::Black => &mut snap.black_screen,
+        WatchAlert::Frozen => &mut snap.frozen_screen,
+        WatchAlert::Silent => &mut snap.silent_audio,
+    };
+    if *flag == on {
+        return;
+    }
+    *flag = on;
     let out = snap.clone();
     drop(eng);
     emit(app, &out);
     if on {
-        log::warn!("engine: the OBS picture has stayed black");
-        notify(
-            app,
-            &Msg::NotifyBlackScreenTitle.now(),
-            &Msg::NotifyBlackScreenBody.now(),
-        );
+        let (what, title, body) = match alert {
+            WatchAlert::Black => (
+                "the OBS picture has stayed black",
+                Msg::NotifyBlackScreenTitle,
+                Msg::NotifyBlackScreenBody,
+            ),
+            WatchAlert::Frozen => (
+                "the OBS picture has stayed frozen",
+                Msg::NotifyFrozenScreenTitle,
+                Msg::NotifyFrozenScreenBody,
+            ),
+            WatchAlert::Silent => (
+                "OBS has sent no sound",
+                Msg::NotifySilentAudioTitle,
+                Msg::NotifySilentAudioBody,
+            ),
+        };
+        log::warn!("engine: {what}");
+        notify(app, &title.now(), &body.now());
     }
 }
 

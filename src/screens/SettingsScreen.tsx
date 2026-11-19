@@ -50,6 +50,8 @@ import { ObsTestButton } from "./settings/ObsTestButton";
 import {
   BitratePreview,
   BlackScreenPreview,
+  FrozenPreview,
+  SilentPreview,
   LoudnessPreview,
   LoudnessTarget,
 } from "./settings/QualityPreviews";
@@ -407,6 +409,36 @@ export function SettingsScreen() {
                     checked={settings.blackScreenAlert}
                     onChange={(v) => setSettings({ blackScreenAlert: v })}
                     label={t("settings.safety.blackScreen.title")}
+                  />
+                </SecurityFeature>
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<FrozenPreview />}
+                  on={settings.frozenFrameAlert}
+                  title={t("settings.safety.frozen.title")}
+                  desc={t("settings.safety.frozen.desc")}
+                >
+                  <Toggle
+                    checked={settings.frozenFrameAlert}
+                    onChange={(v) => setSettings({ frozenFrameAlert: v })}
+                    label={t("settings.safety.frozen.title")}
+                  />
+                </SecurityFeature>
+              </div>
+
+              <div>
+                <SecurityFeature
+                  preview={<SilentPreview />}
+                  on={settings.silentAudioAlert}
+                  title={t("settings.safety.silent.title")}
+                  desc={t("settings.safety.silent.desc")}
+                >
+                  <Toggle
+                    checked={settings.silentAudioAlert}
+                    onChange={(v) => setSettings({ silentAudioAlert: v })}
+                    label={t("settings.safety.silent.title")}
                   />
                 </SecurityFeature>
               </div>

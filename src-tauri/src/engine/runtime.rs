@@ -77,6 +77,10 @@ pub struct EngineSnapshot {
     pub forced_brb: bool,
     /// The OBS picture has stayed fully black long enough to warn; set only with the opt-in watch.
     pub black_screen: bool,
+    /// The OBS picture has not moved long enough to warn; set only with the opt-in watch.
+    pub frozen_screen: bool,
+    /// OBS has sent no audible sound long enough to warn; set only with the opt-in watch.
+    pub silent_audio: bool,
 }
 
 #[derive(Serialize, Clone, Debug, Default)]
@@ -107,6 +111,8 @@ impl EngineSnapshot {
             obs: None,
             forced_brb: false,
             black_screen: false,
+            frozen_screen: false,
+            silent_audio: false,
         }
     }
 
@@ -158,6 +164,8 @@ impl EngineSnapshot {
             obs: None,
             forced_brb: false,
             black_screen: false,
+            frozen_screen: false,
+            silent_audio: false,
         }
     }
 }

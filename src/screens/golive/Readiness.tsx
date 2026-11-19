@@ -60,8 +60,21 @@ function useSafetyItems() {
       on: settings.blackScreenAlert,
       label: t("golive.security.blackScreen.label"),
     },
+    {
+      key: "frozen",
+      on: settings.frozenFrameAlert,
+      label: t("golive.security.frozen.label"),
+    },
+    {
+      key: "silent",
+      on: settings.silentAudioAlert,
+      label: t("golive.security.silent.label"),
+    },
   ];
 }
+
+/** Watches that start off because a legitimate scene can set them off. */
+const OPT_IN_ALERTS = new Set(["blackScreen", "frozen", "silent"]);
 
 export function ReadinessTiles({
   onOpen,
@@ -170,7 +183,7 @@ export function ReadinessTiles({
 
   const armed = safety.filter((x) => x.on);
   // The check means the recommended nets are on, not merely that one of them is.
-  const recommended = safety.filter((x) => x.key !== "blackScreen");
+  const recommended = safety.filter((x) => !OPT_IN_ALERTS.has(x.key));
   const safetyTile: TileProps = {
     tone: recommended.every((x) => x.on) ? "ok" : "neutral",
     value: t("golive.tile.safety.count", {
@@ -791,6 +804,24 @@ function SafetyPanel() {
         : t("golive.security.blackScreen.desc.off"),
       on: settings.blackScreenAlert,
       set: (blackScreenAlert) => setSettings({ blackScreenAlert }),
+    },
+    {
+      key: "frozen",
+      label: t("golive.security.frozen.label"),
+      desc: settings.frozenFrameAlert
+        ? t("golive.security.frozen.desc")
+        : t("golive.security.frozen.desc.off"),
+      on: settings.frozenFrameAlert,
+      set: (frozenFrameAlert) => setSettings({ frozenFrameAlert }),
+    },
+    {
+      key: "silent",
+      label: t("golive.security.silent.label"),
+      desc: settings.silentAudioAlert
+        ? t("golive.security.silent.desc")
+        : t("golive.security.silent.desc.off"),
+      on: settings.silentAudioAlert,
+      set: (silentAudioAlert) => setSettings({ silentAudioAlert }),
     },
   ];
   if (settings.loudnessNormalize)

@@ -361,6 +361,8 @@ export function Ready({
     [state.protections.brb, t("deck.health.protect.brb")],
     [state.protections.autoBitrate, t("deck.health.protect.autoBitrate")],
     [state.protections.blackScreen, t("deck.health.protect.blackScreen")],
+    [state.protections.frozenScreen, t("deck.health.protect.frozen")],
+    [state.protections.silentAudio, t("deck.health.protect.silent")],
   ] as const;
   const armed = protections.filter(([on]) => on).map(([, name]) => name);
   const blocked = offline
