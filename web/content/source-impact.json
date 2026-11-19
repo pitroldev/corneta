@@ -15,6 +15,12 @@
     },
     {
       "article": "en/guides/multistream/horizontal-and-vertical-live.mdx",
+      "source": "src/components/ReframeEditor.tsx",
+      "sourceBlob": "8e0380058e2175c4cf5d67465d33b3906a1aa113",
+      "reason": "The stage shade now keeps overlapping crops clear; nothing the guide states about the editor changed."
+    },
+    {
+      "article": "en/guides/multistream/horizontal-and-vertical-live.mdx",
       "source": "src/lib/estimates.ts",
       "sourceBlob": "03ce4a2c6893b6f73735f787407fe88869bfc3e1",
       "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
@@ -318,6 +324,12 @@
       "source": "web/PRODUCT.md",
       "sourceBlob": "8ca58100adc94761a48af1b82f3cf672db19b7c3",
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
+    },
+    {
+      "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
+      "source": "src/components/ReframeEditor.tsx",
+      "sourceBlob": "8e0380058e2175c4cf5d67465d33b3906a1aa113",
+      "reason": "The stage shade now keeps overlapping crops clear; nothing the guide states about the editor changed."
     },
     {
       "article": "pt-BR/guides/multistream/horizontal-and-vertical-live.mdx",
