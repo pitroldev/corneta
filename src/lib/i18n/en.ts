@@ -2400,6 +2400,19 @@ export const en: Dict = {
   "platforms.reframe.title": "Frame the vertical",
   "platforms.reframe.titleWithTarget": "Frame the vertical · {target}",
   "platforms.reframe.zoom": "Zoom",
+  "platforms.reframe.camera.aria":
+    "Camera crop — drag it or use the arrow keys (Shift = 10%)",
+  "platforms.reframe.layout.aria": "Vertical layout",
+  "platforms.reframe.layout.single": "One frame",
+  "platforms.reframe.layout.split": "Camera + game",
+  "platforms.reframe.lede.split":
+    "Drag the green box onto your camera and the yellow one onto the game: in the **{size}**, the camera goes on top and the game below.",
+  "platforms.reframe.main.aria":
+    "Game crop — drag it or use the arrow keys (Shift = 10%)",
+  "platforms.reframe.region.camera": "Camera",
+  "platforms.reframe.region.main": "Game",
+  "platforms.reframe.split.ratio": "Camera height",
+  "platforms.reframe.zoomOf": "Zoom · {region}",
   "platforms.target.reframe": "Frame the 9:16",
   "platforms.target.reframeTitle":
     "Crops the 9:16 out of your video for this vertical destination",

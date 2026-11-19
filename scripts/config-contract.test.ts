@@ -66,6 +66,27 @@ function scenarios(): { name: string; config: AppConfig }[] {
       blackScreenAlert: true,
     },
   };
+  const reframed: AppConfig = {
+    ...everyPlatform,
+    targets: everyPlatform.targets.map((t) =>
+      t.platformId === "tiktok"
+        ? {
+            ...t,
+            encoding: {
+              ...t.encoding,
+              reframe: {
+                x: 0.4,
+                y: 0.5,
+                zoom: 0.9,
+                layout: "split",
+                top: { x: 1, y: 1, zoom: 0.3 },
+                splitRatio: 0.4,
+              },
+            },
+          }
+        : t,
+    ),
+  };
   return [
     { name: "default", config: base },
     { name: "every platform added", config: everyPlatform },
@@ -74,6 +95,10 @@ function scenarios(): { name: string; config: AppConfig }[] {
     { name: "target removed", config: trimmed },
     { name: "platforms synced from onboarding", config: synced },
     { name: "settings changed", config: settings },
+    {
+      name: "vertical destination split into camera and game",
+      config: reframed,
+    },
   ];
 }
 

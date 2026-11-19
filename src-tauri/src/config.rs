@@ -151,14 +151,53 @@ pub struct VideoPreset {
     pub keyframe_sec: u32,
 }
 
+/// x/y pan across available space (0..1); zoom is the crop height fraction.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CropBox {
+    pub x: f64,
+    pub y: f64,
+    pub zoom: f64,
+}
+
 /// x/y pan across available space (0..1); zoom is the crop height fraction (0.25..1).
+/// The root crop is the whole portrait frame, or its lower region when split.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct Reframe {
     pub x: f64,
     pub y: f64,
     pub zoom: f64,
+    /// `split` stacks a camera region over the root crop; absent or `single` keeps one frame.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub layout: Option<String>,
+    /// The camera region when split.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub top: Option<CropBox>,
+    /// Share of the output height the camera region takes when split.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub split_ratio: Option<f64>,
 }
+
+impl Reframe {
+    /// The camera region and its height share, when this reframe stacks two regions.
+    pub fn split(&self) -> Option<(CropBox, f64)> {
+        (self.layout.as_deref() == Some("split")).then(|| {
+            (
+                self.top.unwrap_or(DEFAULT_SPLIT_TOP),
+                self.split_ratio.unwrap_or(DEFAULT_SPLIT_RATIO),
+            )
+        })
+    }
+}
+
+/// A webcam usually sits in a corner of the canvas.
+pub const DEFAULT_SPLIT_TOP: CropBox = CropBox {
+    x: 1.0,
+    y: 1.0,
+    zoom: 0.35,
+};
+pub const DEFAULT_SPLIT_RATIO: f64 = 0.35;
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
@@ -763,6 +802,12 @@ fn normalize_target(target: &mut Target, l: Locale) -> Result<(), String> {
             .hybrid_override
             .as_deref()
             .is_some_and(|v| !matches!(v, "copy" | "transcode"))
+        || target
+            .encoding
+            .reframe
+            .as_ref()
+            .and_then(|r| r.layout.as_deref())
+            .is_some_and(|v| !matches!(v, "single" | "split"))
     {
         return Err(Msg::ConfigInvalidEncodingIn { name: &target.name }.text(l));
     }
@@ -1092,6 +1137,47 @@ mod tests {
                 hybrid_override: None,
                 reframe: None,
             },
+        }
+    }
+
+    #[test]
+    fn a_saved_reframe_without_the_split_fields_still_loads_as_one_frame() {
+        let old: Reframe = serde_json::from_value(serde_json::json!({
+            "x": 0.2, "y": 0.5, "zoom": 0.8
+        }))
+        .unwrap();
+        assert!(old.split().is_none());
+        assert_eq!(
+            serde_json::to_value(&old).unwrap(),
+            serde_json::json!({ "x": 0.2, "y": 0.5, "zoom": 0.8 }),
+            "an untouched reframe saves exactly as before"
+        );
+
+        let split: Reframe = serde_json::from_value(serde_json::json!({
+            "x": 0.5, "y": 0.5, "zoom": 1.0, "layout": "split"
+        }))
+        .unwrap();
+        assert_eq!(
+            split.split(),
+            Some((DEFAULT_SPLIT_TOP, DEFAULT_SPLIT_RATIO))
+        );
+    }
+
+    #[test]
+    fn an_unknown_reframe_layout_is_rejected() {
+        for (layout, valid) in [("single", true), ("split", true), ("grid", false)] {
+            let mut cfg = AppConfig::default();
+            let mut target = target_fixture("target_vertical");
+            target.encoding.reframe = Some(Reframe {
+                x: 0.5,
+                y: 0.5,
+                zoom: 1.0,
+                layout: Some(layout.into()),
+                top: None,
+                split_ratio: None,
+            });
+            cfg.targets.push(target);
+            assert_eq!(cfg.validate_and_normalize().is_ok(), valid, "{layout}");
         }
     }
 

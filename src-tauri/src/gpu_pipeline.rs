@@ -585,6 +585,15 @@ mod tests {
     }
 
     #[test]
+    fn a_split_portrait_graph_keeps_the_cpu_path() {
+        let split = "split=2[cam][main];[cam]crop=min(ih*0.3000\\,iw/1.6071)*1.6071:min(ih*0.3000\\,iw/1.6071):(iw-min(ih*0.3000\\,iw/1.6071)*1.6071)*1.0000:(ih-min(ih*0.3000\\,iw/1.6071))*1.0000,scale=720:448,setsar=1[top];[main]crop=min(ih*1.0000\\,iw/0.8654)*0.8654:min(ih*1.0000\\,iw/0.8654):(iw-min(ih*1.0000\\,iw/0.8654)*0.8654)*0.5000:(ih-min(ih*1.0000\\,iw/0.8654))*0.5000,scale=720:832,setsar=1[bottom];[top][bottom]vstack=inputs=2";
+        let src = h264_1080p();
+        assert!(candidate_for(&args("h264_nvenc", split), Some(&src), true).is_none());
+        assert!(candidate_for(&args("h264_qsv", split), Some(&src), true).is_none());
+        assert!(!needs_source_video_for(&args("h264_nvenc", split), true));
+    }
+
+    #[test]
     fn resolves_vertical_reframe_crops_on_cuda_and_qsv_when_source_is_known() {
         let reframe = "crop=min(iw\\,ih*0.8000*0.5625):ih*0.8000:(iw-min(iw\\,ih*0.8000*0.5625))*0.2500:(ih-ih*0.8000)*0.5000,scale=720:1280";
         let src = h264_1080p();
@@ -850,6 +859,9 @@ Output #0, null, to 'pipe:':
                     x: 0.25,
                     y: 0.5,
                     zoom: 0.8,
+                    layout: None,
+                    top: None,
+                    split_ratio: None,
                 }),
             },
         };

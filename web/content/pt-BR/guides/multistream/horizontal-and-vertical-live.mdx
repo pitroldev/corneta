@@ -14,9 +14,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-20
-reviewedAt: 2026-10-20
-productVersion: 0.10.0
+updatedAt: 2026-11-19
+reviewedAt: 2026-11-19
+productVersion: 0.16.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -43,7 +43,7 @@ sources:
   - title: Corneta reframe editor
     kind: internal
     repoPath: src/components/ReframeEditor.tsx
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-11-19
   - title: Corneta platform presets
     kind: internal
     repoPath: src/lib/platforms.ts
@@ -51,7 +51,7 @@ sources:
   - title: Corneta quality modes
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-11-19
 images:
   - baseName: corneta-vertical-target-settings
     alt: "Destino TikTok vertical na tela Plataformas da Corneta, com URL de ingestão e ação Enquadrar vertical."
@@ -82,13 +82,19 @@ No YouTube, a própria plataforma já cria por padrão uma versão 9:16 da live 
 
 <ContentImage baseName="corneta-vertical-reframe-editor" />
 
+### Câmera em cima, jogo embaixo
+
+Se a webcam fica num canto da cena, escolha **Câmera + jogo** no topo do editor. Aparecem duas caixas: arraste a verde até a câmera e a amarela até a parte do jogo que importa. No vertical, a câmera vai em cima e o jogo embaixo, sem plugin nem cena extra no OBS.
+
+O zoom vale para a caixa selecionada, e **Altura da câmera** decide quanto do vertical ela ocupa, de 25% a 50%. Dá para voltar para **1 quadro** quando quiser sem perder o recorte da câmera.
+
 O editor é manual. A Corneta não promete auto-reframe nem segue uma pessoa sozinha. Se o foco muda muito durante a live, prepare uma composição que continue legível no centro ou use uma ferramenta com canvas vertical independente.
 
 ## O que cabe no centro
 
 Um recorte 9:16 de um quadro 16:9 joga fora boa parte das laterais. Antes de transmitir:
 
-- mova webcam e legendas importantes para a zona central;
+- mova webcam e legendas importantes para a zona central, ou use **Câmera + jogo** para trazer a webcam de um canto;
 - evite placares colados nos cantos;
 - não use texto pequeno pensado só para 1080p horizontal;
 - teste menus, mapa e HUD do jogo;
@@ -96,7 +102,7 @@ Um recorte 9:16 de um quadro 16:9 joga fora boa parte das laterais. Antes de tra
 
 ## Quanto custa na máquina
 
-Uma saída vertical precisa escalar e recodificar. Se o OBS já usa o encoder da GPU, confirme quantas sessões simultâneas o driver suporta. A Corneta manda o vertical em 720×1280 a 30 FPS. O que dá para subir é o bitrate, de **Padrão** para **Bonitão** no ajuste fino da tela **Qualidade**, e só depois de uma live de teste estável.
+Uma saída vertical precisa escalar e recodificar. No **Câmera + jogo**, os dois recortes saem do mesmo encode, mas são feitos no processador, mesmo com placa NVIDIA; confira o uso da máquina numa live de teste. Se o OBS já usa o encoder da GPU, confirme quantas sessões simultâneas o driver suporta. A Corneta manda o vertical em 720×1280 a 30 FPS. O que dá para subir é o bitrate, de **Padrão** para **Bonitão** no ajuste fino da tela **Qualidade**, e só depois de uma live de teste estável.
 
 <Callout label="Dual Format da Twitch é outro fluxo" tone="note">
   A Twitch liberou o Dual Format para todos os streamers. No OBS 32 ou mais

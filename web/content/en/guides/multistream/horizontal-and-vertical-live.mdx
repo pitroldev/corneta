@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-11-19
+reviewedAt: 2026-11-19
+productVersion: 0.16.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -43,7 +43,7 @@ sources:
   - title: Corneta reframe editor
     kind: internal
     repoPath: src/components/ReframeEditor.tsx
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-11-19
   - title: Corneta platform presets
     kind: internal
     repoPath: src/lib/platforms.ts
@@ -51,7 +51,7 @@ sources:
   - title: Corneta quality modes
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-10-18
+    reviewedAt: 2026-11-19
 images:
   - baseName: corneta-vertical-target-settings-en
     alt: "Vertical TikTok destination on Corneta's Platforms screen, with the ingest URL and the Frame the 9:16 action."
@@ -82,13 +82,19 @@ On YouTube, the platform itself creates a 9:16 version of your horizontal stream
 
 <ContentImage baseName="corneta-vertical-reframe-editor-en" />
 
+### Camera on top, game below
+
+If your webcam sits in a corner of the scene, pick **Camera + game** at the top of the editor. Two boxes show up: drag the green one onto your camera and the yellow one onto the part of the game that matters. In the vertical output, the camera goes on top and the game below, with no plugin or extra scene in OBS.
+
+The zoom applies to the selected box, and **Camera height** sets how much of the vertical output it takes, from 25% to 50%. You can go back to **One frame** whenever you like without losing the camera crop.
+
 The editor is manual. Corneta doesn't promise auto-reframing and doesn't follow a person on its own. If the focus moves around a lot during the stream, set up a layout that stays readable in the center or use a tool with an independent vertical canvas.
 
 ## What fits in the center
 
 A 9:16 crop of a 16:9 frame throws away a good part of the sides. Before you stream:
 
-- move your webcam and important captions to the center zone;
+- move your webcam and important captions to the center zone, or use **Camera + game** to bring the webcam in from a corner;
 - avoid scoreboards pinned to the corners;
 - don't use small text designed only for horizontal 1080p;
 - test the game's menus, map and HUD;
@@ -96,7 +102,7 @@ A 9:16 crop of a 16:9 frame throws away a good part of the sides. Before you str
 
 ## What it costs your machine
 
-A vertical output has to scale and re-encode. If OBS already uses the GPU encoder, confirm how many simultaneous sessions your driver supports. Corneta sends the vertical output at 720×1280 and 30 FPS. What you can raise is the bitrate, from **Standard** to **Sharp** in the fine-tuning on the **Quality** screen, and only after a stable test stream.
+A vertical output has to scale and re-encode. With **Camera + game**, both crops come out of the same encode, but they're done on the processor, even with an NVIDIA card; check your machine's usage in a test stream. If OBS already uses the GPU encoder, confirm how many simultaneous sessions your driver supports. Corneta sends the vertical output at 720×1280 and 30 FPS. What you can raise is the bitrate, from **Standard** to **Sharp** in the fine-tuning on the **Quality** screen, and only after a stable test stream.
 
 <Callout label="Twitch Dual Format is a different flow" tone="note">
   Twitch has rolled out Dual Format to all streamers. On OBS 32 or newer, it

@@ -65,11 +65,24 @@ export interface PlatformPreset {
   userServer?: boolean;
 }
 
-/** Portrait crop: x/y pan within 0–1; zoom within 0.25–1. */
-export interface Reframe {
+/** A crop: x/y pan within 0–1; zoom is the crop height fraction. */
+export interface CropBox {
   x: number;
   y: number;
   zoom: number;
+}
+
+/**
+ * Portrait crop: x/y pan within 0–1; zoom within 0.25–1. The root crop is the whole frame,
+ * or its lower region when split.
+ */
+export interface Reframe extends CropBox {
+  /** `split` stacks a camera region over the root crop; absent keeps one frame. */
+  layout?: "single" | "split";
+  /** The camera region when split. */
+  top?: CropBox;
+  /** Share of the output height the camera region takes when split, 0.25–0.5. */
+  splitRatio?: number;
 }
 
 export interface TargetEncoding {

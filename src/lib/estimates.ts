@@ -9,6 +9,7 @@ import type {
   VideoPreset,
 } from "./types";
 import { PLATFORMS, isVertical, presetOf } from "./platforms";
+import { reframeKey } from "./reframe";
 
 // Reference workload: one 1080p60 encode.
 const REF_PIXELS_PER_SEC = 1920 * 1080 * 60;
@@ -58,10 +59,7 @@ function recommended(t: Target) {
 }
 
 function renditionKey(t: Target, p: VideoPreset): string {
-  const rf =
-    p.height > p.width
-      ? `${(t.encoding.reframe?.x ?? 0.5).toFixed(4)}:${(t.encoding.reframe?.y ?? 0.5).toFixed(4)}:${(t.encoding.reframe?.zoom ?? 1).toFixed(4)}`
-      : "landscape";
+  const rf = p.height > p.width ? reframeKey(t.encoding.reframe) : "landscape";
   return `${p.width}x${p.height}@${p.fps}:${p.videoBitrateKbps}:${p.audioBitrateKbps}:${p.keyframeSec}:${t.encoding.encoder}:${rf}`;
 }
 

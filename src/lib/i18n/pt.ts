@@ -2389,6 +2389,19 @@ export const pt = {
   "platforms.reframe.title": "Enquadrar vertical",
   "platforms.reframe.titleWithTarget": "Enquadrar vertical · {target}",
   "platforms.reframe.zoom": "Zoom",
+  "platforms.reframe.camera.aria":
+    "Recorte da câmera — arraste ou use as setas (Shift = 10%)",
+  "platforms.reframe.layout.aria": "Formato do vertical",
+  "platforms.reframe.layout.single": "1 quadro",
+  "platforms.reframe.layout.split": "Câmera + jogo",
+  "platforms.reframe.lede.split":
+    "Arraste a caixa verde até a sua câmera e a amarela até o jogo: no **{size}**, a câmera vai em cima e o jogo embaixo.",
+  "platforms.reframe.main.aria":
+    "Recorte do jogo — arraste ou use as setas (Shift = 10%)",
+  "platforms.reframe.region.camera": "Câmera",
+  "platforms.reframe.region.main": "Jogo",
+  "platforms.reframe.split.ratio": "Altura da câmera",
+  "platforms.reframe.zoomOf": "Zoom · {region}",
   "platforms.target.reframe": "Enquadrar vertical",
   "platforms.target.reframeTitle":
     "Recorta o 9:16 do seu vídeo pra esta saída vertical",

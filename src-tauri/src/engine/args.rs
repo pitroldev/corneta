@@ -1,5 +1,5 @@
 use super::hybrid::{effective_action, effective_preset, strictest_copy_limits};
-use crate::config::{AppConfig, Reframe, Target};
+use crate::config::{AppConfig, CropBox, Reframe, Target};
 
 /// `auto_codec` must pass a real encode probe; `-encoders` does not prove hardware availability.
 fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str {
@@ -62,6 +62,9 @@ fn compose_output_url(ingest_url: &str, key: &str) -> String {
 
 // Pan within the remaining source area so crops cannot extend beyond the input.
 fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
+    if let Some(vf) = reframe.and_then(|r| split_filter(r, out_w, out_h)) {
+        return vf;
+    }
     let ar = out_w as f64 / out_h as f64;
     let (x, y, z) = match reframe {
         Some(r) => (
@@ -74,6 +77,47 @@ fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
     let cw = format!("min(iw\\,ih*{z:.4}*{ar:.4})");
     let ch = format!("ih*{z:.4}");
     format!("crop={cw}:{ch}:(iw-{cw})*{x:.4}:(ih-{ch})*{y:.4},scale={out_w}:{out_h}")
+}
+
+/// Heights of the camera and main regions: both even for 4:2:0 and at least 16 px.
+pub(crate) fn split_heights(out_h: u32, ratio: f64) -> Option<(u32, u32)> {
+    let ratio = if ratio.is_finite() {
+        ratio.clamp(0.25, 0.5)
+    } else {
+        crate::config::DEFAULT_SPLIT_RATIO
+    };
+    let top = ((f64::from(out_h) * ratio).round() as u32) & !1;
+    let bottom = out_h.checked_sub(top)? & !1;
+    (top >= 16 && bottom >= 16).then_some((top, bottom))
+}
+
+/// A crop of the region's aspect that stays inside the source on both axes.
+fn region_crop(region: CropBox, min_zoom: f64, out_w: u32, out_h: u32) -> String {
+    let ar = f64::from(out_w) / f64::from(out_h);
+    let x = region.x.clamp(0.0, 1.0);
+    let y = region.y.clamp(0.0, 1.0);
+    let z = region.zoom.clamp(min_zoom, 1.0);
+    let ch = format!("min(ih*{z:.4}\\,iw/{ar:.4})");
+    let cw = format!("{ch}*{ar:.4}");
+    format!("crop={cw}:{ch}:(iw-{cw})*{x:.4}:(ih-{ch})*{y:.4},scale={out_w}:{out_h},setsar=1")
+}
+
+/// The camera region stacked over the main one, inside a single-input `-vf` graph so
+/// renditions and the copy path keep treating it as one filter.
+fn split_filter(reframe: &Reframe, out_w: u32, out_h: u32) -> Option<String> {
+    let (camera, ratio) = reframe.split()?;
+    let (top_h, bottom_h) = split_heights(out_h, ratio)?;
+    let main = CropBox {
+        x: reframe.x,
+        y: reframe.y,
+        zoom: reframe.zoom,
+    };
+    // A webcam in a corner needs a tighter crop than the main region allows.
+    let camera = region_crop(camera, 0.1, out_w, top_h);
+    let main = region_crop(main, 0.25, out_w, bottom_h);
+    Some(format!(
+        "split=2[cam][main];[cam]{camera}[top];[main]{main}[bottom];[top][bottom]vstack=inputs=2"
+    ))
 }
 
 pub fn ingest_url(config: &AppConfig) -> String {
@@ -741,6 +785,136 @@ mod tests {
         let vf = reframe_filter(None, 720, 1280);
         assert!(vf.contains("crop="));
         assert!(vf.contains("scale=720:1280"));
+    }
+
+    fn split_reframe(ratio: Option<f64>) -> Reframe {
+        Reframe {
+            x: 0.5,
+            y: 0.5,
+            zoom: 1.0,
+            layout: Some("split".into()),
+            top: Some(CropBox {
+                x: 1.0,
+                y: 1.0,
+                zoom: 0.3,
+            }),
+            split_ratio: ratio,
+        }
+    }
+
+    #[test]
+    fn split_heights_are_even_and_fill_the_frame() {
+        for out_h in [1280u32, 1920, 1366, 960] {
+            for step in 0..=50 {
+                let ratio = 0.2 + f64::from(step) * 0.01;
+                let (top, bottom) = split_heights(out_h, ratio).unwrap();
+                assert_eq!(top % 2, 0, "{out_h} {ratio}");
+                assert_eq!(bottom % 2, 0, "{out_h} {ratio}");
+                assert_eq!(top + bottom, out_h, "{out_h} {ratio}");
+                assert!(top >= out_h / 4 - 1 && top <= out_h / 2 + 1);
+            }
+        }
+        assert_eq!(split_heights(1280, 0.35), Some((448, 832)));
+        assert_eq!(split_heights(1280, f64::NAN), Some((448, 832)));
+        assert_eq!(split_heights(40, 0.25), None, "a region under 16 px");
+    }
+
+    #[test]
+    fn a_split_reframe_stacks_the_camera_over_the_main_crop_in_one_graph() {
+        let vf = reframe_filter(Some(&split_reframe(None)), 720, 1280);
+        assert!(vf.starts_with("split=2[cam][main];[cam]crop="), "{vf}");
+        assert!(vf.contains(",scale=720:448,setsar=1[top]"), "{vf}");
+        assert!(vf.contains(",scale=720:832,setsar=1[bottom]"), "{vf}");
+        assert!(vf.ends_with("[top][bottom]vstack=inputs=2"), "{vf}");
+        assert!(
+            vf.contains("min(ih*0.3000\\,iw/1.6071)"),
+            "camera zoom: {vf}"
+        );
+
+        let mut single = split_reframe(None);
+        single.layout = Some("single".into());
+        assert_eq!(
+            reframe_filter(Some(&single), 720, 1280),
+            reframe_filter(
+                Some(&Reframe {
+                    x: 0.5,
+                    y: 0.5,
+                    zoom: 1.0,
+                    layout: None,
+                    top: None,
+                    split_ratio: None,
+                }),
+                720,
+                1280
+            ),
+            "switching back to one frame keeps the main crop"
+        );
+    }
+
+    #[test]
+    fn split_numbers_from_an_imported_config_are_clamped_into_the_graph() {
+        let mut hostile = split_reframe(Some(9.0));
+        hostile.x = -3.0;
+        hostile.zoom = 40.0;
+        hostile.top = Some(CropBox {
+            x: f64::INFINITY,
+            y: 2.0,
+            zoom: 0.0,
+        });
+        let vf = reframe_filter(Some(&hostile), 720, 1280);
+        assert!(vf.contains("scale=720:640,setsar=1[top]"), "{vf}");
+        assert!(vf.contains("min(ih*0.1000\\,"), "{vf}");
+        assert!(vf.contains("min(ih*1.0000\\,"), "{vf}");
+        assert!(!vf.contains("inf") && !vf.contains("NaN"), "{vf}");
+    }
+
+    #[test]
+    fn identical_split_destinations_produce_identical_encoder_arguments() {
+        let mut tiktok = tgt("tiktok", Some(preset(720, 1280, 30, 3000)));
+        tiktok.encoding.reframe = Some(split_reframe(Some(0.4)));
+        let mut shorts = tiktok.clone();
+        shorts.id = "shorts".into();
+        let c = cfg("per-platform", vec![tiktok.clone(), shorts.clone()]);
+        let args = |t: &Target| {
+            ffmpeg_args_for_target(&c, t, "k", None, "rtmp://127.0.0.1:1935/live/obs", None)
+        };
+        let (a, b) = (args(&tiktok), args(&shorts));
+        let vf = a.iter().position(|x| x == "-vf").unwrap();
+        assert!(a[vf + 1].contains("vstack"));
+        assert_eq!(
+            a[..a.len() - 1],
+            b[..b.len() - 1],
+            "renditions group by these"
+        );
+    }
+
+    #[test]
+    #[ignore = "requires verified ffmpeg and ffprobe on PATH in a disposable contributor checkout"]
+    fn a_split_graph_encodes_a_1080p_source_into_a_720x1280_portrait() {
+        let vf = reframe_filter(Some(&split_reframe(Some(0.35))), 720, 1280);
+        let out = std::env::temp_dir().join("corneta-split-reframe.mp4");
+        let encoded = std::process::Command::new("ffmpeg")
+            .args(["-y", "-hide_banner", "-loglevel", "error"])
+            .args(["-f", "lavfi", "-i", "testsrc2=s=1920x1080:r=30:d=1"])
+            .args(["-vf", &vf, "-c:v", "libx264", "-pix_fmt", "yuv420p"])
+            .arg(&out)
+            .status();
+        assert!(encoded.is_ok_and(|s| s.success()), "encode with {vf}");
+        let probe = std::process::Command::new("ffprobe")
+            .args(["-v", "error", "-select_streams", "v:0"])
+            .args([
+                "-show_entries",
+                "stream=width,height,pix_fmt,sample_aspect_ratio",
+            ])
+            .args(["-of", "csv=p=0"])
+            .arg(&out)
+            .output()
+            .unwrap();
+        let _ = std::fs::remove_file(&out);
+        let line = String::from_utf8_lossy(&probe.stdout).trim().to_string();
+        let mut fields: Vec<&str> = line.split(',').collect();
+        fields.sort_unstable();
+        assert_eq!(fields, ["1280", "1:1", "720", "yuv420p"], "{line}");
     }
 
     #[test]
