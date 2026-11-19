@@ -130,9 +130,25 @@ pub(super) fn slate_forced(app: &AppHandle) -> bool {
 /// The opt-in watches over what OBS sends.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(super) enum WatchAlert {
-    Black,
-    Frozen,
-    Silent,
+    Black = 0,
+    Frozen = 1,
+    Silent = 2,
+}
+
+static LAST_WATCH_NOTIFY: std::sync::Mutex<[Option<std::time::Instant>; 3]> =
+    std::sync::Mutex::new([None; 3]);
+
+fn watch_notification_claimed(alert: WatchAlert) -> bool {
+    let mut last = LAST_WATCH_NOTIFY
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner);
+    let slot = &mut last[alert as usize];
+    let now = std::time::Instant::now();
+    let due = crate::engine_policy::watch_notification_due(*slot, now);
+    if due {
+        *slot = Some(now);
+    }
+    due
 }
 
 impl From<crate::black_screen::PictureAlert> for WatchAlert {
@@ -184,7 +200,9 @@ pub(super) fn set_watch_alert(app: &AppHandle, alert: WatchAlert, on: bool) {
             ),
         };
         log::warn!("engine: {what}");
-        notify(app, &title.now(), &body.now());
+        if watch_notification_claimed(alert) {
+            notify(app, &title.now(), &body.now());
+        }
     }
 }
 

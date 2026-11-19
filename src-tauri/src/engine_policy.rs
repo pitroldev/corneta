@@ -2,6 +2,15 @@ use crate::engine::{EngineSnapshot, PlatformCheck, PlatformCheckState, TargetSta
 use crate::i18n::{Locale, Msg};
 use crate::platforms::provider::PlatformReading;
 use std::path::Path;
+use std::time::{Duration, Instant};
+
+/// A watch alert that flaps, like silence between sentences behind a noise gate, must not
+/// flood Windows with notifications; the in-app alert still follows every change.
+pub(crate) const WATCH_NOTIFY_COOLDOWN: Duration = Duration::from_secs(5 * 60);
+
+pub(crate) fn watch_notification_due(last: Option<Instant>, now: Instant) -> bool {
+    last.is_none_or(|at| now.saturating_duration_since(at) >= WATCH_NOTIFY_COOLDOWN)
+}
 
 pub(crate) fn fmt_mbps(kbps: u32) -> String {
     if kbps >= 1000 {
@@ -678,6 +687,22 @@ pub(crate) fn parse_ingest_hostport(ingest_url: &str) -> Result<(String, u16), S
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_flapping_watch_alert_notifies_at_most_once_per_cooldown() {
+        use super::{watch_notification_due, WATCH_NOTIFY_COOLDOWN};
+        use std::time::{Duration, Instant};
+        let start = Instant::now();
+        assert!(watch_notification_due(None, start));
+        assert!(!watch_notification_due(
+            Some(start),
+            start + Duration::from_secs(40)
+        ));
+        assert!(watch_notification_due(
+            Some(start),
+            start + WATCH_NOTIFY_COOLDOWN
+        ));
+    }
+
     use super::*;
     use std::collections::HashMap;
 

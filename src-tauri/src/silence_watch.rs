@@ -90,7 +90,7 @@ pub fn run(
                 return;
             }
         };
-        let mut heard_any = false;
+        let (mut heard_any, mut exited) = (false, false);
         while running.load(Ordering::Relaxed) && has_signal.load(Ordering::Relaxed) {
             match seconds.recv_timeout(Duration::from_millis(1500)) {
                 Ok(pcm) => {
@@ -99,18 +99,39 @@ pub fn run(
                     emit(watch.observe(silent, Instant::now()));
                 }
                 Err(RecvTimeoutError::Timeout) => {}
-                Err(RecvTimeoutError::Disconnected) => break,
+                Err(RecvTimeoutError::Disconnected) => {
+                    exited = true;
+                    break;
+                }
             }
         }
         let _ = child.kill();
         let _ = child.wait();
-        std::thread::sleep(if heard_any {
-            Duration::from_secs(2)
-        } else {
-            NO_AUDIO_RETRY
-        });
+        nap(&running, retry_after(exited, heard_any));
     }
     emit(watch.clear());
+}
+
+/// Only a probe that ended on its own before any audio points at an ingest without sound;
+/// one stopped by a lost signal comes back as soon as the signal does.
+fn retry_after(exited: bool, heard_any: bool) -> Duration {
+    if exited && !heard_any {
+        NO_AUDIO_RETRY
+    } else {
+        Duration::from_secs(2)
+    }
+}
+
+/// Sleep that ends early when the live stops, so the watch never outlives it.
+fn nap(running: &AtomicBool, total: Duration) {
+    let until = Instant::now() + total;
+    while running.load(Ordering::Relaxed) {
+        let left = until.saturating_duration_since(Instant::now());
+        if left.is_zero() {
+            return;
+        }
+        std::thread::sleep(left.min(Duration::from_millis(250)));
+    }
 }
 
 #[cfg(test)]
@@ -137,6 +158,25 @@ mod tests {
         one_click[RATE..RATE + 2].copy_from_slice(&i16::MIN.to_le_bytes());
         assert!(!is_silent(&one_click), "i16::MIN must not overflow");
         assert!(!is_silent(&[]));
+    }
+
+    #[test]
+    fn only_a_probe_that_ends_without_audio_waits_long_before_retrying() {
+        assert_eq!(retry_after(true, false), NO_AUDIO_RETRY);
+        assert_eq!(
+            retry_after(false, false),
+            Duration::from_secs(2),
+            "signal lost"
+        );
+        assert_eq!(retry_after(true, true), Duration::from_secs(2));
+    }
+
+    #[test]
+    fn the_retry_wait_ends_as_soon_as_the_live_stops() {
+        let running = AtomicBool::new(false);
+        let start = Instant::now();
+        nap(&running, NO_AUDIO_RETRY);
+        assert!(start.elapsed() < Duration::from_millis(100));
     }
 
     #[test]
