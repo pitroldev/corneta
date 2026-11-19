@@ -675,6 +675,26 @@ pub(crate) fn kick_set_info(
     }
 }
 
+/// Kick documents `name` filters of 3 to 100 characters on its v2 categories endpoint.
+pub(crate) fn kick_search_categories(app: &AppHandle, query: &str) -> Result<Vec<String>, String> {
+    if query.trim().chars().count() < 3 {
+        return Ok(Vec::new());
+    }
+    let body = kick_api(
+        app,
+        "GET",
+        &format!(
+            "https://api.kick.com/public/v2/categories?name={}&limit={}",
+            pct(query.trim()),
+            crate::platforms::categories::SUGGESTIONS
+        ),
+        None,
+    )?;
+    let v: Value =
+        serde_json::from_str(&body).map_err(|_| "kick: bad category response".to_string())?;
+    Ok(crate::platforms::categories::names_in_data(&v))
+}
+
 fn kick_category_id(app: &AppHandle, name: &str) -> Option<i64> {
     let body = kick_api(
         app,

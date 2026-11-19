@@ -236,6 +236,7 @@ mod secret_presence_tests {
                 target("profile_target_saved", false),
                 target("profile_target_empty", true),
             ],
+            ..Default::default()
         });
         config.settings.alert_sources.push(AlertSource {
             id: "alerts_saved".into(),

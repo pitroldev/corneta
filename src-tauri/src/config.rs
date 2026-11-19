@@ -332,6 +332,9 @@ pub struct Settings {
     pub youtube_made_for_kids: bool,
     #[serde(default)]
     pub stream_title: String,
+    /// Last category applied or picked; Twitch and Kick names are not localized.
+    #[serde(default)]
+    pub stream_category: String,
     #[serde(default = "default_true")]
     pub chat_auto_connect: bool,
     #[serde(default = "default_popout_tab")]
@@ -541,6 +544,7 @@ impl Default for Settings {
             youtube_privacy: default_youtube_privacy(),
             youtube_made_for_kids: false,
             stream_title: String::new(),
+            stream_category: String::new(),
             chat_auto_connect: true,
             chat_popout_tab: default_popout_tab(),
             chat_show_alerts_panel: false,
@@ -580,13 +584,21 @@ fn default_both_layout() -> String {
     "auto".to_string()
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Profile {
     pub id: String,
     pub name: String,
     pub mode: String,
     pub targets: Vec<Target>,
+    /// The live context the profile restores with its destinations; absent in older profiles.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stream_category: Option<String>,
+    /// One of `YOUTUBE_PRIVACY`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub youtube_privacy: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -691,6 +703,21 @@ impl AppConfig {
             for target in &mut profile.targets {
                 target.has_key = false;
             }
+            profile.stream_title = profile
+                .stream_title
+                .take()
+                .map(|title| title.chars().take(200).collect());
+            profile.stream_category = profile
+                .stream_category
+                .take()
+                .map(|category| category.chars().take(100).collect());
+            if profile
+                .youtube_privacy
+                .as_deref()
+                .is_some_and(|privacy| !YOUTUBE_PRIVACY.contains(&privacy))
+            {
+                profile.youtube_privacy = None;
+            }
         }
         if !self.active_profile_id.is_empty() && !valid_id(&self.active_profile_id) {
             return Err(Msg::ConfigInvalidActiveProfile.text(l));
@@ -699,6 +726,7 @@ impl AppConfig {
         s.obs_password = s.obs_password.chars().take(512).collect();
         s.youtube_api_key = s.youtube_api_key.chars().take(512).collect();
         s.stream_title = s.stream_title.chars().take(200).collect();
+        s.stream_category = s.stream_category.chars().take(100).collect();
         if !YOUTUBE_PRIVACY.contains(&s.youtube_privacy.as_str()) {
             s.youtube_privacy = default_youtube_privacy();
         }
@@ -1195,6 +1223,34 @@ mod tests {
         assert_eq!(cfg.targets[0].protocol, "rtmps");
     }
 
+    #[test]
+    fn a_profile_keeps_its_live_context_within_limits_and_older_profiles_still_load() {
+        let old: Profile = serde_json::from_value(serde_json::json!({
+            "id": "perfil_1", "name": "Live", "mode": "hybrid", "targets": []
+        }))
+        .unwrap();
+        assert_eq!(old.stream_title, None);
+        assert!(!serde_json::to_string(&old).unwrap().contains("streamTitle"));
+
+        let mut cfg = AppConfig::default();
+        cfg.settings.stream_category = "c".repeat(300);
+        cfg.profiles.push(Profile {
+            id: "perfil_1".into(),
+            name: "Valorant".into(),
+            mode: "hybrid".into(),
+            stream_title: Some("t".repeat(300)),
+            stream_category: Some("VALORANT".into()),
+            youtube_privacy: Some("everyone".into()),
+            ..Default::default()
+        });
+        let cfg = cfg.validate_and_normalize().expect("valid configuration");
+        let profile = &cfg.profiles[0];
+        assert_eq!(profile.stream_title.as_ref().unwrap().chars().count(), 200);
+        assert_eq!(profile.stream_category.as_deref(), Some("VALORANT"));
+        assert_eq!(profile.youtube_privacy, None, "unknown privacy is dropped");
+        assert_eq!(cfg.settings.stream_category.chars().count(), 100);
+    }
+
     /// Normalization must preserve destination IDs because they index vault credentials.
     #[test]
     fn normalization_must_preserve_destination_ids() {
@@ -1208,6 +1264,7 @@ mod tests {
             name: "Live de sexta".into(),
             mode: "per-platform".into(),
             targets: ids.iter().map(|id| target_fixture(id)).collect(),
+            ..Default::default()
         });
         let cfg = cfg.validate_and_normalize().expect("valid configuration");
 
@@ -1247,6 +1304,7 @@ mod tests {
             name: "Podcast".into(),
             mode: "hybrid".into(),
             targets: vec![with_key],
+            ..Default::default()
         });
 
         let cfg = cfg.validate_and_normalize().expect("valid configuration");
@@ -1442,6 +1500,7 @@ mod tests {
             name: "Sexta".into(),
             mode: "hybrid".into(),
             targets: vec![target_fixture("tgt_a1")],
+            ..Default::default()
         });
         cfg.active_profile_id = "prof_a1".into();
         cfg.settings.chat_sources.push(ChatSource {

@@ -184,6 +184,8 @@ export interface AppSettings {
   youtubeMadeForKids: boolean;
   /** Persisted across sessions and used for automatic YouTube broadcasts. */
   streamTitle: string;
+  /** Last category applied or picked; Twitch and Kick names are not localized. */
+  streamCategory: string;
   chatAutoConnect: boolean;
   chatPopoutTab: "chat" | "alerts" | "both";
   chatShowAlertsPanel: boolean;
@@ -486,6 +488,16 @@ export interface Profile {
   name: string;
   mode: EncodingMode;
   targets: Target[];
+  /** The live context the profile restores with its destinations; absent in older profiles. */
+  streamTitle?: string;
+  streamCategory?: string;
+  youtubePrivacy?: YoutubePrivacy;
+}
+
+/** A category name from the platforms' search, with the platforms that returned it. */
+export interface CategorySuggestion {
+  name: string;
+  platforms: AccountPlatform[];
 }
 
 export interface AppConfig {

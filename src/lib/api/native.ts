@@ -341,6 +341,10 @@ export function tauriApi(): CornetaApi {
         category: category ?? null,
       });
     },
+    async searchStreamCategories(query) {
+      const { invoke } = await core();
+      return await invoke("search_stream_categories", { query });
+    },
     async accountSaveOwnCredentials(platform, clientId, clientSecret) {
       const { invoke } = await core();
       await invoke("account_save_own_credentials", {

@@ -10,6 +10,7 @@ import {
 import type {
   Alert,
   AppConfig,
+  CategorySuggestion,
   ChatDelete,
   ChatMessage,
   ChatSideEvent,
@@ -159,6 +160,8 @@ export interface CornetaApi {
     title: string,
     category?: string,
   ): Promise<Record<string, { ok: boolean; error?: string; warn?: string }>>;
+  /** Best effort: a platform that fails only leaves its matches out. */
+  searchStreamCategories(query: string): Promise<CategorySuggestion[]>;
   /** Saves the user's own OAuth app for an account and switches to it. */
   accountSaveOwnCredentials(
     platform: AccountPlatform,

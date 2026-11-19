@@ -1,5 +1,5 @@
 import { makeTarget } from "./factory";
-import type { AppConfig, PlatformId, Target } from "./types";
+import type { AppConfig, PlatformId, Profile, Target } from "./types";
 
 export function suffixName(base: string, taken: Set<string>): string {
   if (!taken.has(base)) return base;
@@ -135,15 +135,54 @@ export function moveTarget(
   return { ...config, targets };
 }
 
+/** The live context a profile carries next to its destinations. */
+function liveContext(settings: AppConfig["settings"]) {
+  return {
+    streamTitle: settings.streamTitle,
+    streamCategory: settings.streamCategory,
+    youtubePrivacy: settings.youtubePrivacy,
+  };
+}
+
+/** The active profile mirrors what is on screen: destinations, mode and live context. */
+export function withActiveProfile(config: AppConfig): AppConfig {
+  return {
+    ...config,
+    profiles: config.profiles.map((p) =>
+      p.id === config.activeProfileId
+        ? {
+            ...p,
+            mode: config.mode,
+            targets: config.targets,
+            ...liveContext(config.settings),
+          }
+        : p,
+    ),
+  };
+}
+
+/** Switch to a profile; one saved before it kept a live context leaves the current one in place. */
+function applyProfile(config: AppConfig, prof: Profile): AppConfig {
+  const settings = { ...config.settings };
+  if (prof.streamTitle !== undefined) settings.streamTitle = prof.streamTitle;
+  if (prof.streamCategory !== undefined)
+    settings.streamCategory = prof.streamCategory;
+  if (prof.youtubePrivacy !== undefined)
+    settings.youtubePrivacy = prof.youtubePrivacy;
+  return {
+    ...config,
+    activeProfileId: prof.id,
+    mode: prof.mode,
+    targets: prof.targets.map((t) => ({ ...t })),
+    settings,
+  };
+}
+
 export function loadProfile(config: AppConfig, id: string): AppConfig {
   const prof = config.profiles.find((p) => p.id === id);
   if (!prof) return config;
-  return {
-    ...config,
-    activeProfileId: id,
-    mode: prof.mode,
-    targets: prof.targets.map((t) => ({ ...t })),
-  };
+  // Keep edits made elsewhere, like a title set from the deck, in the profile being left.
+  return applyProfile(withActiveProfile(config), prof);
 }
 
 export function addProfile(
@@ -154,11 +193,12 @@ export function addProfile(
   const taken = new Set(config.profiles.map((p) => p.name));
   let n = config.profiles.length + 1;
   while (taken.has(label(n))) n++;
-  const prof = {
+  const prof: Profile = {
     id,
     name: label(n),
     mode: config.mode,
     targets: config.targets.map((t) => ({ ...t })),
+    ...liveContext(config.settings),
   };
   return {
     ...config,
@@ -172,14 +212,7 @@ export function removeProfile(config: AppConfig, id: string): AppConfig {
   if (config.profiles.length <= 1) return config;
   const profiles = config.profiles.filter((p) => p.id !== id);
   if (config.activeProfileId === id) {
-    const first = profiles[0];
-    return {
-      ...config,
-      profiles,
-      activeProfileId: first.id,
-      mode: first.mode,
-      targets: first.targets.map((t) => ({ ...t })),
-    };
+    return applyProfile({ ...config, profiles }, profiles[0]);
   }
   return { ...config, profiles };
 }

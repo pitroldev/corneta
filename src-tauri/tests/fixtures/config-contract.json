@@ -94,6 +94,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -438,6 +439,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -803,6 +805,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -1168,6 +1171,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -1481,7 +1485,10 @@
                 "encoder": "auto"
               }
             }
-          ]
+          ],
+          "streamTitle": "",
+          "streamCategory": "",
+          "youtubePrivacy": "public"
         }
       ],
       "activeProfileId": "prof_second"
@@ -1750,6 +1757,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -2063,7 +2071,10 @@
                 "encoder": "auto"
               }
             }
-          ]
+          ],
+          "streamTitle": "",
+          "streamCategory": "",
+          "youtubePrivacy": "public"
         }
       ],
       "activeProfileId": "prof_second"
@@ -2164,6 +2175,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -2340,6 +2352,7 @@
         "youtubePrivacy": "unlisted",
         "youtubeMadeForKids": true,
         "streamTitle": "Live de teste",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,
@@ -2696,6 +2709,7 @@
         "youtubePrivacy": "public",
         "youtubeMadeForKids": false,
         "streamTitle": "",
+        "streamCategory": "",
         "chatAutoConnect": true,
         "chatPopoutTab": "both",
         "chatShowAlertsPanel": false,

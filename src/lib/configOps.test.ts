@@ -103,6 +103,62 @@ describe("configOps", () => {
     expect(ops.removeProfile(c, c.profiles[0].id)).toBe(c);
   });
 
+  it("a profile brings back its title, category and YouTube privacy", () => {
+    const live = (c: ReturnType<typeof base>, title: string, game: string) => ({
+      ...c,
+      settings: { ...c.settings, streamTitle: title, streamCategory: game },
+    });
+    let c = live(base(), "Conversa de domingo", "Just Chatting");
+    c = ops.withActiveProfile(c);
+    const chatting = c.activeProfileId;
+    c = ops.addProfile(c, "prof_fps", (n) => `Perfil ${n}`);
+    expect(c.profiles[1].streamCategory).toBe("Just Chatting");
+    c = ops.withActiveProfile(live(c, "Ranqueada até o Radiante", "VALORANT"));
+    c = {
+      ...c,
+      settings: { ...c.settings, youtubePrivacy: "unlisted" },
+    };
+
+    c = ops.loadProfile(c, chatting);
+    expect(c.settings.streamTitle).toBe("Conversa de domingo");
+    expect(c.settings.streamCategory).toBe("Just Chatting");
+    expect(c.settings.youtubePrivacy).toBe("public");
+    const fps = c.profiles.find((p) => p.id === "prof_fps")!;
+    expect(fps.streamCategory).toBe("VALORANT");
+    expect(fps.youtubePrivacy, "kept on leaving the profile").toBe("unlisted");
+
+    c = ops.loadProfile(c, "prof_fps");
+    expect(c.settings.streamTitle).toBe("Ranqueada até o Radiante");
+    expect(c.settings.youtubePrivacy).toBe("unlisted");
+
+    c = ops.removeProfile(c, "prof_fps");
+    expect(c.settings.streamCategory).toBe("Just Chatting");
+  });
+
+  it("a profile saved before it carried a live context keeps the current one", () => {
+    const c = ops.addProfile(base(), "prof_2", (n) => `Perfil ${n}`);
+    const first = c.profiles[0];
+    const older = {
+      id: first.id,
+      name: first.name,
+      mode: first.mode,
+      targets: first.targets,
+    };
+    const withOld = {
+      ...c,
+      profiles: [older, c.profiles[1]],
+      settings: {
+        ...c.settings,
+        streamTitle: "Agora",
+        streamCategory: "Music",
+      },
+    };
+    const next = ops.loadProfile(withOld, older.id);
+    expect(next.settings.streamTitle).toBe("Agora");
+    expect(next.settings.streamCategory).toBe("Music");
+    expect(next.activeProfileId).toBe(older.id);
+  });
+
   it("loadProfile preserves identity for an unknown ID", () => {
     const c = base();
     expect(ops.loadProfile(c, "nope")).toBe(c);

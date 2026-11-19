@@ -570,6 +570,25 @@ fn marker_outcome(status: u16) -> MarkOutcome {
     }
 }
 
+pub(crate) fn twitch_search_categories(
+    app: &AppHandle,
+    query: &str,
+) -> Result<Vec<String>, String> {
+    let token = twitch_token(app).ok_or_else(|| Msg::StreamInfoTwitchSignIn.now())?;
+    let client_id = oauth(app).twitch_client_id;
+    let v = helix(
+        &token,
+        &client_id,
+        &format!(
+            "https://api.twitch.tv/helix/search/categories?query={}&first={}",
+            pct(query),
+            crate::platforms::categories::SUGGESTIONS
+        ),
+    )
+    .ok_or_else(|| "twitch: category search failed".to_string())?;
+    Ok(crate::platforms::categories::names_in_data(&v))
+}
+
 fn twitch_game_id(token: &str, client_id: &str, name: &str) -> Option<String> {
     let v = helix(
         token,

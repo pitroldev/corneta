@@ -2112,6 +2112,10 @@ export const pt = {
   "golive.streamInfo.applied": "Atualizei o título em {n} plataforma(s)",
   "golive.streamInfo.apply": "Mandar pras plataformas",
   "golive.streamInfo.game.placeholder": "Jogo / categoria (opcional)",
+  "golive.streamInfo.game.suggestions": "Categorias encontradas",
+  "golive.streamInfo.profile.label": "Perfil",
+  "golive.streamInfo.profile.locked":
+    "Dá pra trocar de perfil quando a live acabar",
   "golive.streamInfo.needTitle": "Digite um título",
   "golive.streamInfo.partial": "{ok}/{total} ok — veja os detalhes",
   "golive.streamInfo.signIn": "Entrar na conta →",

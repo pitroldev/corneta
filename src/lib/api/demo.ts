@@ -30,6 +30,22 @@ import type {
 } from "../types";
 import { CornetaApi } from "./types";
 
+/** Real Twitch and Kick category names, so the demo autocomplete looks like the live one. */
+const DEMO_CATEGORIES = [
+  { name: "Just Chatting", platforms: ["twitch", "kick"] },
+  { name: "VALORANT", platforms: ["twitch", "kick"] },
+  { name: "Counter-Strike", platforms: ["twitch", "kick"] },
+  { name: "League of Legends", platforms: ["twitch", "kick"] },
+  { name: "Minecraft", platforms: ["twitch", "kick"] },
+  { name: "Grand Theft Auto V", platforms: ["twitch", "kick"] },
+  { name: "Fortnite", platforms: ["twitch", "kick"] },
+  { name: "EA Sports FC 26", platforms: ["twitch"] },
+  { name: "Free Fire", platforms: ["twitch", "kick"] },
+  { name: "Slots & Casino", platforms: ["kick"] },
+  { name: "Talk Shows & Podcasts", platforms: ["twitch"] },
+  { name: "Music", platforms: ["twitch", "kick"] },
+] as const;
+
 export function mockApi(): CornetaApi {
   const CONFIG_KEY = "corneta.config";
   const VAULT_KEY = "corneta.vault";
@@ -1187,6 +1203,13 @@ export function mockApi(): CornetaApi {
     async youtubeAcknowledgeUnknownBroadcast() {},
     async setStreamInfo() {
       return {};
+    },
+    async searchStreamCategories(query) {
+      const q = query.trim().toLowerCase();
+      if (q.length < 2) return [];
+      return DEMO_CATEGORIES.filter((c) => c.name.toLowerCase().includes(q))
+        .slice(0, 8)
+        .map((c) => ({ ...c, platforms: [...c.platforms] }));
     },
     async accountSaveOwnCredentials() {},
     async accountClearOwnCredentials() {},

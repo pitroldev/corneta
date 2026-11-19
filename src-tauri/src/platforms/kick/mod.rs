@@ -170,6 +170,14 @@ impl AccountProvider for Kick {
     ) -> Result<Option<String>, String> {
         account::kick_set_info(app, title, category)
     }
+
+    fn search_categories(
+        &self,
+        app: &AppHandle,
+        query: &str,
+    ) -> Option<Result<Vec<String>, String>> {
+        Some(account::kick_search_categories(app, query))
+    }
 }
 
 impl OwnCredentials for Kick {

@@ -74,6 +74,7 @@ export function defaultConfig(): AppConfig {
       youtubePrivacy: "public",
       youtubeMadeForKids: false,
       streamTitle: "",
+      streamCategory: "",
       chatAutoConnect: true,
       chatPopoutTab: "both",
       chatShowAlertsPanel: false,

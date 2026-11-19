@@ -138,9 +138,13 @@ pub async fn run(
             let title =
                 text_arg(args, "title", 140).ok_or_else(|| Msg::StreamInfoEmptyTitle.now())?;
             let game = text_arg(args, "game", 60);
-            let saved = title.clone();
+            let (saved, saved_game) = (title.clone(), game.clone());
             crate::commands::save_native_config(&app, move |cfg| {
                 cfg.settings.stream_title = saved;
+                // An empty game keeps the category already set on the platforms.
+                if let Some(game) = saved_game.filter(|g| !g.trim().is_empty()) {
+                    cfg.settings.stream_category = game.trim().to_string();
+                }
             })?;
             let results = crate::auth::set_stream_info(app, title, game).await?;
             Ok(results)

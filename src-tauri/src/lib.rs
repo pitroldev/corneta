@@ -339,6 +339,7 @@ pub fn run() {
             platforms::youtube::account::youtube_retry_broadcast_cleanup,
             platforms::youtube::account::youtube_acknowledge_unknown_broadcast,
             auth::set_stream_info,
+            auth::search_stream_categories,
             auth::chat_moderate,
             commands::alerts_start,
             commands::alerts_stop,

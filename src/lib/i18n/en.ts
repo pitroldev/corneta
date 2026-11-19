@@ -2124,6 +2124,10 @@ export const en: Dict = {
   "golive.streamInfo.applied": "Updated your title on {n} platform(s)",
   "golive.streamInfo.apply": "Send it to the platforms",
   "golive.streamInfo.game.placeholder": "Game / category (optional)",
+  "golive.streamInfo.game.suggestions": "Matching categories",
+  "golive.streamInfo.profile.label": "Profile",
+  "golive.streamInfo.profile.locked":
+    "You can switch profiles once the stream ends",
   "golive.streamInfo.needTitle": "Type a title first",
   "golive.streamInfo.partial": "{ok}/{total} ok — check the details",
   "golive.streamInfo.signIn": "Sign in →",

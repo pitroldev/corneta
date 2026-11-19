@@ -288,4 +288,13 @@ pub trait AccountProvider: Sync {
         title: &str,
         category: &str,
     ) -> Result<Option<String>, String>;
+    /// Blocking; category names matching `query`, best first. None when the platform has no
+    /// category search, as YouTube, whose search spends quota the whole official client shares.
+    fn search_categories(
+        &self,
+        _app: &AppHandle,
+        _query: &str,
+    ) -> Option<Result<Vec<String>, String>> {
+        None
+    }
 }

@@ -807,7 +807,36 @@ pub(crate) fn youtube_moderate(
     }
 }
 
-pub(crate) fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<String>, String> {
+/// YouTube's own category for a Twitch or Kick category name, decided here so that setting it
+/// rides on the title update and costs no extra quota. Any other name is taken as a game.
+pub(crate) fn youtube_category_id(category: &str) -> Option<&'static str> {
+    let name = category.trim().to_lowercase();
+    if name.is_empty() {
+        return None;
+    }
+    Some(match name.as_str() {
+        "just chatting" | "talk shows & podcasts" | "podcasts" | "irl" | "i'm only sleeping" => {
+            "22"
+        }
+        "music" | "dj" | "music & performing arts" => "10",
+        "sports" | "fitness & health" => "17",
+        "travel & outdoors" => "19",
+        "art" | "makers & crafting" | "beauty & body art" | "food & drink" => "26",
+        "science & technology" | "software and game development" => "28",
+        "politics" => "25",
+        "animals, aquariums, and zoos" => "15",
+        "asmr" | "special events" | "slots & casino" | "slots" | "pools, hot tubs, and beaches" => {
+            "24"
+        }
+        _ => "20",
+    })
+}
+
+pub(crate) fn youtube_set_title(
+    app: &AppHandle,
+    title: &str,
+    category: &str,
+) -> Result<Option<String>, String> {
     let token = youtube_token(app).ok_or_else(|| Msg::StreamInfoYoutubeSignIn.now())?;
     let vid = youtube_active_video_id(&token)
         .ok_or_else(|| Msg::StreamInfoYoutubeNoActiveBroadcast.now())?;
@@ -828,8 +857,10 @@ pub(crate) fn youtube_set_title(app: &AppHandle, title: &str) -> Result<Option<S
         .ok_or_else(|| Msg::StreamInfoYoutubeVideoNotFound.now())?;
     let cut = title.chars().count() > 100;
     snippet["title"] = json!(title.chars().take(100).collect::<String>());
-    // categoryId is required; preserve it or use Entertainment (24) as fallback.
-    if snippet
+    // categoryId is required; set it from the category, else preserve it or use Entertainment (24).
+    if let Some(id) = youtube_category_id(category) {
+        snippet["categoryId"] = json!(id);
+    } else if snippet
         .get("categoryId")
         .and_then(|x| x.as_str())
         .unwrap_or("")
@@ -1221,6 +1252,18 @@ pub async fn youtube_retry_broadcast_cleanup(app: AppHandle) -> Result<(), Strin
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_youtube_category_follows_the_twitch_or_kick_name_without_a_search() {
+        assert_eq!(youtube_category_id(""), None, "no category keeps YouTube's");
+        assert_eq!(youtube_category_id("   "), None);
+        assert_eq!(youtube_category_id("Just Chatting"), Some("22"));
+        assert_eq!(youtube_category_id(" talk shows & podcasts "), Some("22"));
+        assert_eq!(youtube_category_id("Music"), Some("10"));
+        assert_eq!(youtube_category_id("Slots & Casino"), Some("24"));
+        assert_eq!(youtube_category_id("VALORANT"), Some("20"), "a game");
+        assert_eq!(youtube_category_id("EA Sports FC 26"), Some("20"));
+    }
 
     #[test]
     fn the_destination_stream_carries_youtube_health_and_known_issues() {

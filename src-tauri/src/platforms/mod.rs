@@ -1,6 +1,7 @@
 //! Platforms the app knows: destination presets shared with the frontend through
 //! `src/platforms/<id>/destination.json`, and the chat and account providers registered below.
 
+pub mod categories;
 pub mod cinefy;
 pub mod emotes;
 pub mod kick;

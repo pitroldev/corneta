@@ -139,12 +139,7 @@ export const useStore = create<State>((set, get) => {
     if (rebased) await saveQueued();
   };
   const persist = (config: AppConfig) => {
-    const profiles = config.profiles.map((p) =>
-      p.id === config.activeProfileId
-        ? { ...p, mode: config.mode, targets: config.targets }
-        : p,
-    );
-    const next = { ...config, profiles };
+    const next = cfgOps.withActiveProfile(config);
     set({ config: next });
     const scheduled = queuedConfig !== null;
     queuedConfig = next;

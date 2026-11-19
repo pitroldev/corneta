@@ -710,6 +710,54 @@ pub async fn set_stream_info(
     .map_err(|e| e.to_string())?
 }
 
+/// Category suggestions from every signed-in platform that can search; best effort, so a
+/// platform that fails or times out only leaves its matches out.
+#[tauri::command]
+pub async fn search_stream_categories(
+    app: AppHandle,
+    query: String,
+) -> Result<Vec<crate::platforms::categories::CategorySuggestion>, String> {
+    use crate::platforms::categories;
+    let Some(key) = categories::cache_key(&query) else {
+        return Ok(Vec::new());
+    };
+    if let Some(hit) = categories::cached(&key) {
+        return Ok(hit);
+    }
+    let query = query.split_whitespace().collect::<Vec<_>>().join(" ");
+    let (answered, merged) = tauri::async_runtime::spawn_blocking(move || {
+        let results: Vec<Option<(&'static str, Vec<String>)>> = std::thread::scope(|scope| {
+            let searches: Vec<_> = account_providers()
+                .iter()
+                .filter(|provider| provider.signed_in())
+                .map(|provider| {
+                    let (app, query) = (&app, query.as_str());
+                    scope.spawn(move || match provider.search_categories(app, query)? {
+                        Ok(names) => Some((provider.id(), names)),
+                        Err(e) => {
+                            log::warn!("{}: category search failed: {e}", provider.id());
+                            None
+                        }
+                    })
+                })
+                .collect();
+            searches
+                .into_iter()
+                .map(|search| search.join().ok().flatten())
+                .collect()
+        });
+        let answered: Vec<(&'static str, Vec<String>)> = results.into_iter().flatten().collect();
+        (!answered.is_empty(), categories::merge(&answered))
+    })
+    .await
+    .map_err(|e| e.to_string())?;
+    // A search no platform answered is not an empty result; the next keystroke may get through.
+    if answered {
+        categories::remember(key, merged.clone());
+    }
+    Ok(merged)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

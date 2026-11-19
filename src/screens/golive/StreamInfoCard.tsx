@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { ACCOUNT_PLATFORMS, accountProvider } from "../../platforms";
 import { AnimatePresence, m } from "framer-motion";
 import {
@@ -9,6 +9,12 @@ import {
   Megaphone,
 } from "lucide-react";
 import { api } from "../../lib/api";
+import {
+  CATEGORY_SEARCH_DEBOUNCE_MS,
+  moveHighlight,
+  shouldSearchCategory,
+} from "../../lib/categorySearch";
+import type { CategorySuggestion } from "../../lib/types";
 import { useStore } from "../../lib/store";
 import { toast } from "../../lib/toast";
 import { cn, errMsg } from "../../lib/utils";
@@ -37,14 +43,57 @@ export function StreamInfoCard() {
   const autoBroadcast = targets.some(
     (p) => accountProvider(p)?.connect === "auto-broadcast",
   );
+  const profiles = useStore((s) => s.config!.profiles);
+  const activeProfileId = useStore((s) => s.config!.activeProfileId);
+  const loadProfile = useStore((s) => s.loadProfile);
+  const engineState = useStore((s) => s.snapshot.state);
+  const onAir = engineState === "live" || engineState === "starting";
   const [title, setTitleLocal] = useState(settings.streamTitle ?? "");
-  const [game, setGame] = useState("");
+  const [game, setGame] = useState(settings.streamCategory ?? "");
   const [youtubeOpen, setYoutubeOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [results, setResults] = useState<Record<
     string,
     { ok: boolean; error?: string; warn?: string }
   > | null>(null);
+  const [query, setQuery] = useState<string | null>(null);
+  const [suggestions, setSuggestions] = useState<CategorySuggestion[]>([]);
+  const [listOpen, setListOpen] = useState(false);
+  const [highlight, setHighlight] = useState(-1);
+  const listId = useId();
+
+  // A profile switch brings that profile's title and category into the fields.
+  const [shownProfile, setShownProfile] = useState(activeProfileId);
+  if (shownProfile !== activeProfileId) {
+    setShownProfile(activeProfileId);
+    setTitleLocal(settings.streamTitle ?? "");
+    setGame(settings.streamCategory ?? "");
+    setResults(null);
+    setQuery(null);
+    setListOpen(false);
+  }
+
+  useEffect(() => {
+    if (query === null || !shouldSearchCategory(query)) return;
+    let current = true;
+    const timer = setTimeout(() => {
+      api
+        .searchStreamCategories(query)
+        .then((found) => {
+          if (!current) return;
+          setSuggestions(found);
+          setHighlight(-1);
+          setListOpen(found.length > 0);
+        })
+        .catch(() => {
+          if (current) setListOpen(false);
+        });
+    }, CATEGORY_SEARCH_DEBOUNCE_MS);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
+  }, [query]);
 
   if (targets.length === 0) {
     return (
@@ -81,10 +130,25 @@ export function StreamInfoCard() {
     setTitleLocal(v);
     setResults(null);
   };
+  const persistGame = (value = game) => {
+    const trimmed = value.trim();
+    if (trimmed !== settings.streamCategory)
+      setSettings({ streamCategory: trimmed });
+  };
   const onGame = (v: string) => {
     setGame(v);
     setResults(null);
+    setQuery(v);
+    if (!shouldSearchCategory(v)) setListOpen(false);
   };
+  const pick = (name: string) => {
+    setGame(name);
+    setQuery(null);
+    setListOpen(false);
+    setResults(null);
+    persistGame(name);
+  };
+  const listShown = listOpen && suggestions.length > 0;
 
   const apply = async () => {
     if (busy) return;
@@ -93,6 +157,8 @@ export function StreamInfoCard() {
       return;
     }
     persistTitle();
+    persistGame();
+    setListOpen(false);
     setBusy(true);
     setResults(null);
     try {
@@ -133,6 +199,47 @@ export function StreamInfoCard() {
           ))}
         </div>
       </div>
+      {profiles.length > 1 && (
+        <div
+          role="group"
+          aria-label={t("golive.streamInfo.profile.label")}
+          className="mb-2.5 flex flex-wrap items-center gap-1.5"
+        >
+          <span className="pr-1 text-xs font-bold uppercase tracking-wide text-ink-faint">
+            {t("golive.streamInfo.profile.label")}
+          </span>
+          {profiles.map((p) => {
+            const on = p.id === activeProfileId;
+            const name = p.name || t("platforms.profile.untitled");
+            return (
+              <button
+                key={p.id}
+                type="button"
+                aria-pressed={on}
+                disabled={!on && onAir}
+                onClick={() => {
+                  if (!on) loadProfile(p.id);
+                }}
+                title={
+                  on
+                    ? t("platforms.profile.active")
+                    : onAir
+                      ? t("golive.streamInfo.profile.locked")
+                      : t("platforms.profile.switchTo", { name })
+                }
+                className={cn(
+                  "h-7 max-w-[12rem] truncate rounded-md px-2.5 font-display text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-50",
+                  on
+                    ? "bg-brass text-brass-ink"
+                    : "bg-surface-2 text-ink-muted hover:text-ink",
+                )}
+              >
+                {name}
+              </button>
+            );
+          })}
+        </div>
+      )}
       <div className="grid grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)_auto] gap-2">
         <Input
           value={title}
@@ -145,15 +252,83 @@ export function StreamInfoCard() {
           aria-label={t("golive.streamInfo.title.placeholder")}
           maxLength={140}
         />
-        <Input
-          value={game}
-          onChange={(e) => onGame(e.target.value)}
-          onKeyDown={(e) =>
-            e.key === "Enter" && !busy && title.trim() && void apply()
-          }
-          placeholder={t("golive.streamInfo.game.placeholder")}
-          aria-label={t("golive.streamInfo.game.placeholder")}
-        />
+        <div className="relative min-w-0">
+          <Input
+            value={game}
+            role="combobox"
+            aria-autocomplete="list"
+            aria-expanded={listShown}
+            aria-controls={listId}
+            aria-activedescendant={
+              listShown && highlight >= 0 ? `${listId}-${highlight}` : undefined
+            }
+            onChange={(e) => onGame(e.target.value)}
+            onBlur={() => {
+              setListOpen(false);
+              persistGame();
+            }}
+            onKeyDown={(e) => {
+              const next = moveHighlight(highlight, suggestions.length, e.key);
+              if (next !== null) {
+                e.preventDefault();
+                setListOpen(true);
+                setHighlight(next);
+              } else if (e.key === "Escape" && listShown) {
+                e.preventDefault();
+                setListOpen(false);
+              } else if (e.key === "Enter") {
+                if (listShown && highlight >= 0) {
+                  e.preventDefault();
+                  pick(suggestions[highlight].name);
+                } else if (!busy && title.trim()) void apply();
+              }
+            }}
+            placeholder={t("golive.streamInfo.game.placeholder")}
+            aria-label={t("golive.streamInfo.game.placeholder")}
+            maxLength={100}
+          />
+          {listShown && (
+            <ul
+              id={listId}
+              role="listbox"
+              aria-label={t("golive.streamInfo.game.suggestions")}
+              className="absolute inset-x-0 top-full z-30 mt-1 max-h-64 overflow-auto rounded-md bg-surface-2 py-1 pop"
+            >
+              {suggestions.map((s, i) => (
+                <li
+                  key={s.name}
+                  id={`${listId}-${i}`}
+                  role="option"
+                  aria-selected={i === highlight}
+                  // Keep focus in the field so its blur does not close the list before the click.
+                  onMouseDown={(e) => e.preventDefault()}
+                  onMouseEnter={() => setHighlight(i)}
+                  onClick={() => pick(s.name)}
+                  // The field drives the list from the keyboard; this covers assistive tech that activates options.
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") pick(s.name);
+                  }}
+                  className={cn(
+                    "flex cursor-pointer select-none items-center justify-between gap-3 px-3 py-2 text-sm text-ink transition-colors",
+                    i === highlight && "bg-surface-3",
+                  )}
+                >
+                  <span className="truncate">{s.name}</span>
+                  <span
+                    className="flex shrink-0 items-center gap-1"
+                    title={s.platforms
+                      .map((p) => PLAT_LABEL[p] ?? p)
+                      .join(", ")}
+                  >
+                    {s.platforms.map((p) => (
+                      <PlatformGlyph key={p} id={p} size={14} />
+                    ))}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
         <Button
           variant="primary"
           onClick={apply}

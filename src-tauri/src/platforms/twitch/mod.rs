@@ -172,6 +172,14 @@ impl AccountProvider for Twitch {
         account::twitch_set_info(app, title, category)
     }
 
+    fn search_categories(
+        &self,
+        app: &AppHandle,
+        query: &str,
+    ) -> Option<Result<Vec<String>, String>> {
+        Some(account::twitch_search_categories(app, query))
+    }
+
     fn mark_moment(&self, app: &AppHandle, label: &str) -> Option<MarkOutcome> {
         Some(account::twitch_mark_moment(app, label))
     }

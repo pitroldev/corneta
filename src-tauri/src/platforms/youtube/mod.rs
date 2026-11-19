@@ -190,9 +190,9 @@ impl AccountProvider for Youtube {
         &self,
         app: &AppHandle,
         title: &str,
-        _category: &str,
+        category: &str,
     ) -> Result<Option<String>, String> {
-        account::youtube_set_title(app, title)
+        account::youtube_set_title(app, title, category)
     }
 }
 
