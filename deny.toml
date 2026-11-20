@@ -4,11 +4,7 @@ targets = ["x86_64-pc-windows-msvc"]
 [advisories]
 version = 2
 ignore = [
-  { id = "RUSTSEC-2025-0081", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
-  { id = "RUSTSEC-2025-0075", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
-  { id = "RUSTSEC-2025-0080", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
-  { id = "RUSTSEC-2025-0100", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
-  { id = "RUSTSEC-2025-0098", reason = "rust-unic is transitive through urlpattern/Tauri; informational advisory, no vulnerability and no safe upgrade" },
+  { id = "RUSTSEC-2026-0543", reason = "chrono is direct and transitive through posthog-rs; informational unmaintained advisory, no vulnerability and no safe upgrade" },
 ]
 
 [licenses]

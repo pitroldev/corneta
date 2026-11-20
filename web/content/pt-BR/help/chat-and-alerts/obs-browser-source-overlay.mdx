@@ -14,9 +14,9 @@ publishedAt: 2026-08-01
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-20
-reviewedAt: 2026-10-20
-productVersion: 0.10.0
+updatedAt: 2026-11-20
+reviewedAt: 2026-11-20
+productVersion: 0.17.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -35,11 +35,11 @@ sources:
   - title: Corneta local overlay server
     kind: internal
     repoPath: src-tauri/src/overlay.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-11-20
   - title: Corneta overlay controls
     kind: internal
     repoPath: src/screens/ChatScreen.tsx
-    reviewedAt: 2026-10-20
+    reviewedAt: 2026-11-20
 images:
   - baseName: corneta-unified-chat
     alt: "Tela Chat conectada a Twitch, YouTube e Kick antes de configurar o overlay."
@@ -52,7 +52,7 @@ Aplica-se ao app instalado; o modo de demonstração no navegador não abre o se
 
 1. Abra **Chat → Configurar → Overlays**.
 2. Ative **Overlays pro OBS**.
-3. Em **Alertas** ou **Chat**, clique em **Adicionar no OBS**.
+3. Em **Alertas**, **Chat** ou **Destaque de mensagem**, clique em **Adicionar no OBS**.
 4. No OBS, confirme a nova **Browser Source** na cena atual.
 5. Posicione e redimensione a fonte.
 6. Volte à Corneta e use o botão de teste.
@@ -61,7 +61,7 @@ Aplica-se ao app instalado; o modo de demonstração no navegador não abre o se
 
 ## Ajuste antes da live
 
-Para alertas, configure posição, escala, duração, som e seguidores. Para chat, ajuste tamanho da fonte, máximo de mensagens, selos, ícone da plataforma, comandos e tempo para sumir.
+Para alertas, configure posição, escala, duração, som e seguidores. Para chat, ajuste tamanho da fonte, máximo de mensagens, selos, ícone da plataforma, comandos e tempo para sumir. Em **Destaque de mensagem**, escolha posição, tema, escala e se o card fica na tela até você tirar (`Esc` ou o botão de destaque no Chat, no chat destacado ou no Deck). Se a moderação apagar a mensagem destacada, a Corneta limpa a tela sozinha.
 
 A URL usa loopback e a porta local configurada. Não troque por IP público nem abra a porta no roteador.
 

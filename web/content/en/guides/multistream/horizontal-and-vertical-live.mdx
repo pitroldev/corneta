@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-11-19
-reviewedAt: 2026-11-19
-productVersion: 0.16.0
+updatedAt: 2026-11-20
+reviewedAt: 2026-11-20
+productVersion: 0.17.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -43,7 +43,7 @@ sources:
   - title: Corneta reframe editor
     kind: internal
     repoPath: src/components/ReframeEditor.tsx
-    reviewedAt: 2026-11-19
+    reviewedAt: 2026-11-20
   - title: Corneta platform presets
     kind: internal
     repoPath: src/lib/platforms.ts
@@ -51,7 +51,7 @@ sources:
   - title: Corneta quality modes
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-11-19
+    reviewedAt: 2026-11-20
 images:
   - baseName: corneta-vertical-target-settings-en
     alt: "Vertical TikTok destination on Corneta's Platforms screen, with the ingest URL and the Frame the 9:16 action."
@@ -88,7 +88,13 @@ If your webcam sits in a corner of the scene, pick **Camera + game** at the top 
 
 The zoom applies to the selected box, and **Camera height** sets how much of the vertical output it takes, from 25% to 50%. You can go back to **One frame** whenever you like without losing the camera crop.
 
-The editor is manual. Corneta doesn't promise auto-reframing and doesn't follow a person on its own. If the focus moves around a lot during the stream, set up a layout that stays readable in the center or use a tool with an independent vertical canvas.
+The editor is manual. Corneta doesn't promise auto-reframing and doesn't follow a person on its own. If the focus moves around a lot during the stream, set up a layout that stays readable in the center or use a separate vertical canvas.
+
+### Or send a separate vertical canvas
+
+If you already build a 9:16 scene in OBS with a plugin such as Aitum Vertical, open the vertical destination in **Platforms** and switch **Video source** from **Crop from main OBS** to **Separate vertical canvas**. Corneta shows a second local RTMP server and stream key (ending in `_vertical`) to paste into the plugin.
+
+In **Smart** mode, Corneta copies that vertical feed straight to TikTok or Instagram with no extra crop or re-encode. If the second canvas is off when you go live, your horizontal platforms still stay on air while Corneta waits for the vertical signal.
 
 ## What fits in the center
 

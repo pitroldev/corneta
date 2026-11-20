@@ -14,9 +14,9 @@ publishedAt: 2026-10-24
 intent: support
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-10-24
-reviewedAt: 2026-10-24
-productVersion: 0.11.0
+updatedAt: 2026-11-20
+reviewedAt: 2026-11-20
+productVersion: 0.17.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -35,11 +35,11 @@ sources:
   - title: Corneta local overlay server
     kind: internal
     repoPath: src-tauri/src/overlay.rs
-    reviewedAt: 2026-08-01
+    reviewedAt: 2026-11-20
   - title: Corneta overlay controls
     kind: internal
     repoPath: src/screens/ChatScreen.tsx
-    reviewedAt: 2026-10-20
+    reviewedAt: 2026-11-20
 images:
   - baseName: corneta-unified-chat-en
     alt: "Chat screen connected to Twitch, YouTube and Kick before setting up the overlay."
@@ -52,7 +52,7 @@ Applies to the installed app; the browser demo mode doesn't open the local serve
 
 1. Open **Chat → Set up → Overlays**.
 2. Turn on **Overlays for OBS**.
-3. Under **Alerts** or **Chat**, click **Add to OBS**.
+3. Under **Alerts**, **Chat** or **Message highlight**, click **Add to OBS**.
 4. In OBS, confirm the new **Browser Source** in the current scene.
 5. Position and resize the source.
 6. Go back to Corneta and use the test button.
@@ -61,7 +61,7 @@ Applies to the installed app; the browser demo mode doesn't open the local serve
 
 ## Adjust before the stream
 
-For alerts, set position, scale, duration, sound and followers. For chat, adjust font size, maximum messages, badges, platform icon, commands and the time before messages fade out.
+For alerts, set position, scale, duration, sound and followers. For chat, adjust font size, maximum messages, badges, platform icon, commands and the time before messages fade out. For **Message highlight**, choose position, theme, scale and whether the card stays on screen until you clear it (`Esc` or the highlight button in Chat, pop-out chat or Deck). If a highlighted message is removed by moderation, Corneta clears it from the screen on its own.
 
 The URL uses loopback and the configured local port. Don't swap it for a public IP or open the port on your router.
 

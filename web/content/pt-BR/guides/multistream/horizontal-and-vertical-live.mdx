@@ -14,9 +14,9 @@ publishedAt: 2026-08-01
 intent: informational
 author: Petro Cardoso
 reviewedBy: Petro Cardoso
-updatedAt: 2026-11-19
-reviewedAt: 2026-11-19
-productVersion: 0.16.0
+updatedAt: 2026-11-20
+reviewedAt: 2026-11-20
+productVersion: 0.17.0
 testedWith:
   - name: Corneta
     version: 0.6.0
@@ -43,7 +43,7 @@ sources:
   - title: Corneta reframe editor
     kind: internal
     repoPath: src/components/ReframeEditor.tsx
-    reviewedAt: 2026-11-19
+    reviewedAt: 2026-11-20
   - title: Corneta platform presets
     kind: internal
     repoPath: src/lib/platforms.ts
@@ -51,7 +51,7 @@ sources:
   - title: Corneta quality modes
     kind: internal
     repoPath: src/lib/estimates.ts
-    reviewedAt: 2026-11-19
+    reviewedAt: 2026-11-20
 images:
   - baseName: corneta-vertical-target-settings
     alt: "Destino TikTok vertical na tela Plataformas da Corneta, com URL de ingestão e ação Enquadrar vertical."
@@ -88,7 +88,13 @@ Se a webcam fica num canto da cena, escolha **Câmera + jogo** no topo do editor
 
 O zoom vale para a caixa selecionada, e **Altura da câmera** decide quanto do vertical ela ocupa, de 25% a 50%. Dá para voltar para **1 quadro** quando quiser sem perder o recorte da câmera.
 
-O editor é manual. A Corneta não promete auto-reframe nem segue uma pessoa sozinha. Se o foco muda muito durante a live, prepare uma composição que continue legível no centro ou use uma ferramenta com canvas vertical independente.
+O editor é manual. A Corneta não promete auto-reframe nem segue uma pessoa sozinha. Se o foco muda muito durante a live, prepare uma composição que continue legível no centro ou envie um canvas vertical separado.
+
+### Ou mande um canvas vertical separado
+
+Se você já monta uma cena 9:16 no OBS com um plugin como o Aitum Vertical, abra o destino vertical em **Plataformas** e mude **Origem da imagem** de **Recortar do OBS principal** para **Canvas vertical separado**. A Corneta mostra um segundo servidor RTMP local e uma chave terminada em `_vertical` para colar no plugin.
+
+No modo **Esperto**, a Corneta copia esse sinal vertical direto para TikTok ou Instagram sem recorte nem recodificação extra. Se o segundo canvas estiver desligado na hora de entrar no ar, os destinos horizontais continuam normalmente enquanto a Corneta aguarda o sinal vertical.
 
 ## O que cabe no centro
 

@@ -40,14 +40,14 @@
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest routing; disconnect recovery and per-platform isolation described here did not change."
     },
     {
       "article": "en/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "29c2b7dac024717e8fb7dc1b8e9706b20e715340",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "2340822fd9bb4262d3817ceb458721a5383ae728",
+      "reason": "Visual polish and preflight/bandwidth layout refinements; disconnect handling flow and controls did not change."
     },
     {
       "article": "en/guides/multistream/twitch-youtube-kick.mdx",
@@ -62,10 +62,16 @@
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
+      "article": "en/guides/operations/analyze-stream-drop.mdx",
+      "source": "src/lib/report.ts",
+      "sourceBlob": "c9eb2137568ba13e8406256cc7b4968611a95751",
+      "reason": "Added cross-stream trend aggregation helpers; single-stream drop diagnosis logic and metrics did not change."
+    },
+    {
       "article": "en/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat and alert overlays the article describes did not change."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and chat highlight support; OBS alert source setup and test flow described here did not change."
     },
     {
       "article": "en/guides/operations/obs-closed-during-stream.mdx",
@@ -82,62 +88,62 @@
     {
       "article": "en/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat rules the article describes did not change."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and chat highlight support; unified chat connection rules and moderation guidance did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "e3a28f966b9217d7469072315aa1052f1e86bd75",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "b3580af2dfe0818812124c63b775dd0d74758e35",
+      "reason": "Added highlight overlay fields and optional vertical feed enum; copy vs transcode modes and rules did not change."
     },
     {
       "article": "en/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; copy vs transcode behavior for standard streams did not change."
     },
     {
       "article": "en/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "0b9efa13fb9e7782afd74c8b7be1b94906c570bf",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "9f7b55338f549a4d27729b17ad463a9393785ff6",
+      "reason": "Added default settings for OBS message highlight; default encoding and dropped-frame guidance did not change."
     },
     {
       "article": "en/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; hardware/software encoder selection and behavior did not change."
     },
     {
       "article": "en/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; low-end PC encoding recommendations did not change."
     },
     {
       "article": "en/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; upload bitrate calculation and headroom rules did not change."
     },
     {
       "article": "en/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; resolution and FPS preset guidance did not change."
     },
     {
       "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; platform bitrate limits and calculations did not change."
     },
     {
       "article": "en/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "b72ad876ada1cb3f433750b349ebd9d60ca48d73",
+      "reason": "Added bandwidth ruler polish; platform bitrate limits and preset defaults did not change."
     },
     {
       "article": "en/guides/quality/why-stream-lags.mdx",
@@ -166,20 +172,20 @@
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "c6d574a842b3d37686743b3a261fb6f7f8103038",
-      "reason": "chat.rs only added the probe that reconnects a silent chat connection; connecting and using the chat work as the article describes."
+      "sourceBlob": "d3364671da9a61241545d4a08768cafd0644eabc",
+      "reason": "Added recent-message buffer and moderation clear hook for OBS highlight; chat setup and connection steps did not change."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/components/ChatFeed.tsx",
-      "sourceBlob": "5ea536358445ba5dfb26b4e8a28d0e17bec174f9",
-      "reason": "ChatFeed.tsx only measures message heights on the next frame; the chat setup and feed controls the article describes did not change."
+      "sourceBlob": "0047788ddebaed95a020f2e955b10252ef9c6a7a",
+      "reason": "Added optional OBS highlight button on rows; unified chat reading, filtering and reply flow did not change."
     },
     {
       "article": "en/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; adding channels in Chat, Configure works as the article describes."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and OBS highlight bar; unified chat setup steps and channel connection flow did not change."
     },
     {
       "article": "en/help/getting-started/first-stream.mdx",
@@ -194,46 +200,52 @@
       "reason": "PRODUCT.md was translated into English with the same capabilities and limits; nothing the article states changed."
     },
     {
+      "article": "en/help/platforms/manage-platform.mdx",
+      "source": "src/screens/PlatformsScreen.tsx",
+      "sourceBlob": "d4139c7bfd29250bf8f2d55a92035d9c9d459028",
+      "reason": "Added optional video source toggle on portrait destinations and visual polish; adding, testing, pausing and removing platforms did not change."
+    },
+    {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "e3a28f966b9217d7469072315aa1052f1e86bd75",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "b3580af2dfe0818812124c63b775dd0d74758e35",
+      "reason": "Added highlight overlay fields and optional vertical feed enum; auto-bitrate settings and defaults did not change."
     },
     {
       "article": "en/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; auto-bitrate step-down and recovery behavior did not change."
     },
     {
       "article": "en/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; Smart, Straight up and Quality mode rules did not change."
     },
     {
       "article": "en/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "b72ad876ada1cb3f433750b349ebd9d60ca48d73",
+      "reason": "Added bandwidth ruler polish; quality mode names, descriptions and tradeoffs did not change."
     },
     {
       "article": "en/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; live stream metrics definitions and thresholds did not change."
     },
     {
       "article": "en/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; upload speed test command and interpretation did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; safe diagnostic export format and redaction rules did not change."
     },
     {
       "article": "en/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -256,8 +268,8 @@
     {
       "article": "en/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "2377a94ceec3b86d65ef4c0506e79a7df30ea422",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "de617cd258b738e6af51f0c5654894d163329ddd",
+      "reason": "Added translations for new 0.17.0 features; automatic OBS setup labels and steps did not change."
     },
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
@@ -268,8 +280,8 @@
     {
       "article": "en/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "dba10d640a70a88039702b3a74cf95fc0202c275",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "a42c7691966290267ce62e2cde95002858355374",
+      "reason": "Visual polish and unrelated settings controls; BE RIGHT BACK slate setup and behavior did not change."
     },
     {
       "article": "en/help/troubleshooting/obs-not-found.mdx",
@@ -286,32 +298,32 @@
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; platform reconnection troubleshooting steps did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
-      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
+      "sourceBlob": "9f80e74ec6c3939ddbc63afdbdbf0d27e024b8b8",
+      "reason": "Added single-path MediaMTX parser for vertical ingest status; reconnection policy and backoff did not change."
     },
     {
       "article": "en/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; platform reconnection logic did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; stream status labels and meaning did not change."
     },
     {
       "article": "en/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
-      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
+      "sourceBlob": "9f80e74ec6c3939ddbc63afdbdbf0d27e024b8b8",
+      "reason": "Added single-path MediaMTX parser for vertical ingest status; stream status definitions and transitions did not change."
     },
     {
       "article": "pt-BR/guides/comparisons/multistream-tools.mdx",
@@ -358,14 +370,14 @@
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest routing; disconnect recovery and per-platform isolation described here did not change."
     },
     {
       "article": "pt-BR/guides/multistream/one-platform-disconnected.mdx",
       "source": "src/screens/GoLiveScreen.tsx",
-      "sourceBlob": "29c2b7dac024717e8fb7dc1b8e9706b20e715340",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "2340822fd9bb4262d3817ceb458721a5383ae728",
+      "reason": "Visual polish and preflight/bandwidth layout refinements; disconnect handling flow and controls did not change."
     },
     {
       "article": "pt-BR/guides/multistream/twitch-youtube-kick.mdx",
@@ -382,14 +394,14 @@
     {
       "article": "pt-BR/guides/operations/analyze-stream-drop.mdx",
       "source": "src/lib/report.ts",
-      "sourceBlob": "d8edb6e364d37293745dcde2d14d32a195bc5683",
-      "reason": "The replay now stores chat emotes, badges and marks, and the new alert kinds got labels; what the article describes is still correct."
+      "sourceBlob": "c9eb2137568ba13e8406256cc7b4968611a95751",
+      "reason": "Added cross-stream trend aggregation helpers; single-stream drop diagnosis logic and metrics did not change."
     },
     {
       "article": "pt-BR/guides/operations/chat-alerts-obs.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat and alert overlays the article describes did not change."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and chat highlight support; OBS alert source setup and test flow described here did not change."
     },
     {
       "article": "pt-BR/guides/operations/obs-closed-during-stream.mdx",
@@ -406,50 +418,50 @@
     {
       "article": "pt-BR/guides/operations/unified-chat-rules.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; the chat rules the article describes did not change."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and chat highlight support; unified chat connection rules and moderation guidance did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "e3a28f966b9217d7469072315aa1052f1e86bd75",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "b3580af2dfe0818812124c63b775dd0d74758e35",
+      "reason": "Added highlight overlay fields and optional vertical feed enum; copy vs transcode modes and rules did not change."
     },
     {
       "article": "pt-BR/guides/quality/copy-vs-transcode.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; copy vs transcode behavior for standard streams did not change."
     },
     {
       "article": "pt-BR/guides/quality/dropped-frames.mdx",
       "source": "src/lib/factory.ts",
-      "sourceBlob": "0b9efa13fb9e7782afd74c8b7be1b94906c570bf",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "9f7b55338f549a4d27729b17ad463a9393785ff6",
+      "reason": "Added default settings for OBS message highlight; default encoding and dropped-frame guidance did not change."
     },
     {
       "article": "pt-BR/guides/quality/live-stream-encoders.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; hardware/software encoder selection and behavior did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-low-end-pc.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; low-end PC encoding recommendations did not change."
     },
     {
       "article": "pt-BR/guides/quality/multistream-upload-speed.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; upload bitrate calculation and headroom rules did not change."
     },
     {
       "article": "pt-BR/guides/quality/resolution-and-fps.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; resolution and FPS preset guidance did not change."
     },
     {
       "article": "pt-BR/guides/quality/streaming-glossary.mdx",
@@ -460,8 +472,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; platform bitrate limits and calculations did not change."
     },
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
@@ -472,8 +484,8 @@
     {
       "article": "pt-BR/guides/quality/twitch-youtube-kick-bitrate.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "b72ad876ada1cb3f433750b349ebd9d60ca48d73",
+      "reason": "Added bandwidth ruler polish; platform bitrate limits and preset defaults did not change."
     },
     {
       "article": "pt-BR/guides/quality/why-stream-lags.mdx",
@@ -502,20 +514,20 @@
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src-tauri/src/chat.rs",
-      "sourceBlob": "c6d574a842b3d37686743b3a261fb6f7f8103038",
-      "reason": "chat.rs only added the probe that reconnects a silent chat connection; connecting and using the chat work as the article describes."
+      "sourceBlob": "d3364671da9a61241545d4a08768cafd0644eabc",
+      "reason": "Added recent-message buffer and moderation clear hook for OBS highlight; chat setup and connection steps did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/components/ChatFeed.tsx",
-      "sourceBlob": "5ea536358445ba5dfb26b4e8a28d0e17bec174f9",
-      "reason": "ChatFeed.tsx only measures message heights on the next frame; the chat setup and feed controls the article describes did not change."
+      "sourceBlob": "0047788ddebaed95a020f2e955b10252ef9c6a7a",
+      "reason": "Added optional OBS highlight button on rows; unified chat reading, filtering and reply flow did not change."
     },
     {
       "article": "pt-BR/help/chat-and-alerts/unified-chat-setup.mdx",
       "source": "src/screens/ChatScreen.tsx",
-      "sourceBlob": "fd9d5f986a5d7d98058d7f63d06c74dec0e6572f",
-      "reason": "ChatScreen.tsx only added the one-click offer of the signed-in accounts' channels to the empty chat; adding channels in Chat, Configure works as the article describes."
+      "sourceBlob": "ea2cd31e70544f26a1dbcceb7ff28b02f75141c4",
+      "reason": "Visual polish and OBS highlight bar; unified chat setup steps and channel connection flow did not change."
     },
     {
       "article": "pt-BR/help/getting-started/first-stream.mdx",
@@ -532,8 +544,8 @@
     {
       "article": "pt-BR/help/platforms/manage-platform.mdx",
       "source": "src/screens/PlatformsScreen.tsx",
-      "sourceBlob": "b82e3122fe5e243eeb1f4340053de761bd7c4950",
-      "reason": "The Custom RTMP destination is now recognized by a catalog capability; the screen and the article's steps did not change."
+      "sourceBlob": "d4139c7bfd29250bf8f2d55a92035d9c9d459028",
+      "reason": "Added optional video source toggle on portrait destinations and visual polish; adding, testing, pausing and removing platforms did not change."
     },
     {
       "article": "pt-BR/help/platforms/streaming-keys-and-urls.mdx",
@@ -544,44 +556,44 @@
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/config.rs",
-      "sourceBlob": "e3a28f966b9217d7469072315aa1052f1e86bd75",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "b3580af2dfe0818812124c63b775dd0d74758e35",
+      "reason": "Added highlight overlay fields and optional vertical feed enum; auto-bitrate settings and defaults did not change."
     },
     {
       "article": "pt-BR/help/quality/auto-bitrate.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; auto-bitrate step-down and recovery behavior did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/lib/estimates.ts",
-      "sourceBlob": "92219e057e56e43cecb7ddfcf141aa1a23f2df01",
-      "reason": "The split camera-and-game framing adds editor copy, a reframe layout and a shared rendition key; nothing this article states about this source changed."
+      "sourceBlob": "fcaf80e822faffc8ff9c3f15d22b933c6aca71cc",
+      "reason": "Added zero-copy estimate for optional separate vertical canvas; Smart, Straight up and Quality mode rules did not change."
     },
     {
       "article": "pt-BR/help/quality/quality-modes.mdx",
       "source": "src/screens/EncodingScreen.tsx",
-      "sourceBlob": "ff954b30a8c85fb9ae75f1b60c4d7d21037524aa",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "b72ad876ada1cb3f433750b349ebd9d60ca48d73",
+      "reason": "Added bandwidth ruler polish; quality mode names, descriptions and tradeoffs did not change."
     },
     {
       "article": "pt-BR/help/quality/stream-metrics.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; live stream metrics definitions and thresholds did not change."
     },
     {
       "article": "pt-BR/help/quality/test-upload.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; upload speed test command and interpretation did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; safe diagnostic export format and redaction rules did not change."
     },
     {
       "article": "pt-BR/help/reports-and-data/export-safe-diagnostic.mdx",
@@ -616,8 +628,8 @@
     {
       "article": "pt-BR/help/streaming-software/automatic-obs-setup.mdx",
       "source": "src/lib/i18n/pt.ts",
-      "sourceBlob": "2377a94ceec3b86d65ef4c0506e79a7df30ea422",
-      "reason": "Category autocomplete and profiles that restore the title, category and YouTube privacy change nothing this article states about this source."
+      "sourceBlob": "de617cd258b738e6af51f0c5654894d163329ddd",
+      "reason": "Added translations for new 0.17.0 features; automatic OBS setup labels and steps did not change."
     },
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
@@ -628,8 +640,8 @@
     {
       "article": "pt-BR/help/streaming-software/brb-screen.mdx",
       "source": "src/screens/SettingsScreen.tsx",
-      "sourceBlob": "dba10d640a70a88039702b3a74cf95fc0202c275",
-      "reason": "The opt-in frozen-picture and no-sound alerts add settings, live alerts and deck banners; nothing this article states about these sources changed."
+      "sourceBlob": "a42c7691966290267ce62e2cde95002858355374",
+      "reason": "Visual polish and unrelated settings controls; BE RIGHT BACK slate setup and behavior did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/obs-not-found.mdx",
@@ -646,32 +658,32 @@
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; platform reconnection troubleshooting steps did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
-      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
+      "sourceBlob": "9f80e74ec6c3939ddbc63afdbdbf0d27e024b8b8",
+      "reason": "Added single-path MediaMTX parser for vertical ingest status; reconnection policy and backoff did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/platform-reconnecting.mdx",
       "source": "src-tauri/src/engine.rs",
-      "sourceBlob": "a71be0d19ad2158991ac3fd75db415eed6fe4e8b",
-      "reason": "Enhanced RTMP (HEVC and AV1) support preserves existing H.264 default workflows and article guidance."
+      "sourceBlob": "061bb3669e9f2515792782802923c113bac731db",
+      "reason": "Added optional secondary vertical ingest path routing; platform reconnection logic did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/commands.rs",
-      "sourceBlob": "56f61bfbd7ffec06313369f0204a5a7e236d3a0a",
-      "reason": "Extracted internal Rust submodules without changing any command, message, limit, flow or user-facing behavior."
+      "sourceBlob": "86194f7a3acd445c01353aba3eee4aa254fbc9b6",
+      "reason": "Module split and unrelated command wiring; stream status labels and meaning did not change."
     },
     {
       "article": "pt-BR/help/troubleshooting/stream-statuses.mdx",
       "source": "src-tauri/src/engine_policy.rs",
-      "sourceBlob": "d092836375548f4497e2bb45641841308513fb47",
-      "reason": "A notification cooldown for the opt-in watch alerts and a shorter silence-probe retry change nothing these articles state about this source."
+      "sourceBlob": "9f80e74ec6c3939ddbc63afdbdbf0d27e024b8b8",
+      "reason": "Added single-path MediaMTX parser for vertical ingest status; stream status definitions and transitions did not change."
     }
   ]
 }

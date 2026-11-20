@@ -8,6 +8,33 @@ in English and Portuguese, with the installers.
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-20
+
+### Added
+
+- **OBS chat message highlight:** a third local Browser Source (**Message highlight**) puts any chat message on screen in one click from Chat, pop-out chat or the phone Deck, with dark/light theme, position, scale, auto-hide duration, `Esc` to clear, and automatic removal if moderation deletes the message.
+- **Separate vertical canvas (Dual Canvas):** vertical destinations can now take a dedicated 9:16 RTMP feed (with a local `_vertical` stream key, e.g. from Aitum Vertical) and copy it in **Smart** mode with no extra re-encoding, without blocking horizontal destinations when the vertical canvas is off.
+- **Camera + game vertical framing:** the vertical reframe editor can stack a camera crop on top of a game crop directly from a single 16:9 OBS scene, with adjustable camera height.
+- **Enhanced RTMP (HEVC and AV1):** Corneta accepts HEVC (`hvc1`) and AV1 (`av01`) from OBS, detects the OBS profile codec, splices the BE RIGHT BACK slate cleanly, and copies compatible destinations in Smart mode.
+- **Frozen-picture and no-sound alerts:** Corneta warns you if the OBS video freezes or goes silent during a live, with rate-limited notifications so alerts stay calm.
+- **Category autocomplete and live profiles:** search platform categories as you type and switch between saved profiles that restore title, category and destinations together.
+- **Cross-stream trends and batch moment clips:** compare recent streams side by side in **Reports** and export multiple marked moments into clips in a single queue.
+
+### Changed
+
+- **NVIDIA vertical pipeline in VRAM:** single-frame vertical 9:16 re-encoding on NVIDIA cards now keeps decoding, scaling and encoding in GPU memory and stays on the GPU path across healthy runs.
+- **Interface polish:** refined the Live cockpit hierarchy, preflight summary, upload bandwidth ruler, vertical safe-zone guides and contrast across light and dark themes.
+
+### Fixed
+
+- Capped the BE RIGHT BACK slate and program bitrate to the strictest copy destination so platforms don't reject the transition.
+- Stopped the silence probe from lingering after a live ends, kept camera/game crop overlap legible in the reframe editor, and keyed cached category suggestions per signed-in account.
+
+### Security
+
+- **End-to-end encrypted Deck sessions:** traffic between the phone Deck and Corneta over local Wi-Fi now negotiates ephemeral X25519 keys with ChaCha20-Poly1305 AEAD and strict per-direction monotonic nonces (`v2` pairing; previously paired `v1` devices are prompted to re-pair once).
+- **Remote OAuth revocation on sign-out:** signing out of Twitch, YouTube or Kick now removes local vault tokens first and attempts best-effort RFC 7009 remote token revocation (including a dedicated Kick revoke endpoint in the Setup API), notifying you calmly if the platform could not be reached.
+
 ## [0.16.0] - 2026-11-16
 
 ### Added
