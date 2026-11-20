@@ -99,6 +99,24 @@ pub(crate) fn mediamtx_paths_with_codec(
     program_name: &str,
     use_program: bool,
 ) -> (bool, u64, bool, Option<crate::platforms::VideoCodec>) {
+    let (ready, bytes, prog, _, _, codec) =
+        mediamtx_paths_full(ingest_name, program_name, None, use_program);
+    (ready, bytes, prog, codec)
+}
+
+pub(crate) fn mediamtx_paths_full(
+    ingest_name: &str,
+    program_name: &str,
+    vertical_name: Option<&str>,
+    use_program: bool,
+) -> (
+    bool,
+    u64,
+    bool,
+    bool,
+    u64,
+    Option<crate::platforms::VideoCodec>,
+) {
     let url = format!(
         "http://127.0.0.1:{}/v3/paths/list",
         engine::MEDIAMTX_API_PORT
@@ -108,16 +126,20 @@ pub(crate) fn mediamtx_paths_with_codec(
         .call()
     {
         Ok(r) => r.into_string().unwrap_or_default(),
-        Err(_) => return (false, 0, false, None),
+        Err(_) => return (false, 0, false, false, 0, None),
     };
     let (ready, bytes, prog) = parse_mediamtx_paths(&body, ingest_name, program_name);
+    let (v_ready, v_bytes) = match vertical_name {
+        Some(name) => crate::engine_policy::parse_mediamtx_single_path(&body, name),
+        None => (false, 0),
+    };
     let codec_path = if use_program {
         program_name
     } else {
         ingest_name
     };
     let codec = parse_mediamtx_path_codec(&body, codec_path);
-    (ready, bytes, prog, codec)
+    (ready, bytes, prog, v_ready, v_bytes, codec)
 }
 
 pub(crate) fn mediamtx_source_codec(source_url: &str) -> Option<crate::platforms::VideoCodec> {

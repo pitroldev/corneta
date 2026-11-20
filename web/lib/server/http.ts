@@ -195,3 +195,45 @@ export async function providerForm(
   }
   return { response, body };
 }
+
+/** Form-POST helper for OAuth revocation endpoints, which may legitimately return an empty 200/204 body. */
+export async function providerRevokeForm(
+  url: string,
+  fields: Record<string, string>,
+) {
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      body: new URLSearchParams(fields),
+      cache: "no-store",
+      redirect: "error",
+      signal: AbortSignal.timeout(12_000),
+    });
+  } catch {
+    throw new ApiError(
+      503,
+      "PROVIDER_UNAVAILABLE",
+      "The provider did not respond; try again.",
+      true,
+    );
+  }
+
+  let body: Record<string, unknown> = {};
+  try {
+    const raw = await readBoundedText(response.body, 32_768);
+    if (raw.trim()) {
+      const value: unknown = JSON.parse(raw);
+      if (value && typeof value === "object" && !Array.isArray(value)) {
+        body = value as Record<string, unknown>;
+      }
+    }
+  } catch {
+    // Non-JSON error bodies are ignored; status codes decide the sanitized reply.
+  }
+  return { response, body };
+}

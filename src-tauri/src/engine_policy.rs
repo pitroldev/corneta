@@ -362,6 +362,32 @@ pub(crate) fn parse_mediamtx_paths(
     (ingest_ready, bytes, prog_ready)
 }
 
+pub(crate) fn parse_mediamtx_single_path(body: &str, path_name: &str) -> (bool, u64) {
+    let v: serde_json::Value = match serde_json::from_str(body) {
+        Ok(v) => v,
+        Err(_) => return (false, 0),
+    };
+    if let Some(arr) = v.get("items").and_then(|i| i.as_array()) {
+        for p in arr {
+            if p.get("name").and_then(|n| n.as_str()) != Some(path_name) {
+                continue;
+            }
+            let ready = p
+                .get("online")
+                .and_then(|r| r.as_bool())
+                .or_else(|| p.get("ready").and_then(|r| r.as_bool()))
+                == Some(true);
+            let bytes = p
+                .get("inboundBytes")
+                .and_then(|b| b.as_u64())
+                .or_else(|| p.get("bytesReceived").and_then(|b| b.as_u64()))
+                .unwrap_or(0);
+            return (ready, bytes);
+        }
+    }
+    (false, 0)
+}
+
 pub(crate) fn parse_mediamtx_path_codec(
     body: &str,
     path_name: &str,
@@ -731,6 +757,7 @@ mod tests {
             state: state.into(),
             started_at: None,
             ingest_live: state == "live",
+            vertical_ingest_live: None,
             operation_id: None,
             error_id: None,
             error_code: None,

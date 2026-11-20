@@ -11,14 +11,16 @@ use crate::i18n::{self, Locale, Msg};
 use crate::keys;
 use crate::AppState;
 
-use crate::platforms::provider::{IssueSeverity, PlatformHealth, PlatformIssue, PlatformReading};
+use crate::platforms::provider::{
+    IssueSeverity, PlatformHealth, PlatformIssue, PlatformReading, RemoteRevoke, SignOutOutcome,
+};
 
 use super::broadcast as youtube_broadcast;
 use super::broadcast::{Error as BroadcastError, Recovery as YoutubeRecovery, RemoteState};
 use super::error::GoogleError;
 use crate::auth::{
     auth_code_event, auth_event, byok_active, finish_local_logout, forget_account_channel, now_ms,
-    oauth, oauth_wait, own_creds, pct, pkce_challenge, post_form, rand_token,
+    oauth, oauth_wait, own_creds, pct, pkce_challenge, post_form, post_revoke_form, rand_token,
     refresh_broker_config, timeout_seconds, AccountChannel, OauthConfig, GRANT_DEVICE,
 };
 
@@ -573,11 +575,34 @@ fn youtube_direct_login(app: &AppHandle, cfg: &OauthConfig) {
     auth_event(app, "youtube", "connected", "", "", "");
 }
 
-pub(crate) fn youtube_logout(app: &AppHandle) -> Result<(), String> {
-    finish_local_logout(
-        forget_youtube_session,
-        || {},
-        || auth_event(app, "youtube", "loggedout", "", "", ""),
+pub(crate) fn youtube_logout(app: &AppHandle) -> Result<SignOutOutcome, String> {
+    crate::auth::finish_logout_with_revoke(
+        || {
+            let _guard = YT_REFRESH_LOCK
+                .lock()
+                .map_err(|_| Msg::VaultDeleteFailed.now())?;
+            let token = keys::get_key("youtube_refresh")
+                .or_else(|| YT_TOKEN.lock().unwrap().as_ref().map(|(t, _)| t.clone()));
+            finish_local_logout(
+                // "youtube_oauth" held access tokens written by older versions; logout still purges it.
+                || keys::clear_keys(&["youtube_refresh", "youtube_oauth", "youtube_oauth_mode"]),
+                || {
+                    *YT_TOKEN.lock().unwrap() = None;
+                    *YT_CHAT.lock().unwrap() = None;
+                    forget_account_channel("youtube");
+                },
+                || auth_event(app, "youtube", "loggedout", "", "", ""),
+            )?;
+            Ok(token)
+        },
+        |token| match token.filter(|t| !t.trim().is_empty()) {
+            None => RemoteRevoke::Confirmed,
+            Some(t) => post_revoke_form(
+                "youtube",
+                "https://oauth2.googleapis.com/revoke",
+                &[("token", &t)],
+            ),
+        },
     )
 }
 

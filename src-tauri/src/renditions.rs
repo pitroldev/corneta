@@ -69,11 +69,17 @@ fn record_failure(failures: &mut u8, progress: &ProgressWatchdog) -> bool {
 pub(crate) struct Plan {
     pub targets: Vec<String>,
     pub url: String,
+    pub is_vertical: bool,
     args: Vec<String>,
 }
 
-pub(crate) fn plan(config: &AppConfig, source: &str, codec: Option<&str>) -> Vec<Plan> {
-    let mut groups: HashMap<Vec<String>, Vec<String>> = HashMap::new();
+pub(crate) fn plan(
+    config: &AppConfig,
+    primary_source: &str,
+    vertical_source: &str,
+    codec: Option<&str>,
+) -> Vec<Plan> {
+    let mut groups: HashMap<(bool, Vec<String>), Vec<String>> = HashMap::new();
     let mut encoding_config = config.clone();
     encoding_config.mode = "per-platform".into();
     for target in config.targets.iter().filter(|target| {
@@ -83,10 +89,19 @@ pub(crate) fn plan(config: &AppConfig, source: &str, codec: Option<&str>) -> Vec
         local.encoding.preset = Some(engine::effective_preset(target));
         local.platform_id = "rendition".into();
         local.ingest_url = "rtmp://127.0.0.1/placeholder".into();
+        let is_vertical = target.encoding.source_feed == crate::config::InputFeed::Vertical;
+        let source = if is_vertical {
+            vertical_source
+        } else {
+            primary_source
+        };
         let mut args =
             engine::ffmpeg_args_for_target(&encoding_config, &local, "", None, source, codec);
         args.pop(); // Destination URL is transport, not an encoding parameter.
-        groups.entry(args).or_default().push(target.id.clone());
+        groups
+            .entry((is_vertical, args))
+            .or_default()
+            .push(target.id.clone());
     }
     let mut groups: Vec<_> = groups
         .into_iter()
@@ -96,10 +111,15 @@ pub(crate) fn plan(config: &AppConfig, source: &str, codec: Option<&str>) -> Vec
     groups
         .into_iter()
         .enumerate()
-        .map(|(index, (mut args, targets))| {
+        .map(|(index, ((is_vertical, mut args), targets))| {
             let url = format!("{}_rendition_{index}", engine::program_url(config));
             args.push(url.clone());
-            Plan { targets, url, args }
+            Plan {
+                targets,
+                url,
+                is_vertical,
+                args,
+            }
         })
         .collect()
 }
@@ -129,7 +149,8 @@ pub(crate) fn start(
     app: &AppHandle,
     plans: Vec<Plan>,
     running: &Arc<AtomicBool>,
-    signal: &Arc<AtomicBool>,
+    primary_signal: &Arc<AtomicBool>,
+    vertical_signal: &Arc<AtomicBool>,
 ) -> HashMap<String, Rendition> {
     let mut targets = HashMap::new();
     let generation = app.state::<AppState>().engine.lock().unwrap().start_gen;
@@ -149,7 +170,11 @@ pub(crate) fn start(
         }
         let app = app.clone();
         let running = running.clone();
-        let signal = signal.clone();
+        let signal = if plan.is_vertical {
+            vertical_signal.clone()
+        } else {
+            primary_signal.clone()
+        };
         tauri::async_runtime::spawn(async move {
             let id = format!("__rendition_{generation}_{index}");
             let mut failures = 0;
@@ -434,6 +459,7 @@ mod tests {
                 }),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: crate::config::InputFeed::Primary,
             },
         };
         let second = Target {
@@ -446,7 +472,7 @@ mod tests {
             ..AppConfig::default()
         };
         config.settings.loudness_normalize = true;
-        let mut plans = plan(&config, &source, None);
+        let mut plans = plan(&config, &source, &source, None);
         assert_eq!(plans.len(), 1);
         *plans[0].args.last_mut().unwrap() = encoded.clone();
         run(&plans[0].args);

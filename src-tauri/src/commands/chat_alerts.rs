@@ -169,14 +169,85 @@ pub fn overlay_chat_test(state: State<'_, AppState>) {
 }
 
 #[tauri::command]
-pub async fn overlay_obs_add_source(app: AppHandle, url: String) -> Result<(), String> {
+pub fn overlay_highlight_message(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    message: chat::ChatMessage,
+) -> chat::ChatMessage {
+    let dur_secs = get_config(app.clone())
+        .settings
+        .overlay_highlight_duration_secs;
+    let duration_ms = (dur_secs > 0).then_some(dur_secs.saturating_mul(1000));
+    let shown = crate::overlay::show_highlight(&state.overlay, message, duration_ms);
+    let _ = app.emit("overlay://highlight", Some(&shown));
+    crate::deck::notify_highlight_changed(&app);
+    shown
+}
+
+#[tauri::command]
+pub fn overlay_clear_highlight(app: AppHandle, state: State<'_, AppState>) {
+    crate::overlay::clear_highlight(&state.overlay);
+    let _ = app.emit("overlay://highlight", Option::<chat::ChatMessage>::None);
+    crate::deck::notify_highlight_changed(&app);
+}
+
+#[tauri::command]
+pub fn overlay_active_highlight(state: State<'_, AppState>) -> Option<chat::ChatMessage> {
+    crate::overlay::active_highlight(&state.overlay)
+}
+
+#[tauri::command]
+pub fn overlay_highlight_test(app: AppHandle, state: State<'_, AppState>) {
+    let demo = chat::ChatMessage {
+        id: "overlay-highlight-test".into(),
+        platform: "twitch".into(),
+        source: Msg::OverlayDemoSource.now(),
+        author: "fulano_dtal".into(),
+        author_id: None,
+        native_id: None,
+        color: Some("#ffb323".into()),
+        text: Msg::OverlayDemoChatText.now(),
+        fragments: vec![
+            chat::ChatFragment {
+                kind: "text".into(),
+                text: Some(Msg::OverlayDemoChatTextFragment.now()),
+                url: None,
+                ..Default::default()
+            },
+            chat::ChatFragment {
+                kind: "emote".into(),
+                text: Some("Kappa".into()),
+                url: Some("https://static-cdn.jtvnw.net/emoticons/v2/25/default/dark/2.0".into()),
+                ..Default::default()
+            },
+        ],
+        badges: vec![chat::ChatBadge {
+            label: "sub".into(),
+            kind: "subscriber".into(),
+            ..Default::default()
+        }],
+        ts: 0,
+        ..Default::default()
+    };
+    let _ = overlay_highlight_message(app, state, demo);
+}
+
+#[tauri::command]
+pub async fn overlay_obs_add_source(
+    app: AppHandle,
+    url: String,
+    source_name: Option<String>,
+) -> Result<(), String> {
     let password = crate::obs_env::password(&get_config(app).settings.obs_password);
+    let name = source_name
+        .filter(|n| !n.trim().is_empty())
+        .unwrap_or_else(|| OVERLAY_OBS_SOURCE.to_string());
     tauri::async_runtime::spawn_blocking(move || {
         crate::obs::add_or_update_browser_source(
             OBS_WS_HOST,
             crate::obs_env::port(),
             &password,
-            OVERLAY_OBS_SOURCE,
+            &name,
             &url,
             1920,
             1080,

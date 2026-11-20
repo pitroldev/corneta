@@ -8,18 +8,27 @@ import { bold, useT } from "../../lib/i18n";
 import { toast } from "../../lib/toast";
 import type { AppSettings } from "../../lib/types";
 import { errMsg } from "../../lib/utils";
-import { chatPosOpts, overlayPosOpts, scaleOpts } from "./constants";
+import {
+  chatPosOpts,
+  highlightDurOpts,
+  highlightPosOpts,
+  highlightThemeOpts,
+  overlayPosOpts,
+  scaleOpts,
+} from "./constants";
 import { OptRow } from "./primitives";
 
 function OverlayBlock({
   title,
   url,
+  sourceName,
   onTest,
   testMsg,
   children,
 }: {
   title: string;
   url: string;
+  sourceName?: string;
   onTest: () => Promise<void>;
   testMsg: string;
   children?: ReactNode;
@@ -37,7 +46,7 @@ function OverlayBlock({
   };
   const addToObs = () =>
     api
-      .overlayObsAddSource(url)
+      .overlayObsAddSource(url, sourceName)
       .then(() =>
         toast.success(
           t("chat.overlay.added.toast", { block: title.toLowerCase() }),
@@ -137,6 +146,12 @@ export function OverlayCard({
       `&platform=${(settings.overlayChatPlatform ?? true) ? 1 : 0}` +
       `&nocmd=${(settings.overlayChatHideCommands ?? false) ? 1 : 0}` +
       `&fade=${settings.overlayChatFadeSecs ?? 0}`
+    : "";
+  const highlightUrl = info
+    ? `${info.highlightUrl}?pos=${settings.overlayHighlightPosition || "bottom"}` +
+      `&dur=${settings.overlayHighlightDurationSecs ?? 0}` +
+      `&theme=${settings.overlayHighlightTheme || "dark"}` +
+      `&scale=${settings.overlayScale || "md"}`
     : "";
 
   const toggle = async (on: boolean) => {
@@ -320,6 +335,48 @@ export function OverlayCard({
                   checked={settings.overlayChatHideCommands ?? false}
                   onChange={(v) => setSettings({ overlayChatHideCommands: v })}
                   label={t("chat.overlay.aria.hideCommands")}
+                />
+              </OptRow>
+            </OverlayBlock>
+
+            <OverlayBlock
+              title={t("chat.overlay.block.highlight")}
+              url={highlightUrl}
+              sourceName={t("chat.overlay.source.highlight")}
+              onTest={() => api.overlayHighlightTest()}
+              testMsg={t("chat.overlay.test.highlight")}
+            >
+              <OptRow label={t("chat.overlay.opt.position")}>
+                <Select
+                  className="w-40"
+                  value={settings.overlayHighlightPosition || "bottom"}
+                  options={highlightPosOpts(t)}
+                  onChange={(v) => setSettings({ overlayHighlightPosition: v })}
+                  aria-label={t("chat.overlay.aria.highlightPosition")}
+                />
+              </OptRow>
+              <OptRow label={t("chat.overlay.opt.duration")}>
+                <Select
+                  className="w-40"
+                  value={String(settings.overlayHighlightDurationSecs ?? 0)}
+                  options={highlightDurOpts(t)}
+                  onChange={(v) =>
+                    setSettings({ overlayHighlightDurationSecs: Number(v) })
+                  }
+                  aria-label={t("chat.overlay.aria.highlightDuration")}
+                />
+              </OptRow>
+              <OptRow label={t("chat.overlay.opt.theme")}>
+                <Select
+                  className="w-40"
+                  value={settings.overlayHighlightTheme || "dark"}
+                  options={highlightThemeOpts(t)}
+                  onChange={(v) =>
+                    setSettings({
+                      overlayHighlightTheme: v === "light" ? "light" : "dark",
+                    })
+                  }
+                  aria-label={t("chat.overlay.aria.highlightTheme")}
                 />
               </OptRow>
             </OverlayBlock>

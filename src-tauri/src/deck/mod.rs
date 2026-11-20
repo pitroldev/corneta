@@ -5,6 +5,7 @@
 
 mod actions;
 mod combos;
+mod crypto;
 mod net;
 mod pairing;
 mod state;
@@ -57,8 +58,19 @@ enum Outbound {
     Close,
 }
 
+enum ClientPhase {
+    Init,
+    PairPending(crypto::DeckCipher),
+    HelloPending {
+        device: String,
+        cipher: crypto::DeckCipher,
+    },
+    Encrypted(crypto::DeckCipher),
+}
+
 struct Client {
     device: Option<String>,
+    phase: ClientPhase,
     tx: mpsc::UnboundedSender<Outbound>,
     commands: VecDeque<Instant>,
 }
@@ -87,16 +99,36 @@ pub struct Hub {
     assets: HashSet<String>,
 }
 
+/// Plaintext handshake messages accepted only while a connection is in `ClientPhase::Init`.
 #[derive(Deserialize)]
-#[serde(tag = "type", rename_all = "camelCase")]
+#[serde(tag = "type", rename_all = "kebab-case")]
+enum HandshakeMsg {
+    PairInit {
+        #[serde(rename = "pub")]
+        client_pub: String,
+    },
+    HelloInit {
+        #[serde(default)]
+        v: u8,
+        device: String,
+        #[serde(rename = "pub")]
+        client_pub: String,
+    },
+    /// Legacy v1 clients send plaintext `hello` or `pair`; answer with `re-pair-required`.
+    Hello {},
+    Pair {},
+}
+
+/// Decrypted application-layer messages accepted only inside an encrypted session.
+#[derive(Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
 enum ClientMsg {
     Pair {
         token: String,
         name: String,
     },
-    Hello {
+    HelloAuth {
         device: String,
-        secret: String,
     },
     Cmd {
         id: String,
@@ -150,9 +182,28 @@ impl Hub {
         *self.cfg.lock().unwrap() = cfg;
     }
 
-    fn send(&self, conn: u64, value: &Value) {
+    fn send_plain(&self, conn: u64, value: &Value) {
         if let Some(client) = self.clients.lock().unwrap().get(&conn) {
             let _ = client.tx.send(Outbound::Text(value.to_string()));
+        }
+    }
+
+    fn send_encrypted(client: &mut Client, text: &str) {
+        if let ClientPhase::Encrypted(ref mut cipher) = client.phase {
+            match cipher.seal(text) {
+                Ok(wire) => {
+                    let _ = client.tx.send(Outbound::Text(wire));
+                }
+                Err(_) => {
+                    let _ = client.tx.send(Outbound::Close);
+                }
+            }
+        }
+    }
+
+    fn send(&self, conn: u64, value: &Value) {
+        if let Some(client) = self.clients.lock().unwrap().get_mut(&conn) {
+            Self::send_encrypted(client, &value.to_string());
         }
     }
 
@@ -162,12 +213,12 @@ impl Hub {
         }
     }
 
-    /// Chat and alerts go only to paired phones.
+    /// Chat and alerts go only to paired, encrypted phones.
     fn broadcast(&self, value: &Value) {
         let text = value.to_string();
-        for client in self.clients.lock().unwrap().values() {
+        for client in self.clients.lock().unwrap().values_mut() {
             if client.device.is_some() {
-                let _ = client.tx.send(Outbound::Text(text.clone()));
+                Self::send_encrypted(client, &text);
             }
         }
     }
@@ -186,7 +237,7 @@ impl Hub {
         let obs = self.obs_state.lock().unwrap().clone();
         let session = self.session.lock().unwrap().clone();
         let ready = *self.ready.lock().unwrap();
-        state::build(&state::Input {
+        let mut state = state::build(&state::Input {
             cfg: &cfg,
             snapshot: snapshot.as_ref(),
             viewers: viewers.as_ref(),
@@ -195,24 +246,35 @@ impl Hub {
             ready,
             pc: &pc_name(),
             now: now_ms(),
-        })
+        });
+        let active_hl = crate::overlay::active_highlight(&self.app.state::<AppState>().overlay);
+        state["highlight"] = match active_hl {
+            Some(msg) => json!({
+                "id": msg.id,
+                "author": msg.author,
+                "platform": msg.platform,
+                "text": msg.text,
+            }),
+            None => Value::Null,
+        };
+        state
     }
 
     fn broadcast_state(&self) {
         let base = self.state_json();
         let devices = self.config().settings.deck_devices;
-        for client in self.clients.lock().unwrap().values() {
-            let Some(device) = &client.device else {
+        for client in self.clients.lock().unwrap().values_mut() {
+            let Some(device) = client.device.clone() else {
                 continue;
             };
             let mut state = base.clone();
             let name = devices
                 .iter()
-                .find(|d| &d.id == device)
+                .find(|d| d.id == device)
                 .map(|d| d.name.clone())
                 .unwrap_or_default();
             state["device"] = json!({ "id": device, "name": name });
-            let _ = client.tx.send(Outbound::Text(state.to_string()));
+            Self::send_encrypted(client, &state.to_string());
         }
     }
 
@@ -278,20 +340,162 @@ impl Hub {
     }
 
     fn handle(self: &Arc<Self>, conn: u64, ip: IpAddr, text: &str) {
-        let Ok(message) = serde_json::from_str::<ClientMsg>(text) else {
-            return;
+        enum Action {
+            Handshake(String),
+            PairSubmit {
+                token: String,
+                name: String,
+            },
+            PairFailed,
+            HelloAuthed {
+                device: String,
+            },
+            HelloFailed,
+            Cmd {
+                id: String,
+                action: String,
+                args: Value,
+            },
+            Close,
+            Ignore,
+        }
+
+        let action = {
+            let mut clients = self.clients.lock().unwrap();
+            let Some(client) = clients.get_mut(&conn) else {
+                return;
+            };
+            match &mut client.phase {
+                ClientPhase::Init => Action::Handshake(text.to_string()),
+                ClientPhase::PairPending(cipher) => match cipher.open(text) {
+                    Ok(plain) => match serde_json::from_str::<ClientMsg>(&plain) {
+                        Ok(ClientMsg::Pair { token, name }) => {
+                            // Promote to Encrypted so all responses (including pair-invalid / pairing) stay encrypted.
+                            let prev = std::mem::replace(&mut client.phase, ClientPhase::Init);
+                            if let ClientPhase::PairPending(c) = prev {
+                                client.phase = ClientPhase::Encrypted(c);
+                            }
+                            Action::PairSubmit { token, name }
+                        }
+                        _ => Action::PairFailed,
+                    },
+                    Err(_) => Action::PairFailed,
+                },
+                ClientPhase::HelloPending { device, cipher } => match cipher.open(text) {
+                    Ok(plain) => match serde_json::from_str::<ClientMsg>(&plain) {
+                        Ok(ClientMsg::HelloAuth { device: claimed }) if claimed == *device => {
+                            let expected = device.clone();
+                            let prev = std::mem::replace(&mut client.phase, ClientPhase::Init);
+                            if let ClientPhase::HelloPending { cipher: c, .. } = prev {
+                                client.phase = ClientPhase::Encrypted(c);
+                            }
+                            Action::HelloAuthed { device: expected }
+                        }
+                        _ => Action::HelloFailed,
+                    },
+                    Err(_) => Action::HelloFailed,
+                },
+                ClientPhase::Encrypted(cipher) => match cipher.open(text) {
+                    Ok(plain) => match serde_json::from_str::<ClientMsg>(&plain) {
+                        Ok(ClientMsg::Cmd { id, action, args }) => Action::Cmd { id, action, args },
+                        _ => Action::Ignore,
+                    },
+                    Err(_) => Action::Close,
+                },
+            }
         };
-        match message {
-            ClientMsg::Pair { token, name } => self.pair(conn, &token, &name),
-            ClientMsg::Hello { device, secret } => self.hello(conn, ip, &device, &secret),
-            ClientMsg::Cmd { id, action, args } => self.command(conn, id, action, args),
+
+        match action {
+            Action::Handshake(raw) => self.handle_handshake(conn, ip, &raw),
+            Action::PairSubmit { token, name } => self.pair_submit(conn, &token, &name),
+            Action::PairFailed => {
+                self.send_plain(conn, &json!({ "type": "pair-invalid" }));
+                self.close(conn);
+            }
+            Action::HelloAuthed { device } => {
+                self.authenticate(conn, &device);
+                self.send_initial(conn);
+                publish_status(&self.app);
+            }
+            Action::HelloFailed => {
+                self.record_failure(ip);
+                self.send_plain(conn, &json!({ "type": "unknown-device" }));
+                self.close(conn);
+            }
+            Action::Cmd { id, action, args } => self.command(conn, id, action, args),
+            Action::Close => self.close(conn),
+            Action::Ignore => {}
         }
     }
 
-    fn pair(&self, conn: u64, token: &str, name: &str) {
+    fn handle_handshake(&self, conn: u64, ip: IpAddr, text: &str) {
+        let Ok(msg) = serde_json::from_str::<HandshakeMsg>(text) else {
+            return;
+        };
+        match msg {
+            HandshakeMsg::PairInit { client_pub } => self.pair_init(conn, &client_pub),
+            HandshakeMsg::HelloInit {
+                v: 2,
+                device,
+                client_pub,
+            } => self.hello_init(conn, ip, &device, &client_pub),
+            HandshakeMsg::HelloInit { .. } | HandshakeMsg::Hello {} | HandshakeMsg::Pair {} => {
+                self.send_plain(conn, &json!({ "type": "re-pair-required" }));
+                self.close(conn);
+            }
+        }
+    }
+
+    fn pair_init(&self, conn: u64, client_pub_b64: &str) {
+        let now = Instant::now();
+        let Some(token) = self.pairing.lock().unwrap().active_token(now) else {
+            self.send_plain(conn, &json!({ "type": "pair-invalid" }));
+            self.close(conn);
+            return;
+        };
+        let Ok(client_pub) = crypto::decode_key_32(client_pub_b64) else {
+            self.send_plain(conn, &json!({ "type": "pair-invalid" }));
+            self.close(conn);
+            return;
+        };
+        let Ok(server_kp) = crypto::EphemeralKeyPair::generate() else {
+            self.close(conn);
+            return;
+        };
+        let server_pub = server_kp.public;
+        let Ok(shared) = server_kp.agree(&client_pub) else {
+            self.send_plain(conn, &json!({ "type": "pair-invalid" }));
+            self.close(conn);
+            return;
+        };
+        let Ok((c2s, s2c)) = crypto::derive_direction_keys(
+            &shared,
+            token.as_bytes(),
+            &client_pub,
+            &server_pub,
+            crypto::PAIR_INFO,
+        ) else {
+            self.close(conn);
+            return;
+        };
+        let Ok(cipher) = crypto::DeckCipher::for_server(&c2s, &s2c) else {
+            self.close(conn);
+            return;
+        };
+        if let Some(client) = self.clients.lock().unwrap().get_mut(&conn) {
+            client.phase = ClientPhase::PairPending(cipher);
+        }
+        self.send_plain(
+            conn,
+            &json!({ "type": "pair-hello", "pub": crypto::encode_b64(&server_pub) }),
+        );
+    }
+
+    fn pair_submit(&self, conn: u64, token: &str, name: &str) {
         let now = Instant::now();
         if !self.pairing.lock().unwrap().redeem(token, now) {
             self.send(conn, &json!({ "type": "pair-invalid" }));
+            self.close(conn);
             return;
         }
         if self.config().settings.deck_devices.len() >= MAX_DEVICES {
@@ -328,9 +532,9 @@ impl Hub {
         }
     }
 
-    fn hello(&self, conn: u64, ip: IpAddr, device: &str, secret: &str) {
+    fn hello_init(&self, conn: u64, ip: IpAddr, device: &str, client_pub_b64: &str) {
         if self.too_many_failures(ip) {
-            self.send(conn, &json!({ "type": "unknown-device" }));
+            self.send_plain(conn, &json!({ "type": "unknown-device" }));
             self.close(conn);
             return;
         }
@@ -340,18 +544,64 @@ impl Hub {
             .deck_devices
             .iter()
             .any(|d| d.id == device);
-        let verified = known
-            && crate::keys::get_key(&pairing::vault_key(device))
-                .is_some_and(|verifier| pairing::verify(secret, &verifier));
-        if !verified {
+        let stored = known
+            .then(|| crate::keys::get_key(&pairing::vault_key(device)))
+            .flatten();
+        let device_key = match stored.as_deref().and_then(pairing::parse_vault_key) {
+            Some(pairing::VaultKey::V2(key)) => key,
+            Some(pairing::VaultKey::LegacyV1) => {
+                self.send_plain(conn, &json!({ "type": "re-pair-required" }));
+                self.close(conn);
+                return;
+            }
+            None => {
+                self.record_failure(ip);
+                self.send_plain(conn, &json!({ "type": "unknown-device" }));
+                self.close(conn);
+                return;
+            }
+        };
+        let Ok(client_pub) = crypto::decode_key_32(client_pub_b64) else {
             self.record_failure(ip);
-            self.send(conn, &json!({ "type": "unknown-device" }));
+            self.send_plain(conn, &json!({ "type": "unknown-device" }));
             self.close(conn);
             return;
+        };
+        let Ok(server_kp) = crypto::EphemeralKeyPair::generate() else {
+            self.close(conn);
+            return;
+        };
+        let server_pub = server_kp.public;
+        let Ok(shared) = server_kp.agree(&client_pub) else {
+            self.record_failure(ip);
+            self.send_plain(conn, &json!({ "type": "unknown-device" }));
+            self.close(conn);
+            return;
+        };
+        let Ok((c2s, s2c)) = crypto::derive_direction_keys(
+            &shared,
+            &device_key,
+            &client_pub,
+            &server_pub,
+            crypto::SESSION_INFO,
+        ) else {
+            self.close(conn);
+            return;
+        };
+        let Ok(cipher) = crypto::DeckCipher::for_server(&c2s, &s2c) else {
+            self.close(conn);
+            return;
+        };
+        if let Some(client) = self.clients.lock().unwrap().get_mut(&conn) {
+            client.phase = ClientPhase::HelloPending {
+                device: device.to_string(),
+                cipher,
+            };
         }
-        self.authenticate(conn, device);
-        self.send_initial(conn);
-        publish_status(&self.app);
+        self.send_plain(
+            conn,
+            &json!({ "type": "hello-ack", "pub": crypto::encode_b64(&server_pub) }),
+        );
     }
 
     fn command(self: &Arc<Self>, conn: u64, id: String, action: String, args: Value) {
@@ -418,11 +668,10 @@ impl Hub {
     }
 
     fn revoke(&self, device: &str) {
-        for client in self.clients.lock().unwrap().values() {
+        let text = json!({ "type": "revoked" }).to_string();
+        for client in self.clients.lock().unwrap().values_mut() {
             if client.device.as_deref() == Some(device) {
-                let _ = client
-                    .tx
-                    .send(Outbound::Text(json!({ "type": "revoked" }).to_string()));
+                Self::send_encrypted(client, &text);
                 let _ = client.tx.send(Outbound::Close);
             }
         }
@@ -556,6 +805,7 @@ async fn session(hub: Arc<Hub>, mut socket: WebSocket, ip: IpAddr) {
         conn,
         Client {
             device: None,
+            phase: ClientPhase::Init,
             tx,
             commands: VecDeque::new(),
         },
@@ -835,9 +1085,10 @@ pub fn pair_answer(app: &AppHandle, request: &str, allow: bool) -> Result<(), St
         return Err(Msg::DeckPairGone.now());
     }
     let id = pairing::new_device_id();
-    let secret = pairing::random_secret();
+    let device_key = pairing::generate_device_key();
+    let key_b64 = crypto::encode_b64(&device_key);
     let vault = pairing::vault_key(&id);
-    crate::keys::set_key(&vault, &pairing::digest(&secret))?;
+    crate::keys::set_key(&vault, &pairing::encode_vault_key(&device_key))?;
     let device = crate::config::DeckDevice {
         id: id.clone(),
         name: pending.name.clone(),
@@ -854,7 +1105,7 @@ pub fn pair_answer(app: &AppHandle, request: &str, allow: bool) -> Result<(), St
     hub.authenticate(pending.conn, &id);
     hub.send(
         pending.conn,
-        &json!({ "type": "paired", "device": id, "secret": secret, "name": pending.name }),
+        &json!({ "type": "paired", "v": 2, "device": id, "key": key_b64, "name": pending.name }),
     );
     hub.send_initial(pending.conn);
     publish_status(app);
@@ -987,6 +1238,12 @@ pub fn chat_deleted(app: &AppHandle, event: &Value) {
     }
 }
 
+pub fn notify_highlight_changed(app: &AppHandle) {
+    if let Some(hub) = hub(app) {
+        hub.touch();
+    }
+}
+
 /// Engine events the phone announces with its own copy, so it never shows desktop-language text.
 #[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -1082,9 +1339,23 @@ mod tests {
 
     #[test]
     fn client_messages_parse_by_type() {
+        let pair_init: HandshakeMsg =
+            serde_json::from_str(r#"{"type":"pair-init","pub":"AAAA"}"#).unwrap();
+        assert!(matches!(pair_init, HandshakeMsg::PairInit { .. }));
+        let hello_init: HandshakeMsg =
+            serde_json::from_str(r#"{"type":"hello-init","v":2,"device":"d","pub":"AAAA"}"#)
+                .unwrap();
+        assert!(matches!(hello_init, HandshakeMsg::HelloInit { v: 2, .. }));
+        let legacy: HandshakeMsg =
+            serde_json::from_str(r#"{"type":"hello","device":"d","secret":"s"}"#).unwrap();
+        assert!(matches!(legacy, HandshakeMsg::Hello {}));
+
         let pair: ClientMsg =
             serde_json::from_str(r#"{"type":"pair","token":"t","name":"n"}"#).unwrap();
         assert!(matches!(pair, ClientMsg::Pair { .. }));
+        let auth: ClientMsg =
+            serde_json::from_str(r#"{"type":"hello-auth","device":"d"}"#).unwrap();
+        assert!(matches!(auth, ClientMsg::HelloAuth { .. }));
         let cmd: ClientMsg =
             serde_json::from_str(r#"{"type":"cmd","id":"1","action":"mark"}"#).unwrap();
         assert!(matches!(

@@ -14,6 +14,7 @@ import {
   Clock,
   CornerDownRight,
   MessageSquare,
+  MonitorPlay,
   Reply,
   Repeat2,
   Trash2,
@@ -58,6 +59,8 @@ export function ChatFeed({
   onModerate,
   canReply,
   onReply,
+  highlightedId,
+  onHighlight,
   mentionHandles,
   disconnectedHint,
   emptyAction,
@@ -79,6 +82,9 @@ export function ChatFeed({
   onModerate?: (m: ChatMessage, action: string) => void;
   canReply?: (m: ChatMessage) => boolean;
   onReply?: (m: ChatMessage) => void;
+  /** Message ID currently highlighted on the OBS overlay. */
+  highlightedId?: string | null;
+  onHighlight?: (m: ChatMessage) => void;
   /** Broadcaster channel handles used to subtly highlight direct @mentions. */
   mentionHandles?: readonly string[];
 }) {
@@ -91,11 +97,13 @@ export function ChatFeed({
   const onModerateRef = useRef(onModerate);
   const canReplyRef = useRef(canReply);
   const onReplyRef = useRef(onReply);
+  const onHighlightRef = useRef(onHighlight);
   onFontSizeRef.current = onFontSize;
   modLevelRef.current = modLevel;
   onModerateRef.current = onModerate;
   canReplyRef.current = canReply;
   onReplyRef.current = onReply;
+  onHighlightRef.current = onHighlight;
   // Stable indirections preserve memoized rows without capturing stale callbacks.
   const stableModLevel = useRef(
     (m: ChatMessage) => modLevelRef.current?.(m) ?? "none",
@@ -108,6 +116,9 @@ export function ChatFeed({
   ).current;
   const stableReply = useRef((m: ChatMessage) =>
     onReplyRef.current?.(m),
+  ).current;
+  const stableHighlight = useRef((m: ChatMessage) =>
+    onHighlightRef.current?.(m),
   ).current;
   const fontResizeEnabled = onFontSize !== undefined;
 
@@ -255,6 +266,10 @@ export function ChatFeed({
                   onModerate={stableModerate}
                   canReply={onReply ? stableCanReply : undefined}
                   onReply={stableReply}
+                  isHighlighted={
+                    !!highlightedId && messages[vi.index].id === highlightedId
+                  }
+                  onHighlight={onHighlight ? stableHighlight : undefined}
                   mentionHandles={mentionHandles}
                 />
               </div>
@@ -283,6 +298,8 @@ interface MsgRowProps {
   onModerate?: (m: ChatMessage, action: string) => void;
   canReply?: (m: ChatMessage) => boolean;
   onReply?: (m: ChatMessage) => void;
+  isHighlighted?: boolean;
+  onHighlight?: (m: ChatMessage) => void;
   mentionHandles?: readonly string[];
 }
 
@@ -317,6 +334,8 @@ const MsgRow = memo(function MsgRow({
   onModerate,
   canReply,
   onReply,
+  isHighlighted,
+  onHighlight,
   mentionHandles,
 }: MsgRowProps) {
   const t = useT();
@@ -359,16 +378,19 @@ const MsgRow = memo(function MsgRow({
   return (
     <div
       className={cn(
-        "group relative px-3 py-1 pr-16 leading-snug hover:bg-surface-2",
-        m.highlight && "border-l-[3px] bg-surface-2/60",
-        !m.highlight &&
+        "group relative px-3 py-1 pr-20 leading-snug hover:bg-surface-2",
+        isHighlighted && "border-l-[3px] border-l-brass bg-brass/15",
+        !isHighlighted && m.highlight && "border-l-[3px] bg-surface-2/60",
+        !isHighlighted &&
+          !m.highlight &&
           cue === "mention" &&
           "border-l-[3px] border-l-brass bg-brass/10",
-        !m.highlight &&
+        !isHighlighted &&
+          !m.highlight &&
           cue === "question" &&
           "border-l-[3px] border-l-info bg-info/8",
       )}
-      style={accent ? { borderLeftColor: accent } : undefined}
+      style={!isHighlighted && accent ? { borderLeftColor: accent } : undefined}
     >
       {(m.highlight || m.reply) && (
         <div className="mb-0.5 flex min-w-0 items-center gap-1.5 text-[0.78em] text-ink-faint">
@@ -440,6 +462,8 @@ const MsgRow = memo(function MsgRow({
         onModerate={onModerate}
         canReply={canReply}
         onReply={onReply}
+        isHighlighted={isHighlighted}
+        onHighlight={onHighlight}
       />
     </div>
   );
@@ -495,6 +519,8 @@ function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
     prev.onModerate === next.onModerate &&
     prev.canReply === next.canReply &&
     prev.onReply === next.onReply &&
+    prev.isHighlighted === next.isHighlighted &&
+    prev.onHighlight === next.onHighlight &&
     prev.mentionHandles === next.mentionHandles
   );
 }
@@ -506,21 +532,56 @@ function ModButtons({
   onModerate,
   canReply,
   onReply,
+  isHighlighted,
+  onHighlight,
 }: {
   m: ChatMessage;
   modLevel?: (m: ChatMessage) => "full" | "delete" | "none";
   onModerate?: (m: ChatMessage, action: string) => void;
   canReply?: (m: ChatMessage) => boolean;
   onReply?: (m: ChatMessage) => void;
+  isHighlighted?: boolean;
+  onHighlight?: (m: ChatMessage) => void;
 }) {
   const t = useT();
   const lvl = onModerate && modLevel ? modLevel(m) : "none";
   const reply = !!onReply && !!canReply?.(m);
-  if (lvl === "none" && !reply) return null;
+  const highlight = !!onHighlight && !m.deleted && !m.system;
+  if (lvl === "none" && !reply && !highlight) return null;
   const btn =
     "grid size-6 place-items-center rounded text-ink-faint transition-colors";
   return (
-    <div className="absolute right-1.5 top-0.5 flex items-center gap-0.5 rounded-md bg-surface opacity-0 ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100">
+    <div
+      className={cn(
+        "absolute right-1.5 top-0.5 flex items-center gap-0.5 rounded-md bg-surface ring-1 ring-border transition-opacity focus-within:opacity-100 group-hover:opacity-100 group-focus-within:opacity-100",
+        isHighlighted ? "opacity-100" : "opacity-0",
+      )}
+    >
+      {highlight && (
+        <button
+          type="button"
+          onClick={() => onHighlight?.(m)}
+          aria-pressed={!!isHighlighted}
+          title={
+            isHighlighted
+              ? t("chat.highlight.action.clear")
+              : t("chat.highlight.action.show")
+          }
+          aria-label={
+            isHighlighted
+              ? t("chat.highlight.action.clear")
+              : t("chat.highlight.action.show")
+          }
+          className={cn(
+            btn,
+            isHighlighted
+              ? "bg-brass text-brass-ink hover:bg-brass/90"
+              : "hover:text-brass",
+          )}
+        >
+          <MonitorPlay className="size-3.5" />
+        </button>
+      )}
       {reply && (
         <button
           type="button"

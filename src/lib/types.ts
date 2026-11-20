@@ -85,6 +85,8 @@ export interface Reframe extends CropBox {
   splitRatio?: number;
 }
 
+export type InputFeed = "primary" | "vertical";
+
 export interface TargetEncoding {
   /** Persisted legacy field; hybrid behavior uses hybridOverride or automatic selection. */
   action: EncodingAction;
@@ -94,6 +96,8 @@ export interface TargetEncoding {
   hybridOverride?: EncodingAction;
   /** undefined selects a centered portrait crop. */
   reframe?: Reframe;
+  /** Dedicated vertical canvas ingest (`{key}_vertical`) skips reframing and allows zero-GPU copy. */
+  sourceFeed?: InputFeed;
 }
 
 export interface Target {
@@ -215,6 +219,10 @@ export interface AppSettings {
   overlayChatHideCommands: boolean;
   /** Seconds before hiding a message; zero means never. */
   overlayChatFadeSecs: number;
+  overlayHighlightPosition?: string;
+  /** Seconds before hiding a highlighted message; zero keeps it until cleared. */
+  overlayHighlightDurationSecs?: number;
+  overlayHighlightTheme?: "dark" | "light";
 }
 
 /** Stable OBS failure kinds from the native side; classify OBS errors by these, never by text. */
@@ -604,6 +612,8 @@ export interface EngineSnapshot {
   startedAt: number | null;
   /** Input video can be present before any destination accepts its connection. */
   ingestLive?: boolean;
+  /** Present only when an enabled destination reads from the separate vertical ingest. */
+  verticalIngestLive?: boolean;
   targets: Record<string, TargetStatus>;
   message?: string;
   /** Current live-operation UUID shared by UI and native engine. */

@@ -24,6 +24,10 @@ Triage focuses on the main branch and the latest published official version; the
 
 No SLA, on-call team, bounty program or security certification is promised. Acknowledgment, assessment and disclosure will be coordinated by the maintainer according to availability and severity. If you do not receive an acknowledgment, contact us again without publishing sensitive details as a way to get a response.
 
+## Local LAN surfaces (Deck and Table)
+
+Deck mode encrypts WebSocket sessions at the application layer (ephemeral X25519 + HKDF-SHA256 + ChaCha20-Poly1305 with strict monotonic nonces and directional keys) so paired device keys, commands, state, and chat are not exposed to passive listeners on the home LAN. However, the initial `http://<lan-ip>:<port>/deck` page and script load still happen over plain HTTP without TLS, so an active attacker on a hostile network could tamper with the page before the session starts. Use Deck and Table only on a trusted home network, never on public Wi-Fi, and do not forward their ports on the router. See [docs/NETWORK-SURFACE.md](docs/NETWORK-SURFACE.md) for the full boundary analysis.
+
 ## Testing limits
 
 Use an isolated local environment and authorized accounts. Do not run destructive tests, aggressive scans, exfiltration, denial of service or streams to third-party accounts. The code being open source does not authorize attacking the official service or the integrated providers.

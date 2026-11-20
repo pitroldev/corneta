@@ -97,6 +97,9 @@ export function defaultConfig(): AppConfig {
       overlayChatPlatform: true,
       overlayChatHideCommands: false,
       overlayChatFadeSecs: 0,
+      overlayHighlightPosition: "bottom",
+      overlayHighlightDurationSecs: 0,
+      overlayHighlightTheme: "dark",
       // Keep both recording defaults disabled, matching Rust Settings::default().
       recordVideo: false,
       recordVideoDir: "",

@@ -56,9 +56,30 @@ export function LiveCockpit({
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex min-w-0 flex-col gap-3">
         <VitalsStrip />
+        <VerticalIngestBanner />
         <LiveTargetList targets={targets} onNavigate={onNavigate} />
       </div>
       <LiveChatPanel onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+function VerticalIngestBanner() {
+  const t = useT();
+  const state = useStore((s) => s.snapshot.state);
+  const ingestLive = useStore((s) => s.snapshot.ingestLive);
+  const verticalLive = useStore((s) => s.snapshot.verticalIngestLive);
+  const key = useStore((s) => s.config?.ingest.key ?? "obs");
+  if (state !== "live" || !ingestLive || verticalLive !== false) return null;
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-2.5 rounded-lg border border-warn/40 bg-warn/10 px-3.5 py-2.5 text-xs text-ink"
+    >
+      <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warn" aria-hidden />
+      <span className="leading-relaxed">
+        {t("golive.verticalIngest.waiting", { key: `${key}_vertical` })}
+      </span>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import type {
   EncoderKind,
   EncodingAction,
   EncodingMode,
+  InputFeed,
   PlatformId,
   Target,
   VideoCodec,
@@ -36,7 +37,11 @@ export function acceptsCodec(
 export function smartHybridAction(
   platformId: PlatformId,
   sourceCodec: VideoCodec = "h264",
+  sourceFeed: InputFeed = "primary",
 ): EncodingAction {
+  if (sourceFeed === "vertical") {
+    return "copy";
+  }
   return isVertical(platformId) || !acceptsCodec(platformId, sourceCodec)
     ? "transcode"
     : "copy";
@@ -50,7 +55,12 @@ export function effectiveAction(
   if (mode === "passthrough") return "copy";
   if (mode === "per-platform") return "transcode";
   return (
-    t.encoding.hybridOverride ?? smartHybridAction(t.platformId, sourceCodec)
+    t.encoding.hybridOverride ??
+    smartHybridAction(
+      t.platformId,
+      sourceCodec,
+      t.encoding.sourceFeed ?? "primary",
+    )
   );
 }
 
@@ -59,17 +69,24 @@ function recommended(t: Target) {
 }
 
 function renditionKey(t: Target, p: VideoPreset): string {
-  const rf = p.height > p.width ? reframeKey(t.encoding.reframe) : "landscape";
-  return `${p.width}x${p.height}@${p.fps}:${p.videoBitrateKbps}:${p.audioBitrateKbps}:${p.keyframeSec}:${t.encoding.encoder}:${rf}`;
+  const feed = t.encoding.sourceFeed ?? "primary";
+  const rf =
+    feed === "primary" && p.height > p.width
+      ? reframeKey(t.encoding.reframe)
+      : feed;
+  return `${feed}:${p.width}x${p.height}@${p.fps}:${p.videoBitrateKbps}:${p.audioBitrateKbps}:${p.keyframeSec}:${t.encoding.encoder}:${rf}`;
 }
 
-/** Only copied destinations constrain OBS input bitrate; re-encoded destinations use their own settings. */
+/** Only copied primary-feed destinations constrain OBS input bitrate; re-encoded or separate vertical feeds do not. */
 export function lowestCommonDenominator(
   config: AppConfig,
   sourceCodec: VideoCodec = "h264",
 ) {
   const copies = config.targets.filter(
-    (t) => t.enabled && effectiveAction(config.mode, t, sourceCodec) === "copy",
+    (t) =>
+      t.enabled &&
+      t.encoding.sourceFeed !== "vertical" &&
+      effectiveAction(config.mode, t, sourceCodec) === "copy",
   );
   if (copies.length === 0)
     return { videoKbps: null as number | null, capBy: null as string | null };
@@ -129,7 +146,9 @@ export function estimate(
     const rec = recommended(t);
     const p = t.encoding.preset ?? rec;
     const video =
-      act === "copy" ? (lcd ?? rec.videoBitrateKbps) : p.videoBitrateKbps;
+      act === "copy" && t.encoding.sourceFeed !== "vertical"
+        ? (lcd ?? rec.videoBitrateKbps)
+        : p.videoBitrateKbps;
     const audio = p.audioBitrateKbps;
     uploadKbps += video + audio;
     if (act === "transcode") {

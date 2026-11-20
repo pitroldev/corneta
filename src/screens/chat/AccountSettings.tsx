@@ -2,6 +2,7 @@ import { Check, Copy, ExternalLink, LogIn } from "lucide-react";
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { Button, PlatformGlyph } from "../../components/ui";
+import type { SignOutOutcome } from "../../lib/api";
 import { useT } from "../../lib/i18n";
 import type { ChatPlatform } from "../../lib/types";
 import { toast } from "../../lib/toast";
@@ -101,13 +102,19 @@ export function LoginRow({
   };
   enabled: boolean;
   onLogin: () => Promise<void>;
-  onLogout: () => Promise<void>;
+  onLogout: () => Promise<SignOutOutcome | void>;
   /** Platform-specific status below the row, such as a broadcast left to clean up. */
   extra?: ReactNode;
 }) {
   const t = useT();
   const [copied, setCopied] = useState(false);
   const { busy, run: act } = useAccountAction();
+  const handleLogout = async () => {
+    const outcome = await onLogout();
+    if (outcome?.remoteRevoke === "unconfirmed") {
+      toast.info(t("chat.loginrow.signout.unconfirmed", { label }));
+    }
+  };
   const openPage = () => {
     const url = state.verifyUriComplete || state.verifyUri;
     if (url) void openExternal(url);
@@ -149,7 +156,7 @@ export function LoginRow({
               size="sm"
               loading={busy}
               disabled={busy}
-              onClick={() => void act(onLogout)}
+              onClick={() => void act(handleLogout)}
             >
               {t("chat.loginrow.signout")}
             </Button>

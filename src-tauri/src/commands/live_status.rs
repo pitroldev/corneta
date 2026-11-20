@@ -106,16 +106,19 @@ pub(super) fn emit(app: &AppHandle, snap: &EngineSnapshot) {
 }
 
 // Input readiness must not mark the session live when an output is still failing.
-pub(super) fn set_ingest_live(app: &AppHandle, live: bool) {
+pub(super) fn set_ingest_live(app: &AppHandle, live: bool, vertical_live: Option<bool>) {
     let state = app.state::<AppState>();
     let mut eng = state.engine.lock().unwrap();
     let Some(snap) = eng.snapshot.as_mut() else {
         return;
     };
-    if snap.state == "stopped" || snap.ingest_live == live {
+    if snap.state == "stopped"
+        || (snap.ingest_live == live && snap.vertical_ingest_live == vertical_live)
+    {
         return;
     }
     snap.ingest_live = live;
+    snap.vertical_ingest_live = vertical_live;
     let out = snap.clone();
     drop(eng);
     emit(app, &out);

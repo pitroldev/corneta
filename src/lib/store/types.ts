@@ -1,6 +1,6 @@
 import type { StoreApi } from "zustand";
 import type { AccountPlatform } from "../../platforms";
-import type { ChatReply } from "../api";
+import type { ChatReply, SignOutOutcome } from "../api";
 import type { I18n } from "../i18n";
 import type {
   Alert,
@@ -121,6 +121,10 @@ export interface State {
   chatStatuses: Record<string, { platform: string; status: string }>;
   /** Modes, pinned message and running poll per source, keyed by `chatSideKey`. */
   chatSide: Record<string, ChatSide>;
+  /** Message currently displayed on the OBS highlight overlay, if any. */
+  highlightedMessage: ChatMessage | null;
+  highlightMessage: (message: ChatMessage) => Promise<void>;
+  clearHighlight: () => Promise<void>;
   bindChat: () => () => void;
   bindChatRunning: () => () => void;
   connectChat: (t: T) => Promise<void>;
@@ -164,7 +168,7 @@ export interface State {
     platform: AccountPlatform,
     options?: { moderation?: boolean; streamKey?: boolean },
   ) => Promise<void>;
-  accountLogout: (platform: AccountPlatform) => Promise<void>;
+  accountLogout: (platform: AccountPlatform) => Promise<SignOutOutcome>;
   moderate: (
     sourceId: string,
     action: string,

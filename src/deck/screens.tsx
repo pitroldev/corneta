@@ -257,7 +257,8 @@ export function Stop({
     | "full"
     | "unknown"
     | "revoked"
-    | "forgotten";
+    | "forgotten"
+    | "repair";
   message?: string;
 }) {
   const { t } = useI18n();
@@ -302,10 +303,17 @@ export function Stop({
       title: t("deck.forgotten.title"),
       body: t("deck.forgotten.lede"),
     },
+    repair: {
+      icon: <Shield className="ic" aria-hidden />,
+      title: t("deck.repair.title"),
+      body: t("deck.repair.lede"),
+    },
   }[kind];
   return (
     <Full>
-      <Badge tone={kind === "forgotten" ? "muted" : "bad"}>{look.icon}</Badge>
+      <Badge tone={kind === "forgotten" || kind === "repair" ? "muted" : "bad"}>
+        {look.icon}
+      </Badge>
       <h1 className="h2">{look.title}</h1>
       <p>{look.body}</p>
       {kind !== "full" && <p>{strong(t, "deck.again", { where: where(t) })}</p>}

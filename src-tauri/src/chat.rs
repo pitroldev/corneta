@@ -1,8 +1,8 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::{mpsc, Arc, Mutex, OnceLock};
+use std::sync::{mpsc, Arc, LazyLock, Mutex, OnceLock};
 use std::thread;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tauri::{AppHandle, Emitter, Manager};
@@ -17,8 +17,8 @@ fn is_false(value: &bool) -> bool {
 }
 
 /// One piece of a message. `text` is always the plain-text fallback.
-#[derive(Serialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ChatFragment {
     /// "text" | "emote" | "gif" | "sticker" | "link" | "mention" | "cheer"
     pub kind: String,
@@ -41,8 +41,8 @@ pub struct ChatFragment {
     pub giant: bool,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ChatBadge {
     pub label: String,
     pub kind: String,
@@ -55,15 +55,15 @@ pub struct ChatBadge {
 }
 
 /// The message a reply answers, as the platform quotes it.
-#[derive(Serialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ReplyContext {
     pub author: String,
     pub text: String,
 }
 
-#[derive(Serialize, Clone, Debug, Default)]
-#[serde(rename_all = "camelCase")]
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+#[serde(rename_all = "camelCase", default)]
 pub struct ChatMessage {
     pub id: String,
     pub platform: String, // A registered chat provider id.
@@ -108,6 +108,29 @@ pub struct ChatMessage {
     /// The same message reaching more than one source (Twitch shared chat) is shown once.
     #[serde(skip)]
     pub dedup_key: Option<String>,
+}
+
+const RECENT_CHAT_CAP: usize = 200;
+static RECENT_MESSAGES: LazyLock<Mutex<VecDeque<ChatMessage>>> =
+    LazyLock::new(|| Mutex::new(VecDeque::with_capacity(RECENT_CHAT_CAP)));
+
+fn record_recent(msg: &ChatMessage) {
+    let mut recent = RECENT_MESSAGES.lock().unwrap();
+    if recent.len() >= RECENT_CHAT_CAP {
+        recent.pop_front();
+    }
+    recent.push_back(msg.clone());
+}
+
+/// Looks up a recently received chat message by ID so Deck can only highlight real chat history.
+pub(crate) fn recent_message(id: &str) -> Option<ChatMessage> {
+    RECENT_MESSAGES
+        .lock()
+        .unwrap()
+        .iter()
+        .rev()
+        .find(|m| m.id == id && !m.system)
+        .cloned()
 }
 
 #[derive(Default)]
@@ -352,6 +375,7 @@ pub(crate) fn emit_chat(app: &AppHandle, msg: ChatMessage) {
             );
         }
     }
+    record_recent(&msg);
     crate::overlay::push_chat(&app.state::<AppState>().overlay, &msg);
     crate::deck::chat_message(app, &msg);
     let _ = app.emit("chat://message", msg);
@@ -545,8 +569,7 @@ pub(crate) fn delete_message(app: &AppHandle, platform: &str, native_id: &str) {
         }
     }
     let event = json!({ "scope": "message", "platform": platform, "nativeId": native_id });
-    crate::deck::chat_deleted(app, &event);
-    let _ = app.emit("chat://delete", event);
+    publish_delete(app, event);
 }
 /// Removes one author's messages: a ban, a timeout (`seconds`) or a hide.
 pub(crate) fn delete_user(
@@ -575,7 +598,12 @@ pub(crate) fn clear_source(app: &AppHandle, platform: &str, source: &str) {
 }
 
 fn publish_delete(app: &AppHandle, event: Value) {
-    crate::overlay::push_chat_event(&app.state::<AppState>().overlay, "delete", &event);
+    let overlay = &app.state::<AppState>().overlay;
+    crate::overlay::push_chat_event(overlay, "delete", &event);
+    if crate::overlay::clear_highlight_on_delete(overlay, &event) {
+        let _ = app.emit("overlay://highlight", Option::<ChatMessage>::None);
+        crate::deck::notify_highlight_changed(app);
+    }
     crate::deck::chat_deleted(app, &event);
     let _ = app.emit("chat://delete", event);
 }

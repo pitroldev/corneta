@@ -52,6 +52,9 @@ pub struct EngineSnapshot {
     pub started_at: Option<u128>,
     /// OBS input can be live even when no destination accepts output.
     pub ingest_live: bool,
+    /// Present only when an enabled destination reads from the separate vertical ingest.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub vertical_ingest_live: Option<bool>,
     /// Opaque attempt ID, safe to include in copied diagnostics.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub operation_id: Option<String>,
@@ -100,6 +103,7 @@ impl EngineSnapshot {
             state: "stopped".into(),
             started_at: None,
             ingest_live: false,
+            vertical_ingest_live: None,
             operation_id: None,
             error_id: None,
             error_code: None,
@@ -153,6 +157,7 @@ impl EngineSnapshot {
             state: "live".into(),
             started_at: Some(started_at),
             ingest_live: false,
+            vertical_ingest_live: super::has_vertical_feed(config).then_some(false),
             operation_id: None,
             error_id: None,
             error_code: None,

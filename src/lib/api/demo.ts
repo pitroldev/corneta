@@ -507,6 +507,8 @@ export function mockApi(): CornetaApi {
   const targetPlatforms = new Map<string, string>();
 
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
+  const highlightListeners = new Set<(m: ChatMessage | null) => void>();
+  let demoHighlighted: ChatMessage | null = null;
   const clipsProgressListeners = new Set<
     (p: { done: number; total: number; currentName: string }) => void
   >();
@@ -1328,6 +1330,7 @@ export function mockApi(): CornetaApi {
     },
     async accountLogout(platform) {
       if (platform !== "twitch") setAccount(platform, false);
+      return { remoteRevoke: "confirmed" };
     },
     async fetchStreamKey(platform, targetId) {
       if (platform !== "twitch")
@@ -1683,12 +1686,14 @@ export function mockApi(): CornetaApi {
     async overlayStart() {
       return {
         port: 7393,
-        url: "http://127.0.0.1:7393/overlay",
+        url: "http://127.0.0.1:7393/alerts",
         chatUrl: "http://127.0.0.1:7393/chat",
+        highlightUrl: "http://127.0.0.1:7393/highlight",
       };
     },
     async overlayStop() {
-      /* No native overlay server in browser previews. */
+      demoHighlighted = null;
+      for (const fn of highlightListeners) fn(null);
     },
     async overlayStatus() {
       return null;
@@ -1698,6 +1703,25 @@ export function mockApi(): CornetaApi {
     },
     async overlayChatTest() {
       /* No native overlay server in browser previews. */
+    },
+    async overlayHighlightMessage(message) {
+      demoHighlighted = message;
+      for (const fn of highlightListeners) fn(message);
+      return message;
+    },
+    async overlayClearHighlight() {
+      demoHighlighted = null;
+      for (const fn of highlightListeners) fn(null);
+    },
+    async overlayActiveHighlight() {
+      return demoHighlighted;
+    },
+    async overlayHighlightTest() {
+      /* No native overlay server in browser previews. */
+    },
+    subscribeHighlight(cb) {
+      highlightListeners.add(cb);
+      return () => highlightListeners.delete(cb);
     },
     async overlayObsAddSource() {
       /* No OBS connection in browser previews. */

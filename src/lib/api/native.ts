@@ -362,7 +362,7 @@ export function tauriApi(): CornetaApi {
     },
     async accountLogout(platform) {
       const { invoke } = await core();
-      await invoke("account_logout", { platform });
+      return invoke("account_logout", { platform });
     },
     async fetchStreamKey(platform, targetId) {
       const { invoke } = await core();
@@ -823,9 +823,45 @@ export function tauriApi(): CornetaApi {
       const { invoke } = await core();
       await invoke("overlay_chat_test");
     },
-    async overlayObsAddSource(url) {
+    async overlayHighlightMessage(message) {
       const { invoke } = await core();
-      await invoke("overlay_obs_add_source", { url });
+      return invoke<ChatMessage>("overlay_highlight_message", { message });
+    },
+    async overlayClearHighlight() {
+      const { invoke } = await core();
+      await invoke("overlay_clear_highlight");
+    },
+    async overlayActiveHighlight() {
+      const { invoke } = await core();
+      return invoke<ChatMessage | null>("overlay_active_highlight");
+    },
+    async overlayHighlightTest() {
+      const { invoke } = await core();
+      await invoke("overlay_highlight_test");
+    },
+    subscribeHighlight(cb) {
+      let unlisten: (() => void) | null = null;
+      let stopped = false;
+      void event().then(({ listen }) => {
+        if (stopped) return;
+        void listen<ChatMessage | null>("overlay://highlight", (ev) => {
+          cb(ev.payload ?? null);
+        }).then((fn) => {
+          if (stopped) fn();
+          else unlisten = fn;
+        });
+      });
+      return () => {
+        stopped = true;
+        unlisten?.();
+      };
+    },
+    async overlayObsAddSource(url, sourceName) {
+      const { invoke } = await core();
+      await invoke("overlay_obs_add_source", {
+        url,
+        ...(sourceName ? { sourceName } : {}),
+      });
     },
     async openPrivacySettings(which) {
       const { invoke } = await core();

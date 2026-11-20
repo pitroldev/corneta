@@ -225,13 +225,28 @@ pub enum MarkOutcome {
     Failed,
 }
 
+/// Whether the provider confirmed remote OAuth token revocation during logout.
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum RemoteRevoke {
+    Confirmed,
+    Unconfirmed,
+}
+
+/// Returned by logout once local credentials and caches have been removed.
+#[derive(serde::Serialize, Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SignOutOutcome {
+    pub remote_revoke: RemoteRevoke,
+}
+
 pub trait AccountProvider: Sync {
     fn id(&self) -> &'static str;
     fn signed_in(&self) -> bool;
     /// Starts signing in without blocking; progress and the result arrive as auth events.
     fn login_start(&self, app: &AppHandle, options: LoginOptions);
-    /// Forgets the login on this device. Blocking.
-    fn logout(&self, app: &AppHandle) -> Result<(), String>;
+    /// Removes the login locally, then attempts best-effort remote revocation. Blocking.
+    fn logout(&self, app: &AppHandle) -> Result<SignOutOutcome, String>;
     /// Reads the stream key into the target's vault slot. Blocking; None when the platform cannot.
     fn fetch_stream_key(
         &self,

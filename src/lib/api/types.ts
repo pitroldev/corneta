@@ -184,7 +184,7 @@ export interface CornetaApi {
     platform: AccountPlatform,
     options?: { moderation?: boolean; streamKey?: boolean },
   ): Promise<void>;
-  accountLogout(platform: AccountPlatform): Promise<void>;
+  accountLogout(platform: AccountPlatform): Promise<SignOutOutcome>;
   /** Stores the logged-in account's stream key in the vault; `url` is the account's server, if it has one. */
   fetchStreamKey(
     platform: AccountPlatform,
@@ -321,7 +321,12 @@ export interface CornetaApi {
   overlayStatus(): Promise<OverlayInfo | null>;
   overlayTest(): Promise<void>;
   overlayChatTest(): Promise<void>;
-  overlayObsAddSource(url: string): Promise<void>;
+  overlayHighlightMessage(message: ChatMessage): Promise<ChatMessage>;
+  overlayClearHighlight(): Promise<void>;
+  overlayActiveHighlight(): Promise<ChatMessage | null>;
+  overlayHighlightTest(): Promise<void>;
+  subscribeHighlight(cb: (message: ChatMessage | null) => void): () => void;
+  overlayObsAddSource(url: string, sourceName?: string): Promise<void>;
   openPrivacySettings(which: "camera" | "microphone"): Promise<void>;
 }
 
@@ -349,10 +354,18 @@ export interface MesaServerInfo {
   lanIp: string;
 }
 
+export type RemoteRevoke = "confirmed" | "unconfirmed";
+
+export interface SignOutOutcome {
+  remoteRevoke: RemoteRevoke;
+}
+
 export interface OverlayInfo {
   port: number;
   /** Base alert overlay URL without query parameters. */
   url: string;
   /** Base chat overlay URL without query parameters. */
   chatUrl: string;
+  /** Base highlighted-message overlay URL without query parameters. */
+  highlightUrl: string;
 }

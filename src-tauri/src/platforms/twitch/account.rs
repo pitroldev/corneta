@@ -6,13 +6,15 @@ use std::time::{Duration, Instant};
 use tauri::AppHandle;
 
 use crate::auth::{
-    auth_code_event, auth_event, finish_local_logout, oauth, pct, post_form, provider_reason,
-    timeout_seconds, GRANT_DEVICE,
+    auth_code_event, auth_event, finish_local_logout, oauth, pct, post_form, post_revoke_form,
+    provider_reason, timeout_seconds, GRANT_DEVICE,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::{MarkOutcome, PlatformReading, StreamKeyGrant};
+use crate::platforms::provider::{
+    MarkOutcome, PlatformReading, RemoteRevoke, SignOutOutcome, StreamKeyGrant,
+};
 
 const TWITCH_SCOPES: &str =
     "chat:read chat:edit moderator:manage:chat_messages moderator:manage:banned_users channel:manage:broadcast channel:read:stream_key moderator:read:followers";
@@ -260,14 +262,30 @@ pub(crate) fn twitch_login_start(app: AppHandle) {
     });
 }
 
-pub(crate) fn twitch_logout(app: &AppHandle) -> Result<(), String> {
-    let _guard = TWITCH_REFRESH_LOCK
-        .lock()
-        .map_err(|_| Msg::VaultDeleteFailed.now())?;
-    finish_local_logout(
-        || keys::clear_keys(&["twitch_refresh", "twitch_oauth"]),
-        || {},
-        || auth_event(app, "twitch", "loggedout", "", "", ""),
+pub(crate) fn twitch_logout(app: &AppHandle) -> Result<SignOutOutcome, String> {
+    let client_id = oauth(app).twitch_client_id;
+    crate::auth::finish_logout_with_revoke(
+        || {
+            let _guard = TWITCH_REFRESH_LOCK
+                .lock()
+                .map_err(|_| Msg::VaultDeleteFailed.now())?;
+            let token = keys::get_key("twitch_oauth");
+            finish_local_logout(
+                || keys::clear_keys(&["twitch_refresh", "twitch_oauth"]),
+                || {},
+                || auth_event(app, "twitch", "loggedout", "", "", ""),
+            )?;
+            Ok(token)
+        },
+        |token| match token.filter(|t| !t.trim().is_empty()) {
+            None => RemoteRevoke::Confirmed,
+            Some(_) if client_id.is_empty() => RemoteRevoke::Unconfirmed,
+            Some(access) => post_revoke_form(
+                "twitch",
+                "https://id.twitch.tv/oauth2/revoke",
+                &[("client_id", &client_id), ("token", &access)],
+            ),
+        },
     )
 }
 

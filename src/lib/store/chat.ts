@@ -41,6 +41,9 @@ export function createChatSlice({
   | "chatConnected"
   | "chatStatuses"
   | "chatSide"
+  | "highlightedMessage"
+  | "highlightMessage"
+  | "clearHighlight"
   | "alertStatuses"
   | "chatAuth"
   | "bindChat"
@@ -69,8 +72,21 @@ export function createChatSlice({
     chatConnected: false,
     chatStatuses: {},
     chatSide: {},
+    highlightedMessage: null,
     alertStatuses: {},
     chatAuth: {},
+    async highlightMessage(message) {
+      if (get().highlightedMessage?.id === message.id) {
+        await get().clearHighlight();
+        return;
+      }
+      const shown = await api.overlayHighlightMessage(message);
+      set({ highlightedMessage: shown });
+    },
+    async clearHighlight() {
+      await api.overlayClearHighlight();
+      set({ highlightedMessage: null });
+    },
     bindChat() {
       let queue: ChatEvent[] = [];
       let timer: ReturnType<typeof setTimeout> | undefined;
@@ -137,9 +153,21 @@ export function createChatSlice({
       const unsubscribeSide = api.subscribeChatSide((event) =>
         set((state) => ({ chatSide: applySide(state.chatSide, event) })),
       );
+      let alive = true;
+      const unsubscribeHighlight = api.subscribeHighlight((message) => {
+        if (alive) set({ highlightedMessage: message });
+      });
+      void api
+        .overlayActiveHighlight()
+        .then((message) => {
+          if (alive) set({ highlightedMessage: message });
+        })
+        .catch(() => undefined);
       return () => {
+        alive = false;
         unsubscribe();
         unsubscribeSide();
+        unsubscribeHighlight();
         flush();
         if (discardPendingChat === discard) discardPendingChat = () => {};
       };

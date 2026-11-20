@@ -9,7 +9,8 @@ use tauri::AppHandle;
 
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, ChatProvider, Connection,
-    LoginOptions, Moderation, Outbox, OwnCredentials, PlatformReading, StreamKeyGrant,
+    LoginOptions, Moderation, Outbox, OwnCredentials, PlatformReading, SignOutOutcome,
+    StreamKeyGrant,
 };
 use crate::auth::{
     bootstrap_client_id, bootstrap_enabled, keep_client_id, own_creds, AccountChannel, OauthConfig,
@@ -89,7 +90,7 @@ impl AccountProvider for Kick {
         account::kick_login_start(app.clone(), options);
     }
 
-    fn logout(&self, app: &AppHandle) -> Result<(), String> {
+    fn logout(&self, app: &AppHandle) -> Result<SignOutOutcome, String> {
         account::kick_logout(app)
     }
 

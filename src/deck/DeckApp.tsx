@@ -2,11 +2,22 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { I18nProvider } from "../lib/i18n";
 import { DeckClient, type Link } from "./client";
 import {
+  DeckCipher,
+  PAIR_INFO,
+  SESSION_INFO,
+  decodeB64Url,
+  deriveDirectionKeys,
+  encodeB64Url,
+  generateX25519KeyPair,
+  x25519SharedSecret,
+  type X25519KeyPair,
+} from "./crypto";
+import {
   appendChat,
   clearCredentials,
   forgetToken,
   guessDeviceName,
-  loadCredentials,
+  loadStoredCredentials,
   matchesDelete,
   mentions,
   pendingToken,
@@ -48,7 +59,8 @@ type Phase =
         | "full"
         | "unknown"
         | "revoked"
-        | "forgotten";
+        | "forgotten"
+        | "repair";
       message?: string;
     };
 
@@ -56,6 +68,13 @@ type Intent =
   | { kind: "pair"; token: string; name: string; sent: boolean }
   | { kind: "hello"; credentials: Credentials }
   | null;
+
+type Handshake =
+  | { kind: "pair"; kp: X25519KeyPair; token: string; name: string }
+  | { kind: "hello"; kp: X25519KeyPair; credentials: Credentials }
+  | null;
+
+const TEXT_ENC = new TextEncoder();
 
 /** Failed attempts before the phone says it cannot find the PC. */
 const NOT_FOUND_AFTER = 3;
@@ -76,12 +95,16 @@ function takeToken(): string | null {
 function initialPhase(): { phase: Phase; intent: Intent } {
   const token = takeToken() ?? pendingToken(window.sessionStorage);
   if (token) return { phase: { kind: "name", token }, intent: null };
-  const credentials = loadCredentials(window.localStorage);
-  if (credentials)
+  const stored = loadStoredCredentials(window.localStorage);
+  if (stored.status === "v2")
     return {
       phase: { kind: "searching" },
-      intent: { kind: "hello", credentials },
+      intent: { kind: "hello", credentials: stored.credentials },
     };
+  if (stored.status === "legacy") {
+    clearCredentials(window.localStorage);
+    return { phase: { kind: "stop", reason: "repair" }, intent: null };
+  }
   return { phase: { kind: "welcome" }, intent: null };
 }
 
@@ -129,6 +152,7 @@ export function DeckApp() {
   const [event, setEvent] = useState<DeckEvent | null>(null);
   const [deviceName, setDeviceName] = useState("");
   const intent = useRef<Intent>(start.intent);
+  const handshake = useRef<Handshake>(null);
   const client = useRef<DeckClient | null>(null);
   const forgetting = useRef(false);
   const handles = useRef<string[]>([]);
@@ -144,24 +168,43 @@ export function DeckApp() {
     const current = intent.current;
     const socket = client.current;
     if (!socket || !current) return;
-    if (current.kind === "hello")
-      socket.send({
-        type: "hello",
+    if (current.kind === "hello") {
+      const kp = generateX25519KeyPair();
+      handshake.current = {
+        kind: "hello",
+        kp,
+        credentials: current.credentials,
+      };
+      socket.sendPlain({
+        type: "hello-init",
+        v: 2,
         device: current.credentials.device,
-        secret: current.credentials.secret,
+        pub: encodeB64Url(kp.publicKey),
       });
-    else if (
-      !current.sent &&
-      socket.send({ type: "pair", token: current.token, name: current.name })
-    ) {
-      current.sent = true;
-      forgetToken(window.sessionStorage);
+    } else if (!current.sent) {
+      const kp = generateX25519KeyPair();
+      handshake.current = {
+        kind: "pair",
+        kp,
+        token: current.token,
+        name: current.name,
+      };
+      if (
+        socket.sendPlain({
+          type: "pair-init",
+          pub: encodeB64Url(kp.publicKey),
+        })
+      ) {
+        current.sent = true;
+        forgetToken(window.sessionStorage);
+      }
     }
   }, []);
 
   const finish = useCallback(
     (reason: Extract<Phase, { kind: "stop" }>["reason"], message?: string) => {
       intent.current = null;
+      handshake.current = null;
       client.current?.stop();
       go({ kind: "stop", reason, message });
     },
@@ -171,6 +214,54 @@ export function DeckApp() {
   const onMessage = useCallback(
     (message: ServerMessage) => {
       switch (message.type) {
+        case "pair-hello": {
+          const hs = handshake.current;
+          const socket = client.current;
+          if (!hs || hs.kind !== "pair" || !socket) return;
+          handshake.current = null;
+          try {
+            const serverPub = decodeB64Url(message.pub);
+            const shared = x25519SharedSecret(hs.kp.privateKey, serverPub);
+            const { c2s, s2c } = deriveDirectionKeys(
+              shared,
+              TEXT_ENC.encode(hs.token),
+              hs.kp.publicKey,
+              serverPub,
+              PAIR_INFO,
+            );
+            socket.setCipher(DeckCipher.forClient(c2s, s2c));
+            socket.send({ type: "pair", token: hs.token, name: hs.name });
+          } catch {
+            finish("invalid");
+          }
+          return;
+        }
+        case "hello-ack": {
+          const hs = handshake.current;
+          const socket = client.current;
+          if (!hs || hs.kind !== "hello" || !socket) return;
+          handshake.current = null;
+          try {
+            const serverPub = decodeB64Url(message.pub);
+            const shared = x25519SharedSecret(hs.kp.privateKey, serverPub);
+            const { c2s, s2c } = deriveDirectionKeys(
+              shared,
+              decodeB64Url(hs.credentials.key),
+              hs.kp.publicKey,
+              serverPub,
+              SESSION_INFO,
+            );
+            socket.setCipher(DeckCipher.forClient(c2s, s2c));
+            socket.send({
+              type: "hello-auth",
+              device: hs.credentials.device,
+            });
+          } catch {
+            clearCredentials(window.localStorage);
+            finish("unknown");
+          }
+          return;
+        }
         case "state": {
           const { type: _type, ...value } = message;
           handles.current = value.handles ?? [];
@@ -184,9 +275,10 @@ export function DeckApp() {
           go({ kind: "code", code: message.code });
           return;
         case "paired": {
-          const credentials = {
+          const credentials: Credentials = {
+            v: 2,
             device: message.device,
-            secret: message.secret,
+            key: message.key,
           };
           saveCredentials(window.localStorage, credentials);
           intent.current = { kind: "hello", credentials };
@@ -205,6 +297,9 @@ export function DeckApp() {
         case "unknown-device":
           clearCredentials(window.localStorage);
           return finish("unknown");
+        case "re-pair-required":
+          clearCredentials(window.localStorage);
+          return finish("repair");
         case "revoked":
           clearCredentials(window.localStorage);
           return finish(forgetting.current ? "forgotten" : "revoked");

@@ -414,6 +414,29 @@ export function Shell({
     [state.chatPlatforms, tablet],
   );
 
+  const highlightChat = useCallback(
+    (message: DeckChat) =>
+      run("highlight", async () => {
+        await command("highlightChat", { messageId: message.id });
+        buzz(20);
+        confirm(
+          "actions",
+          "ok",
+          t("deck.toast.highlighted", { author: message.author }),
+        );
+      }),
+    [command, confirm, run, t],
+  );
+
+  const clearHighlightChat = useCallback(
+    () =>
+      run("highlight", async () => {
+        await command("clearHighlight");
+        confirm("actions", "info", t("deck.toast.highlightCleared"));
+      }),
+    [command, confirm, run, t],
+  );
+
   /** Runs the steps in order; one that fails does not stop the rest. */
   const runCombo = useCallback(
     (combo: DeckCombo) =>
@@ -948,6 +971,10 @@ export function Shell({
   const chat = (
     <Chat
       messages={conn.chat}
+      highlight={state.highlight}
+      canHighlight={!offline}
+      onHighlight={(m) => void highlightChat(m)}
+      onClearHighlight={() => void clearHighlightChat()}
       canReply={(platform) =>
         state.chatPlatforms.includes(platform) && !offline
       }

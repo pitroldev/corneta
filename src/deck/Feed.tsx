@@ -10,8 +10,10 @@ import {
   ChevronRight,
   Layers,
   MessagesSquare,
+  MonitorPlay,
   Reply,
   Send,
+  X,
 } from "lucide-react";
 import { useI18n } from "../lib/i18n";
 import {
@@ -52,23 +54,54 @@ function useStickToBottom(dep: unknown) {
 
 export function Chat({
   messages,
+  highlight,
+  canHighlight,
+  onHighlight,
+  onClearHighlight,
   canReply,
   onReply,
 }: {
   messages: DeckChat[];
+  highlight?: DeckState["highlight"];
+  canHighlight?: boolean;
+  onHighlight?: (message: DeckChat) => void;
+  onClearHighlight?: () => void;
   canReply: (platform: string) => boolean;
   onReply: (message: DeckChat) => void;
 }) {
   const { t } = useI18n();
   const [open, setOpen] = useState<string | null>(null);
   const ref = useStickToBottom(messages[messages.length - 1]?.id);
+  const hlBar = highlight ? (
+    <div className="hl-bar" role="status">
+      <MonitorPlay className="ic" aria-hidden />
+      <span className="hl-txt">
+        <b>{t("deck.chat.highlight.onScreen", { author: highlight.author })}</b>{" "}
+        <span>{highlight.text}</span>
+      </span>
+      {onClearHighlight && (
+        <button
+          type="button"
+          className="btn btn-subtle btn-sm"
+          disabled={!canHighlight}
+          onClick={onClearHighlight}
+        >
+          <X className="ic" aria-hidden />
+          {t("deck.chat.highlight.clear")}
+        </button>
+      )}
+    </div>
+  ) : null;
   if (!messages.length)
     return (
-      <div className="empty" ref={ref}>
-        <MessagesSquare className="ic" aria-hidden />
-        <b>{t("deck.chat.emptyTitle")}</b>
-        <p>{t("deck.chat.empty")}</p>
-      </div>
+      <>
+        {hlBar}
+        <div className="empty" ref={ref}>
+          <MessagesSquare className="ic" aria-hidden />
+          <b>{t("deck.chat.emptyTitle")}</b>
+          <p>{t("deck.chat.empty")}</p>
+        </div>
+      </>
     );
   return (
     <div
@@ -78,6 +111,7 @@ export function Chat({
       aria-label={t("deck.tabs.chat")}
       aria-live="off"
     >
+      {hlBar}
       {messages.map((m) => {
         if (m.system)
           return (
@@ -88,13 +122,15 @@ export function Chat({
           );
         const expanded = open === m.id;
         const reply = canReply(m.platform);
+        const isHighlighted = highlight?.id === m.id;
+        const canAct = reply || (!!canHighlight && !!onHighlight);
         return (
           <div key={m.id}>
             <button
               type="button"
-              className={`msg ${expanded ? "open" : ""}`}
-              aria-expanded={reply ? expanded : undefined}
-              onClick={() => reply && setOpen(expanded ? null : m.id)}
+              className={`msg ${expanded ? "open" : ""} ${isHighlighted ? "highlighted" : ""}`}
+              aria-expanded={canAct ? expanded : undefined}
+              onClick={() => canAct && setOpen(expanded ? null : m.id)}
             >
               <PlatformGlyph platform={m.platform} size={13} />
               <span
@@ -111,19 +147,38 @@ export function Chat({
               )}
               <span className="txt">{m.text}</span>
             </button>
-            {expanded && (
+            {expanded && canAct && (
               <div className="msg-acts">
-                <button
-                  type="button"
-                  className="btn btn-subtle btn-sm"
-                  onClick={() => {
-                    setOpen(null);
-                    onReply(m);
-                  }}
-                >
-                  <Reply className="ic" aria-hidden />
-                  {t("deck.chat.reply")}
-                </button>
+                {canHighlight && onHighlight && (
+                  <button
+                    type="button"
+                    className={`btn btn-sm ${isHighlighted ? "btn-primary" : "btn-subtle"}`}
+                    data-on-brass={isHighlighted ? true : undefined}
+                    onClick={() => {
+                      setOpen(null);
+                      if (isHighlighted) onClearHighlight?.();
+                      else onHighlight(m);
+                    }}
+                  >
+                    <MonitorPlay className="ic" aria-hidden />
+                    {isHighlighted
+                      ? t("deck.chat.highlight.clear")
+                      : t("deck.chat.highlight.show")}
+                  </button>
+                )}
+                {reply && (
+                  <button
+                    type="button"
+                    className="btn btn-subtle btn-sm"
+                    onClick={() => {
+                      setOpen(null);
+                      onReply(m);
+                    }}
+                  >
+                    <Reply className="ic" aria-hidden />
+                    {t("deck.chat.reply")}
+                  </button>
+                )}
               </div>
             )}
           </div>

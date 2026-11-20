@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src https: data:; connect-src ws://127.0.0.1:* ws://localhost:*;"
+    />
+    <title>Corneta · Chat highlight overlay</title>
+    <style>
+      :root {
+        --bg: #1a130c;
+        --border: #ffb323;
+        --ink: #fcf3e3;
+        --muted: #cbbba0;
+        --shadow: #0b0805;
+        --brass: #ffb323;
+        --brass-ink: #2a1c00;
+        --scale: 1;
+      }
+      body[data-theme="light"] {
+        --bg: #fffaf0;
+        --border: #2a1c0a;
+        --ink: #241707;
+        --muted: #52422c;
+        --shadow: #241a0d;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+        background: transparent;
+        font-family: "Inter", "Segoe UI", system-ui, sans-serif;
+        -webkit-font-smoothing: antialiased;
+      }
+      #stage {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        padding: 32px;
+        pointer-events: none;
+      }
+      body[data-pos="bottom"] #stage {
+        align-items: flex-end;
+        justify-content: center;
+      }
+      body[data-pos="bottom-left"] #stage {
+        align-items: flex-end;
+        justify-content: flex-start;
+      }
+      body[data-pos="bottom-right"] #stage {
+        align-items: flex-end;
+        justify-content: flex-end;
+      }
+      body[data-pos="top"] #stage {
+        align-items: flex-start;
+        justify-content: center;
+      }
+
+      .card {
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        max-width: min(860px, 92vw);
+        min-width: 340px;
+        padding: 18px 24px;
+        border-radius: 14px;
+        background: var(--bg);
+        color: var(--ink);
+        border: 3px solid var(--border);
+        box-shadow: 6px 6px 0 0 var(--shadow);
+        transform-origin: bottom center;
+        font-size: calc(22px * var(--scale));
+        animation: enter 0.28s cubic-bezier(0.18, 0.9, 0.28, 1.15) both;
+      }
+      body[data-pos="top"] .card {
+        transform-origin: top center;
+      }
+      .card.leaving {
+        animation: leave 0.2s ease-in forwards;
+      }
+      @keyframes enter {
+        from {
+          opacity: 0;
+          transform: translateY(18px) scale(0.96);
+        }
+        to {
+          opacity: 1;
+          transform: none;
+        }
+      }
+      @keyframes leave {
+        to {
+          opacity: 0;
+          transform: translateY(10px) scale(0.97);
+        }
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .card,
+        .card.leaving {
+          animation: none;
+        }
+      }
+
+      .glyph {
+        width: 44px;
+        height: 44px;
+        border-radius: 9px;
+        display: grid;
+        place-items: center;
+        flex-shrink: 0;
+        box-shadow: 3px 3px 0 0 var(--shadow);
+        margin-top: 2px;
+      }
+      .glyph svg {
+        width: 24px;
+        height: 24px;
+      }
+
+      .content {
+        min-width: 0;
+        flex: 1;
+      }
+      .meta {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 6px;
+      }
+      .author {
+        font-family: "Baloo 2", "Segoe UI", system-ui, sans-serif;
+        font-weight: 800;
+        font-size: 1.05em;
+        line-height: 1.1;
+      }
+      .badge {
+        display: inline-block;
+        padding: 1px 7px;
+        border-radius: 5px;
+        font-size: 0.56em;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+      }
+      img.badge {
+        height: 1em;
+        width: auto;
+        padding: 0;
+        vertical-align: middle;
+      }
+      .body {
+        font-size: 1em;
+        font-weight: 600;
+        line-height: 1.38;
+        color: var(--ink);
+        overflow-wrap: anywhere;
+      }
+      .body.action {
+        font-style: italic;
+      }
+      .emote {
+        height: 1.45em;
+        width: auto;
+        vertical-align: -0.35em;
+        margin: 0 2px;
+      }
+      .emote.giant {
+        height: 3.4em;
+      }
+      .stack {
+        display: inline-grid;
+        vertical-align: -0.35em;
+      }
+      .stack > img {
+        grid-area: 1 / 1;
+        margin: auto;
+        vertical-align: 0;
+      }
+      .gif {
+        max-height: 5.5em;
+        max-width: 100%;
+        border-radius: 8px;
+        vertical-align: middle;
+        margin: 2px 0;
+      }
+      .mention {
+        font-weight: 800;
+        color: var(--brass);
+      }
+      body[data-theme="light"] .mention {
+        color: #7a4f00;
+      }
+      .cheer {
+        font-weight: 800;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="stage"></div>
+    <script>
+      (() => {
+        "use strict";
+        const q = new URLSearchParams(location.search);
+        const POS_LIST = ["bottom", "bottom-left", "bottom-right", "top"];
+        const POS = POS_LIST.includes(q.get("pos")) ? q.get("pos") : "bottom";
+        const THEME = q.get("theme") === "light" ? "light" : "dark";
+        const SCALE_MAP = { sm: 0.85, md: 1, lg: 1.2 };
+        const SCALE = SCALE_MAP[q.get("scale")] || 1;
+        const QUERY_DUR_MS =
+          Math.max(0, Math.min(300, parseInt(q.get("dur") || "0", 10) || 0)) *
+          1000;
+
+        document.body.dataset.pos = POS;
+        document.body.dataset.theme = THEME;
+        document.documentElement.style.setProperty("--scale", String(SCALE));
+
+        const PLATFORMS = {
+          twitch: {
+            color: "#9146FF",
+            fg: "#FFFFFF",
+            path: "M11.571 4.714h1.715v5.143H11.57zm4.715 0H18v5.143h-1.714zM6 0L1.714 4.286v15.428h5.143V24l4.286-4.286h3.428L22.286 12V0zm14.571 11.143l-3.428 3.428h-3.429l-3 3v-3H6.857V1.714h13.714Z",
+          },
+          youtube: {
+            color: "#FF0000",
+            fg: "#FFFFFF",
+            path: "M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z",
+          },
+          kick: {
+            color: "#53FC18",
+            fg: "#0B0805",
+            path: "M1.333 0h8v5.333H12V2.667h2.667V0h8v8H20v2.667h-2.667v2.666H20V16h2.667v8h-8v-2.667H12v-2.666H9.333V24h-8Z",
+          },
+          tiktok: {
+            color: "#25F4EE",
+            fg: "#0B0805",
+            path: "M12.525.02c1.31-.02 2.61-.01 3.91-.02.08 1.53.63 3.09 1.75 4.17 1.12 1.11 2.7 1.62 4.24 1.79v4.03c-1.44-.05-2.89-.35-4.2-.97-.57-.26-1.1-.59-1.62-.93-.01 2.92.01 5.84-.02 8.75-.08 1.4-.54 2.79-1.35 3.94-1.31 1.92-3.58 3.17-5.91 3.21-1.43.08-2.86-.31-4.08-1.03-2.02-1.19-3.44-3.37-3.65-5.71-.02-.5-.03-1-.01-1.49.18-1.9 1.12-3.72 2.58-4.96 1.66-1.44 3.98-2.13 6.15-1.72.02 1.48-.04 2.96-.04 4.44-.99-.32-2.15-.23-3.02.37-.63.41-1.11 1.04-1.36 1.75-.21.51-.15 1.07-.14 1.61.24 1.64 1.82 3.02 3.5 2.87 1.12-.01 2.19-.66 2.77-1.61.19-.33.4-.67.41-1.06.1-1.79.06-3.57.07-5.36.01-4.03-.01-8.05.02-12.07z",
+          },
+        };
+
+        const BADGE_STYLE = {
+          broadcaster: { bg: "#ff5a36", fg: "#0b0805" },
+          moderator: { bg: "#15803d", fg: "#ffffff" },
+          vip: { bg: "#a21caf", fg: "#ffffff" },
+          subscriber: { bg: "#ffb323", fg: "#2a1c00" },
+          staff: { bg: "#2563eb", fg: "#ffffff" },
+          partner: { bg: "#2563eb", fg: "#ffffff" },
+        };
+
+        const safeHttpsUrl = (raw) => {
+          if (typeof raw !== "string") return null;
+          try {
+            const u = new URL(raw);
+            return u.protocol === "https:" ? u.href : null;
+          } catch {
+            return null;
+          }
+        };
+
+        const safeColor = (raw) => {
+          if (typeof raw !== "string") return null;
+          return /^#[0-9a-fA-F]{3,8}$/.test(raw.trim()) ? raw.trim() : null;
+        };
+
+        const stage = document.getElementById("stage");
+        let hideTimer = null;
+
+        const clearStage = () => {
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+          const current = stage.firstElementChild;
+          if (!current) return;
+          current.classList.add("leaving");
+          setTimeout(() => {
+            if (current.parentNode === stage) stage.removeChild(current);
+          }, 210);
+        };
+
+        const buildGlyph = (platform) => {
+          const info = PLATFORMS[platform] || {
+            color: "#ffb323",
+            fg: "#2a1c00",
+            path: "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Z",
+          };
+          const box = document.createElement("div");
+          box.className = "glyph";
+          box.style.backgroundColor = info.color;
+          const svg = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "svg",
+          );
+          svg.setAttribute("viewBox", "0 0 24 24");
+          svg.setAttribute("aria-hidden", "true");
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path",
+          );
+          path.setAttribute("d", info.path);
+          path.setAttribute("fill", info.fg);
+          svg.appendChild(path);
+          box.appendChild(svg);
+          return box;
+        };
+
+        const appendFragments = (container, msg) => {
+          const frags = Array.isArray(msg.fragments) ? msg.fragments : [];
+          if (!frags.length) {
+            container.textContent = msg.text || "";
+            return;
+          }
+          for (let i = 0; i < frags.length; i++) {
+            const f = frags[i];
+            if (!f || typeof f !== "object") continue;
+            if (f.kind === "emote" || f.kind === "sticker") {
+              const url = safeHttpsUrl(f.url);
+              if (!url) {
+                container.appendChild(document.createTextNode(f.text || ""));
+                continue;
+              }
+              const img = document.createElement("img");
+              img.className = f.giant ? "emote giant" : "emote";
+              img.src = url;
+              img.alt = f.text || "";
+              const overlays = [];
+              while (
+                i + 1 < frags.length &&
+                frags[i + 1] &&
+                frags[i + 1].overlay &&
+                safeHttpsUrl(frags[i + 1].url)
+              ) {
+                i++;
+                overlays.push(frags[i]);
+              }
+              if (overlays.length) {
+                const stack = document.createElement("span");
+                stack.className = "stack";
+                stack.appendChild(img);
+                for (const ov of overlays) {
+                  const ovImg = document.createElement("img");
+                  ovImg.className = "emote";
+                  ovImg.src = safeHttpsUrl(ov.url);
+                  ovImg.alt = ov.text || "";
+                  stack.appendChild(ovImg);
+                }
+                container.appendChild(stack);
+              } else {
+                container.appendChild(img);
+              }
+            } else if (f.kind === "gif") {
+              const url = safeHttpsUrl(f.url);
+              if (url) {
+                const img = document.createElement("img");
+                img.className = "gif";
+                img.src = url;
+                img.alt = f.text || "";
+                container.appendChild(img);
+              } else {
+                container.appendChild(document.createTextNode(f.text || ""));
+              }
+            } else if (f.kind === "mention") {
+              const span = document.createElement("span");
+              span.className = "mention";
+              span.textContent = f.text || "";
+              container.appendChild(span);
+            } else if (f.kind === "cheer") {
+              const span = document.createElement("span");
+              span.className = "cheer";
+              const col = safeColor(f.color);
+              if (col) span.style.color = col;
+              span.textContent = f.text || (f.amount ? String(f.amount) : "");
+              container.appendChild(span);
+            } else {
+              container.appendChild(document.createTextNode(f.text || ""));
+            }
+          }
+        };
+
+        const renderHighlight = (msg, durationMs) => {
+          if (hideTimer) {
+            clearTimeout(hideTimer);
+            hideTimer = null;
+          }
+          stage.replaceChildren();
+
+          const card = document.createElement("article");
+          card.className = "card";
+          card.appendChild(buildGlyph(msg.platform));
+
+          const content = document.createElement("div");
+          content.className = "content";
+
+          const meta = document.createElement("div");
+          meta.className = "meta";
+
+          const badges = Array.isArray(msg.badges) ? msg.badges : [];
+          for (const b of badges) {
+            if (!b || typeof b !== "object") continue;
+            const imgUrl = safeHttpsUrl(b.url);
+            if (imgUrl) {
+              const img = document.createElement("img");
+              img.className = "badge";
+              img.src = imgUrl;
+              img.alt = b.title || b.label || "";
+              meta.appendChild(img);
+            } else if (b.label) {
+              const pill = document.createElement("span");
+              pill.className = "badge";
+              const st = BADGE_STYLE[b.kind] || {
+                bg: "#3d301c",
+                fg: "#fcf3e3",
+              };
+              pill.style.backgroundColor = st.bg;
+              pill.style.color = st.fg;
+              pill.textContent = b.label;
+              meta.appendChild(pill);
+            }
+          }
+
+          const author = document.createElement("span");
+          author.className = "author";
+          author.textContent = msg.author || "";
+          const authorCol = safeColor(msg.color);
+          if (authorCol && THEME === "dark") {
+            author.style.color = authorCol;
+          }
+          meta.appendChild(author);
+
+          content.appendChild(meta);
+
+          const body = document.createElement("div");
+          body.className = msg.action ? "body action" : "body";
+          appendFragments(body, msg);
+          content.appendChild(body);
+
+          card.appendChild(content);
+          stage.appendChild(card);
+
+          const ms = QUERY_DUR_MS > 0 ? QUERY_DUR_MS : durationMs || 0;
+          if (ms > 0) {
+            hideTimer = setTimeout(clearStage, ms);
+          }
+        };
+
+        let retryMs = 600;
+        const connect = () => {
+          const proto = location.protocol === "https:" ? "wss:" : "ws:";
+          const ws = new WebSocket(`${proto}//${location.host}/highlight-ws`);
+          ws.onopen = () => {
+            retryMs = 600;
+          };
+          ws.onmessage = (ev) => {
+            try {
+              const data = JSON.parse(ev.data);
+              if (data && data.type === "show" && data.message) {
+                renderHighlight(data.message, data.durationMs || 0);
+              } else if (data && data.type === "clear") {
+                clearStage();
+              }
+            } catch {
+              /* Ignore malformed frames. */
+            }
+          };
+          ws.onclose = () => {
+            setTimeout(connect, retryMs);
+            retryMs = Math.min(5000, Math.round(retryMs * 1.5));
+          };
+          ws.onerror = () => ws.close();
+        };
+        connect();
+      })();
+    </script>
+  </body>
+</html>

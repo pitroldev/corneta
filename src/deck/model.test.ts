@@ -319,16 +319,25 @@ describe("deck pairing", () => {
     expect(guessDeviceName("Mozilla/5.0 (Windows NT 10.0)")).toBe("");
   });
 
-  it("keeps credentials and survives broken storage", () => {
+  it("keeps v2 credentials, flags legacy v1 entries, and survives broken storage", () => {
     const store = new Map<string, string>();
     const storage = {
       getItem: (k: string) => store.get(k) ?? null,
       setItem: (k: string, v: string) => void store.set(k, v),
       removeItem: (k: string) => void store.delete(k),
     };
-    saveCredentials(storage, { device: "d1", secret: "s1" });
-    expect(loadCredentials(storage)).toEqual({ device: "d1", secret: "s1" });
+    saveCredentials(storage, { v: 2, device: "d1", key: "k1" });
+    expect(loadCredentials(storage)).toEqual({
+      v: 2,
+      device: "d1",
+      key: "k1",
+    });
     clearCredentials(storage);
+    expect(loadCredentials(storage)).toBeNull();
+    store.set(
+      "corneta.deck.device",
+      JSON.stringify({ device: "old", secret: "s1" }),
+    );
     expect(loadCredentials(storage)).toBeNull();
     store.set("corneta.deck.device", "{not json");
     expect(loadCredentials(storage)).toBeNull();
@@ -342,7 +351,7 @@ describe("deck pairing", () => {
     };
     expect(loadCredentials(broken)).toBeNull();
     expect(() =>
-      saveCredentials(broken, { device: "d", secret: "s" }),
+      saveCredentials(broken, { v: 2, device: "d", key: "k" }),
     ).not.toThrow();
   });
 });

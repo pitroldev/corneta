@@ -12,7 +12,8 @@ use tauri::AppHandle;
 
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, ChatProvider, ChatSession,
-    Connection, LoginOptions, MarkOutcome, Moderation, Outbox, PlatformReading, StreamKeyGrant,
+    Connection, LoginOptions, MarkOutcome, Moderation, Outbox, PlatformReading, SignOutOutcome,
+    StreamKeyGrant,
 };
 use crate::auth::{bootstrap_client_id, keep_client_id, AccountChannel, OauthConfig};
 use crate::chat::{source_label, Outgoing};
@@ -105,7 +106,7 @@ impl AccountProvider for Twitch {
         account::twitch_login_start(app.clone());
     }
 
-    fn logout(&self, app: &AppHandle) -> Result<(), String> {
+    fn logout(&self, app: &AppHandle) -> Result<SignOutOutcome, String> {
         account::twitch_logout(app)
     }
 

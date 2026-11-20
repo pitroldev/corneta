@@ -14,7 +14,9 @@ use crate::keys;
 use crate::telemetry::TelemetryCorrelation;
 use crate::AppState;
 
-use crate::platforms::provider::{LoginOptions, Moderation, OwnCredentials, StreamKeyGrant};
+use crate::platforms::provider::{
+    LoginOptions, Moderation, OwnCredentials, RemoteRevoke, SignOutOutcome, StreamKeyGrant,
+};
 use crate::platforms::{account_provider, account_providers, chat_provider};
 
 pub(crate) const GRANT_DEVICE: &str = "urn:ietf:params:oauth:grant-type:device_code";
@@ -332,6 +334,60 @@ pub fn set_oauth_config(
     }
 }
 
+/// Best-effort RFC 7009 form-POST revocation; tokens stay in the POST body and are never logged.
+pub(crate) fn post_revoke_form(who: &str, url: &str, form: &[(&str, &str)]) -> RemoteRevoke {
+    let parse = |s: String| serde_json::from_str::<Value>(&s).unwrap_or(Value::Null);
+    match ureq::post(url)
+        .timeout(Duration::from_secs(5))
+        .send_form(form)
+    {
+        Ok(_) => RemoteRevoke::Confirmed,
+        Err(ureq::Error::Status(400, r)) => {
+            let body = parse(r.into_string().unwrap_or_default());
+            let err = body.get("error").and_then(Value::as_str).unwrap_or("");
+            if err == "invalid_token" || err == "invalid_grant" {
+                RemoteRevoke::Confirmed
+            } else {
+                log::info!("{who}: remote revoke unconfirmed (status=400)");
+                RemoteRevoke::Unconfirmed
+            }
+        }
+        Err(ureq::Error::Status(code, _)) => {
+            log::info!("{who}: remote revoke unconfirmed (status={code})");
+            RemoteRevoke::Unconfirmed
+        }
+        Err(_) => {
+            log::info!("{who}: remote revoke unconfirmed (transport)");
+            RemoteRevoke::Unconfirmed
+        }
+    }
+}
+
+/// Best-effort revocation through the Setup API broker; 404 on an older broker is unconfirmed.
+pub(crate) fn post_setup_revoke(
+    app: &AppHandle,
+    who: &str,
+    url: &str,
+    body: &Value,
+) -> RemoteRevoke {
+    match with_setup_correlation(app, ureq::post(url))
+        .set("Accept", "application/json")
+        .set("Content-Type", "application/json")
+        .timeout(Duration::from_secs(5))
+        .send_string(&body.to_string())
+    {
+        Ok(_) => RemoteRevoke::Confirmed,
+        Err(ureq::Error::Status(code, _)) => {
+            log::info!("{who}: broker revoke unconfirmed (status={code})");
+            RemoteRevoke::Unconfirmed
+        }
+        Err(_) => {
+            log::info!("{who}: broker revoke unconfirmed (transport)");
+            RemoteRevoke::Unconfirmed
+        }
+    }
+}
+
 /// Invalidate volatile tokens even on partial deletion, but announce completion only on success.
 pub(crate) fn finish_local_logout(
     delete: impl FnOnce() -> Result<(), String>,
@@ -343,6 +399,16 @@ pub(crate) fn finish_local_logout(
     result?;
     completed();
     Ok(())
+}
+
+/// Delete local credentials first so sign-out is never blocked by network errors, then revoke remotely.
+pub(crate) fn finish_logout_with_revoke<T>(
+    local_logout: impl FnOnce() -> Result<T, String>,
+    revoke: impl FnOnce(T) -> RemoteRevoke,
+) -> Result<SignOutOutcome, String> {
+    let tokens = local_logout()?;
+    let remote_revoke = revoke(tokens);
+    Ok(SignOutOutcome { remote_revoke })
 }
 
 /// Reports both session state and available login modes without blocking the UI thread.
@@ -449,7 +515,7 @@ pub fn account_use_own_credentials(app: AppHandle, platform: String) -> Result<(
 }
 
 #[tauri::command]
-pub async fn account_logout(app: AppHandle, platform: String) -> Result<(), String> {
+pub async fn account_logout(app: AppHandle, platform: String) -> Result<SignOutOutcome, String> {
     let provider = account_provider(&platform).ok_or_else(|| Msg::VaultDeleteFailed.now())?;
     tauri::async_runtime::spawn_blocking(move || provider.logout(&app))
         .await
@@ -967,5 +1033,66 @@ mod tests {
         assert_eq!(timeout_seconds(None), 600);
         assert_eq!(timeout_seconds(Some(0)), 1);
         assert_eq!(timeout_seconds(Some(u64::MAX)), MAX_TIMEOUT_SECONDS);
+    }
+
+    #[test]
+    fn logout_deletes_local_vault_before_revoking_and_reports_outcome() {
+        let steps = std::cell::RefCell::new(Vec::new());
+        let outcome = finish_logout_with_revoke(
+            || {
+                steps.borrow_mut().push("snapshot");
+                finish_local_logout(
+                    || {
+                        steps.borrow_mut().push("delete");
+                        Ok(())
+                    },
+                    || steps.borrow_mut().push("invalidate"),
+                    || steps.borrow_mut().push("completed"),
+                )?;
+                Ok("token-value".to_string())
+            },
+            |token| {
+                assert_eq!(token, "token-value");
+                steps.borrow_mut().push("revoke");
+                RemoteRevoke::Unconfirmed
+            },
+        )
+        .expect("unconfirmed remote revoke must not fail local sign-out");
+        assert_eq!(
+            outcome,
+            SignOutOutcome {
+                remote_revoke: RemoteRevoke::Unconfirmed,
+            }
+        );
+        assert_eq!(
+            steps.into_inner(),
+            vec!["snapshot", "delete", "invalidate", "completed", "revoke"]
+        );
+    }
+
+    #[test]
+    fn logout_skips_remote_revoke_and_fails_when_vault_delete_fails() {
+        let steps = std::cell::RefCell::new(Vec::new());
+        let err = finish_logout_with_revoke(
+            || {
+                steps.borrow_mut().push("snapshot");
+                finish_local_logout(
+                    || {
+                        steps.borrow_mut().push("delete");
+                        Err("vault locked".to_string())
+                    },
+                    || steps.borrow_mut().push("invalidate"),
+                    || steps.borrow_mut().push("completed"),
+                )?;
+                Ok("token-value")
+            },
+            |_| {
+                steps.borrow_mut().push("revoke");
+                RemoteRevoke::Confirmed
+            },
+        )
+        .unwrap_err();
+        assert_eq!(err, "vault locked");
+        assert_eq!(steps.into_inner(), vec!["snapshot", "delete", "invalidate"]);
     }
 }

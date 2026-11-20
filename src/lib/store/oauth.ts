@@ -151,10 +151,11 @@ export function createOauthSlice({
       });
     },
     async accountLogout(platform) {
-      await api.accountLogout(platform);
+      const outcome = await api.accountLogout(platform);
       set((s) => ({
         chatLogin: { ...s.chatLogin, [platform]: { state: "out" } },
       }));
+      return outcome;
     },
   };
 }

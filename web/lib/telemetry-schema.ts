@@ -45,6 +45,7 @@ export const API_ROUTE_IDS = [
   "health",
   "kick_exchange",
   "kick_refresh",
+  "kick_revoke",
   "site_render",
   "unknown",
 ] as const;

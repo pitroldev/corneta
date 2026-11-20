@@ -218,6 +218,7 @@ mod secret_presence_tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: crate::config::InputFeed::Primary,
             },
         }
     }

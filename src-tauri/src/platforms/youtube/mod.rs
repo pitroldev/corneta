@@ -12,7 +12,7 @@ use tauri::AppHandle;
 use super::provider::{
     status_fields, AccountProvider, AudienceReader, AudienceSetup, AutoBroadcast,
     AutoBroadcastFailure, ChatProvider, Connection, LoginOptions, Moderation, Outbox,
-    OwnCredentials, PlatformReading, ProvisionedIngest,
+    OwnCredentials, PlatformReading, ProvisionedIngest, SignOutOutcome,
 };
 use crate::auth::{
     bootstrap_client_id, bootstrap_enabled, keep_client_id, own_creds, AccountChannel, OauthConfig,
@@ -123,7 +123,7 @@ impl AccountProvider for Youtube {
         account::youtube_login_start(app.clone());
     }
 
-    fn logout(&self, app: &AppHandle) -> Result<(), String> {
+    fn logout(&self, app: &AppHandle) -> Result<SignOutOutcome, String> {
         account::youtube_logout(app)
     }
 

@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   accountLogout: vi.fn(),
   subscribeChat: vi.fn(),
   subscribeChatSide: vi.fn(),
+  subscribeHighlight: vi.fn(),
+  overlayActiveHighlight: vi.fn(),
   subscribeConfigChanged: vi.fn(),
   setOauthConfig: vi.fn(),
   authStatus: vi.fn(),
@@ -27,6 +29,8 @@ describe("store slices preserve shared contracts", () => {
   beforeEach(() => {
     vi.resetAllMocks();
     mocks.subscribeChatSide.mockReturnValue(() => {});
+    mocks.subscribeHighlight.mockReturnValue(() => {});
+    mocks.overlayActiveHighlight.mockResolvedValue(null);
     useStore.setState(
       { ...useStore.getInitialState(), config: defaultConfig(), loaded: true },
       true,
@@ -48,9 +52,10 @@ describe("store slices preserve shared contracts", () => {
         "vault unavailable",
       );
       expect(useStore.getState().chatLogin[platform].state).toBe("connected");
-      mocks.accountLogout.mockResolvedValue(undefined);
-      await useStore.getState().accountLogout(platform);
+      mocks.accountLogout.mockResolvedValue({ remoteRevoke: "unconfirmed" });
+      const outcome = await useStore.getState().accountLogout(platform);
       expect(mocks.accountLogout).toHaveBeenLastCalledWith(platform);
+      expect(outcome).toEqual({ remoteRevoke: "unconfirmed" });
       expect(useStore.getState().chatLogin[platform].state).toBe("out");
     },
   );

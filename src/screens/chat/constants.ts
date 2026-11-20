@@ -35,6 +35,25 @@ export const chatPosOpts = (t: Translate) => [
   { value: "top", label: t("chat.overlay.chatPos.top") },
 ];
 
+export const highlightPosOpts = (t: Translate) => [
+  { value: "bottom", label: t("chat.overlay.pos.bottom") },
+  { value: "bottom-left", label: t("chat.overlay.pos.bottomLeft") },
+  { value: "bottom-right", label: t("chat.overlay.pos.bottomRight") },
+  { value: "top", label: t("chat.overlay.pos.top") },
+];
+
+export const highlightDurOpts = (t: Translate) => [
+  { value: "0", label: t("chat.overlay.highlightDur.manual") },
+  { value: "15", label: t("chat.overlay.highlightDur.15") },
+  { value: "30", label: t("chat.overlay.highlightDur.30") },
+  { value: "60", label: t("chat.overlay.highlightDur.60") },
+];
+
+export const highlightThemeOpts = (t: Translate) => [
+  { value: "dark", label: t("chat.overlay.highlightTheme.dark") },
+  { value: "light", label: t("chat.overlay.highlightTheme.light") },
+];
+
 export const scaleOpts = (t: Translate) => [
   { value: "sm", label: t("chat.overlay.scale.sm") },
   { value: "md", label: t("chat.overlay.scale.md") },

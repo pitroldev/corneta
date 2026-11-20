@@ -7,6 +7,7 @@ import {
   Plus,
   Trash2,
   Check,
+  Copy,
   X,
   ChevronDown,
   Layers,
@@ -15,6 +16,7 @@ import {
   Wifi,
   ExternalLink,
   Crop,
+  Smartphone,
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
@@ -319,6 +321,7 @@ function TargetRow({
   onSpotlightDone?: () => void;
 }) {
   const t = useT();
+  const ingest = useStore((s) => s.config!.ingest);
   const targets = useStore((s) => s.config!.targets);
   const updateTarget = useStore((s) => s.updateTarget);
   const removeTarget = useStore((s) => s.removeTarget);
@@ -397,7 +400,31 @@ function TargetRow({
   );
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
-  const isSplit = isPortrait && target.encoding.reframe?.layout === "split";
+  const isVerticalFeed =
+    isPortrait && target.encoding.sourceFeed === "vertical";
+  const isSplit =
+    isPortrait &&
+    !isVerticalFeed &&
+    target.encoding.reframe?.layout === "split";
+  const [copiedField, setCopiedField] = useState<"server" | "key" | null>(null);
+  const copyIngest = async (field: "server" | "key", value: string) => {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopiedField(field);
+      setTimeout(() => setCopiedField(null), 1500);
+    } catch {
+      /* Clipboard access may be denied; manual copying remains available. */
+    }
+  };
+  const setSourceFeed = (feed: "primary" | "vertical") =>
+    updateTarget(target.id, {
+      encoding: {
+        ...target.encoding,
+        sourceFeed: feed === "vertical" ? "vertical" : undefined,
+      },
+    });
+  const verticalServer = `${ingest.protocol}://${ingest.host}:${ingest.port}/${ingest.app}`;
+  const verticalKey = `${ingest.key}_vertical`;
   const codecTag =
     obsCodec && obsCodec !== "h264" && acceptsCodec(target.platformId, obsCodec)
       ? obsCodec.toUpperCase()
@@ -498,6 +525,11 @@ function TargetRow({
                     {codecTag}
                   </span>
                 )}
+                {isVerticalFeed && (
+                  <span className="rounded-sm border border-ok/35 bg-ok/12 px-1.5 py-0.5 font-mono text-[10px] font-extrabold uppercase text-ok">
+                    {t("platforms.target.feed.badge")}
+                  </span>
+                )}
                 {isSplit && (
                   <span className="rounded-sm bg-brass px-1.5 py-0.5 font-mono text-[10px] font-extrabold uppercase text-brass-ink">
                     {t("golive.destinations.format.split")}
@@ -512,7 +544,7 @@ function TargetRow({
             <FrameThumb
               isPortrait={isPortrait}
               isSplit={isSplit}
-              onClick={isPortrait ? onReframe : undefined}
+              onClick={isPortrait && !isVerticalFeed ? onReframe : undefined}
             />
             <Badge tone={status.tone}>
               {status.tone === "ok" && (
@@ -609,6 +641,110 @@ function TargetRow({
 
             <KeyField target={target} autoFocusKey={justAdded} />
 
+            {isPortrait && (
+              <div className="flex flex-col gap-2 rounded-lg border border-border-soft bg-surface-2 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-xs font-bold text-ink">
+                    <Smartphone className="size-3.5 text-brass" aria-hidden />
+                    {t("platforms.target.feed.label")}
+                  </span>
+                  <div
+                    role="group"
+                    aria-label={t("platforms.target.feed.label")}
+                    className="inline-flex rounded-md bg-surface p-0.5 ring-1 ring-border"
+                  >
+                    <button
+                      type="button"
+                      aria-pressed={!isVerticalFeed}
+                      onClick={() => setSourceFeed("primary")}
+                      className={cn(
+                        "rounded px-2.5 py-1 text-[11px] font-bold transition-colors",
+                        !isVerticalFeed
+                          ? "bg-brass text-brass-ink"
+                          : "text-ink-muted hover:text-ink",
+                      )}
+                    >
+                      {t("platforms.target.feed.primary")}
+                    </button>
+                    <button
+                      type="button"
+                      aria-pressed={isVerticalFeed}
+                      onClick={() => setSourceFeed("vertical")}
+                      className={cn(
+                        "rounded px-2.5 py-1 text-[11px] font-bold transition-colors",
+                        isVerticalFeed
+                          ? "bg-brass text-brass-ink"
+                          : "text-ink-muted hover:text-ink",
+                      )}
+                    >
+                      {t("platforms.target.feed.vertical")}
+                    </button>
+                  </div>
+                </div>
+                {isVerticalFeed && (
+                  <div className="flex flex-col gap-2 border-t border-border-soft pt-2.5 text-xs">
+                    <p className="text-[11px] text-ink-muted">
+                      {t("platforms.target.feed.verticalHint")}
+                    </p>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-ink-faint">
+                          {t("platforms.target.feed.server")}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <code
+                            data-selectable
+                            className="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1.5 font-mono text-[11px] text-ink ring-1 ring-border"
+                          >
+                            {verticalServer}
+                          </code>
+                          <Button
+                            variant="subtle"
+                            size="sm"
+                            onClick={() =>
+                              void copyIngest("server", verticalServer)
+                            }
+                            aria-label={t("platforms.target.feed.copyServer")}
+                          >
+                            {copiedField === "server" ? (
+                              <Check className="size-3.5" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[11px] font-semibold text-ink-faint">
+                          {t("platforms.target.feed.key")}
+                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <code
+                            data-selectable
+                            className="min-w-0 flex-1 truncate rounded bg-surface px-2 py-1.5 font-mono text-[11px] text-ink ring-1 ring-border"
+                          >
+                            {verticalKey}
+                          </code>
+                          <Button
+                            variant="subtle"
+                            size="sm"
+                            onClick={() => void copyIngest("key", verticalKey)}
+                            aria-label={t("platforms.target.feed.copyKey")}
+                          >
+                            {copiedField === "key" ? (
+                              <Check className="size-3.5" />
+                            ) : (
+                              <Copy className="size-3.5" />
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+
             <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
               <Button
                 variant="subtle"
@@ -631,7 +767,7 @@ function TargetRow({
                   <ExternalLink className="size-3" />
                 </button>
               )}
-              {isPortrait && (
+              {isPortrait && !isVerticalFeed && (
                 <button
                   onClick={onReframe}
                   className="flex items-center gap-1 font-semibold text-brass hover:underline"

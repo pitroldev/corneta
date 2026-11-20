@@ -8,6 +8,7 @@ vi.mock("./posthog", () => ({ reportApiFailure: vi.fn() }));
 import { after } from "next/server";
 import { POST as exchange } from "../../app/api/v1/oauth/kick/exchange/route";
 import { POST as refresh } from "../../app/api/v1/oauth/kick/refresh/route";
+import { POST as revoke } from "../../app/api/v1/oauth/kick/revoke/route";
 import { reportApiFailure } from "./posthog";
 import { createRateLimiter } from "./rate-limit-core";
 
@@ -392,5 +393,82 @@ describe("Kick OAuth provider failures", () => {
       expect(logged).not.toContain(secret);
     }
     expect(fetcher).not.toHaveBeenCalled();
+  });
+});
+
+describe("Kick OAuth revoke route", () => {
+  const revokeBody = {
+    token: "test-revoke-token",
+    tokenTypeHint: "refresh_token",
+  };
+
+  it("posts form-urlencoded credentials to Kick revoke and accepts empty 204 responses", async () => {
+    fetcher.mockResolvedValueOnce(new Response(null, { status: 204 }));
+    const response = await revoke(request("revoke", revokeBody));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ revoked: true });
+    expect(response.headers.get("cache-control")).toContain("no-store");
+    expect(response.headers.get("x-request-id")).toBeTruthy();
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    const [url, init] = fetcher.mock.calls[0];
+    expect(url).toBe("https://id.kick.com/oauth/revoke");
+    expect(init?.method).toBe("POST");
+    expect(init?.redirect).toBe("error");
+    const form = new URLSearchParams(String(init?.body));
+    expect(form.get("token")).toBe("test-revoke-token");
+    expect(form.get("token_type_hint")).toBe("refresh_token");
+    expect(form.get("client_id")).toBe("test-client-id");
+    expect(form.get("client_secret")).toBe("test-client-secret");
+  });
+
+  it("treats RFC 7009 invalid_token 400 as already revoked", async () => {
+    fetcher.mockResolvedValueOnce(
+      Response.json({ error: "invalid_token" }, { status: 400 }),
+    );
+    const response = await revoke(request("revoke", revokeBody));
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ revoked: true });
+  });
+
+  it("rejects invalid tokenTypeHint before calling Kick", async () => {
+    const response = await revoke(
+      request("revoke", { token: "abc", tokenTypeHint: "id_token" }),
+    );
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error: { code: "INVALID_REQUEST" },
+    });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it("sanitizes provider errors and never leaks the token or secret", async () => {
+    fetcher.mockResolvedValueOnce(
+      Response.json(
+        {
+          error: "server_error",
+          error_description: "test-revoke-token test-client-secret",
+        },
+        { status: 500 },
+      ),
+    );
+    const response = await revoke(request("revoke", revokeBody));
+    const text = await response.text();
+    expect(response.status).toBe(502);
+    expect(JSON.parse(text)).toMatchObject({
+      error: { code: "PROVIDER_REJECTED_REQUEST", retryable: true },
+    });
+    expect(text).not.toContain("test-revoke-token");
+    expect(text).not.toContain("test-client-secret");
+  });
+
+  it("enforces an independent revoke rate limit of 30 per minute", async () => {
+    globalThis.cornetaOAuthRateLimiter = createRateLimiter({ now: () => 0 });
+    fetcher.mockImplementation(async () => new Response(null, { status: 204 }));
+    for (let i = 0; i < 30; i++) {
+      expect((await revoke(request("revoke", revokeBody))).status).toBe(200);
+    }
+    const denied = await revoke(request("revoke", revokeBody));
+    expect(denied.status).toBe(429);
+    expect(denied.headers.get("retry-after")).toBe("60");
   });
 });

@@ -184,6 +184,29 @@ pub async fn run(
             desktop(hub, "stop").await?;
             Ok(Value::Null)
         }
+        "highlightChat" => {
+            let id =
+                text_arg(args, "messageId", 120).ok_or_else(|| Msg::DeckUnknownAction.now())?;
+            let msg =
+                crate::chat::recent_message(&id).ok_or_else(|| Msg::DeckUnknownAction.now())?;
+            let dur_secs = hub.config().settings.overlay_highlight_duration_secs;
+            let duration_ms = (dur_secs > 0).then_some(dur_secs.saturating_mul(1000));
+            let state = tauri::Manager::state::<crate::AppState>(&app);
+            let shown = crate::overlay::show_highlight(&state.overlay, msg, duration_ms);
+            let _ = app.emit("overlay://highlight", Some(&shown));
+            hub.touch();
+            Ok(Value::Null)
+        }
+        "clearHighlight" => {
+            let state = tauri::Manager::state::<crate::AppState>(&app);
+            crate::overlay::clear_highlight(&state.overlay);
+            let _ = app.emit(
+                "overlay://highlight",
+                Option::<crate::chat::ChatMessage>::None,
+            );
+            hub.touch();
+            Ok(Value::Null)
+        }
         // The phone forgets itself: same as removing it on the PC.
         "forget" => {
             super::remove_device(&app, device)?;

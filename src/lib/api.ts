@@ -14,7 +14,9 @@ export type {
   CornetaApi,
   MesaServerInfo,
   OverlayInfo,
+  RemoteRevoke,
   ShortcutAction,
+  SignOutOutcome,
 } from "./api/types";
 
 export const api: CornetaApi = IS_TAURI ? tauriApi() : mockApi();

@@ -814,6 +814,7 @@ dependencies = [
  "minisign-verify",
  "posthog-rs",
  "regex",
+ "ring",
  "rustls",
  "serde",
  "serde_json",

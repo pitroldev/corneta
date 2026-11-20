@@ -10,13 +10,15 @@ use tauri::{AppHandle, Manager};
 use crate::auth::{
     auth_code_event, auth_event, broker_error, byok_active, finish_local_logout,
     forget_account_channel, oauth, oauth_wait, own_creds, pct, pkce_challenge, post_form,
-    post_setup_json, rand_token, record_broker_failure, refresh_broker_config, setup_url,
-    timeout_seconds, AccountChannel, OauthConfig,
+    post_revoke_form, post_setup_json, post_setup_revoke, rand_token, record_broker_failure,
+    refresh_broker_config, setup_url, timeout_seconds, AccountChannel, OauthConfig,
 };
 use crate::http_client as ureq;
 use crate::i18n::Msg;
 use crate::keys;
-use crate::platforms::provider::{LoginOptions, PlatformReading, StreamKeyGrant};
+use crate::platforms::provider::{
+    LoginOptions, PlatformReading, RemoteRevoke, SignOutOutcome, StreamKeyGrant,
+};
 use crate::AppState;
 
 const KICK_SCOPES: &str =
@@ -337,11 +339,73 @@ fn kick_exchange(
     Ok(())
 }
 
-pub(crate) fn kick_logout(app: &AppHandle) -> Result<(), String> {
-    finish_local_logout(
-        forget_kick_session,
-        || {},
-        || auth_event(app, "kick", "loggedout", "", "", ""),
+pub(crate) fn kick_logout(app: &AppHandle) -> Result<SignOutOutcome, String> {
+    let cfg = oauth(app);
+    crate::auth::finish_logout_with_revoke(
+        || {
+            let _guard = KICK_REFRESH_LOCK
+                .lock()
+                .map_err(|_| Msg::VaultDeleteFailed.now())?;
+            let refresh = keys::get_key("kick_refresh");
+            let access = keys::get_key("kick_oauth");
+            let mode = keys::get_key("kick_oauth_mode");
+            finish_local_logout(
+                || {
+                    keys::clear_keys(&[
+                        "kick_refresh",
+                        "kick_oauth",
+                        "kick_oauth_mode",
+                        KICK_BAN_GRANT,
+                        KICK_KEY_GRANT,
+                    ])
+                },
+                || {
+                    KICK_IDS.lock().unwrap().clear();
+                    forget_account_channel("kick");
+                },
+                || auth_event(app, "kick", "loggedout", "", "", ""),
+            )?;
+            Ok((refresh, access, mode))
+        },
+        |(refresh, access, mode)| {
+            let candidate = refresh
+                .filter(|t| !t.trim().is_empty())
+                .map(|t| (t, "refresh_token"))
+                .or_else(|| {
+                    access
+                        .filter(|t| !t.trim().is_empty())
+                        .map(|t| (t, "access_token"))
+                });
+            let Some((token, hint)) = candidate else {
+                return RemoteRevoke::Confirmed;
+            };
+            let brokered =
+                mode.as_deref() == Some("broker") || (mode.is_none() && cfg.kick_brokered);
+            if brokered {
+                let Some(url) = setup_url(&cfg, "/api/v1/oauth/kick/revoke") else {
+                    return RemoteRevoke::Unconfirmed;
+                };
+                post_setup_revoke(
+                    app,
+                    "kick",
+                    &url,
+                    &json!({ "token": token, "tokenTypeHint": hint }),
+                )
+            } else if !cfg.kick_client_id.is_empty() && !cfg.kick_client_secret.is_empty() {
+                post_revoke_form(
+                    "kick",
+                    "https://id.kick.com/oauth/revoke",
+                    &[
+                        ("token", &token),
+                        ("token_type_hint", hint),
+                        ("client_id", &cfg.kick_client_id),
+                        ("client_secret", &cfg.kick_client_secret),
+                    ],
+                )
+            } else {
+                RemoteRevoke::Unconfirmed
+            }
+        },
     )
 }
 

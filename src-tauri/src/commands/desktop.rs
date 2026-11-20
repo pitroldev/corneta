@@ -254,6 +254,7 @@ mod diagnostic_export_tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: crate::config::InputFeed::Primary,
             },
         });
         let report = build_diagnostic_report(

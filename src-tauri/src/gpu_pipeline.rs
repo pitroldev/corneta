@@ -855,6 +855,7 @@ Output #0, null, to 'pipe:':
                 }),
                 encoder: encoder.into(),
                 hybrid_override: None,
+                source_feed: crate::config::InputFeed::Primary,
                 reframe: Some(Reframe {
                     x: 0.25,
                     y: 0.5,

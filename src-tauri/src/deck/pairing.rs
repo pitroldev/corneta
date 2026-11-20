@@ -1,5 +1,6 @@
-//! Pairing: a single-use QR token, a code the streamer confirms on the PC, then a device secret.
-//! The vault keeps only a digest of each secret, so reading it does not let anyone pose as the phone.
+//! Pairing: a single-use QR token, a code the streamer confirms on the PC, then a 256-bit device key.
+//! Device keys are stored in the OS vault (`v2:<base64url>`) so both sides can authenticate ephemeral
+//! X25519 handshakes without transmitting any secret over the LAN in plaintext.
 
 use std::collections::HashMap;
 use std::time::{Duration, Instant};
@@ -9,6 +10,13 @@ use sha2::{Digest, Sha256};
 
 pub const TOKEN_TTL: Duration = Duration::from_secs(120);
 pub const REQUEST_TTL: Duration = Duration::from_secs(120);
+pub const DEVICE_KEY_PREFIX: &str = "v2:";
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum VaultKey {
+    V2([u8; 32]),
+    LegacyV1,
+}
 
 fn random_bytes<const N: usize>() -> [u8; N] {
     let mut bytes = [0u8; N];
@@ -18,6 +26,31 @@ fn random_bytes<const N: usize>() -> [u8; N] {
 
 pub fn random_secret() -> String {
     base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(random_bytes::<32>())
+}
+
+pub fn generate_device_key() -> [u8; 32] {
+    random_bytes::<32>()
+}
+
+pub fn encode_vault_key(key: &[u8; 32]) -> String {
+    format!(
+        "{DEVICE_KEY_PREFIX}{}",
+        base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(key)
+    )
+}
+
+pub fn parse_vault_key(stored: &str) -> Option<VaultKey> {
+    if let Some(rest) = stored.strip_prefix(DEVICE_KEY_PREFIX) {
+        let raw = base64::engine::general_purpose::URL_SAFE_NO_PAD
+            .decode(rest.as_bytes())
+            .ok()?;
+        let key: [u8; 32] = raw.try_into().ok()?;
+        return Some(VaultKey::V2(key));
+    }
+    if !stored.trim().is_empty() {
+        return Some(VaultKey::LegacyV1);
+    }
+    None
 }
 
 pub fn new_device_id() -> String {
@@ -81,17 +114,28 @@ pub struct Pairing {
 }
 
 impl Pairing {
-    /// A new QR replaces the previous one; only its digest is kept.
+    /// A new QR replaces the previous one; kept only in memory until redeemed or expired.
     pub fn issue(&mut self, now: Instant) -> String {
         let token = random_secret();
-        self.token = Some((digest(&token), now + TOKEN_TTL));
+        self.token = Some((token.clone(), now + TOKEN_TTL));
         token
+    }
+
+    /// Returns the active QR token if unexpired, without consuming it (used during key exchange).
+    pub fn active_token(&mut self, now: Instant) -> Option<String> {
+        match &self.token {
+            Some((token, expires)) if now < *expires => Some(token.clone()),
+            _ => {
+                self.token = None;
+                None
+            }
+        }
     }
 
     /// A token works once and only before it expires.
     pub fn redeem(&mut self, token: &str, now: Instant) -> bool {
         match self.token.take() {
-            Some((stored, expires)) if now < expires && verify(token, &stored) => true,
+            Some((stored, expires)) if now < expires && verify(token, &digest(&stored)) => true,
             Some(other) if now < other.1 => {
                 self.token = Some(other);
                 false
@@ -213,5 +257,17 @@ mod tests {
         );
         assert_eq!(device_name("   ", "Celular"), "Celular");
         assert_eq!(device_name(&"x".repeat(80), "Celular").len(), 32);
+    }
+
+    #[test]
+    fn vault_keys_distinguish_v2_symmetric_keys_from_legacy_v1_digests() {
+        let key = generate_device_key();
+        let stored = encode_vault_key(&key);
+        assert!(stored.starts_with("v2:"));
+        assert_eq!(parse_vault_key(&stored), Some(VaultKey::V2(key)));
+        let legacy_digest = digest("legacy-secret");
+        assert_eq!(parse_vault_key(&legacy_digest), Some(VaultKey::LegacyV1));
+        assert_eq!(parse_vault_key("v2:not-valid-b64!"), None);
+        assert_eq!(parse_vault_key(""), None);
     }
 }

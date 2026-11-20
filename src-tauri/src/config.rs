@@ -199,6 +199,21 @@ pub const DEFAULT_SPLIT_TOP: CropBox = CropBox {
 };
 pub const DEFAULT_SPLIT_RATIO: f64 = 0.35;
 
+/// Which local RTMP ingest supplies a destination's input stream.
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
+pub enum InputFeed {
+    #[default]
+    Primary,
+    Vertical,
+}
+
+impl InputFeed {
+    pub fn is_primary(&self) -> bool {
+        matches!(self, Self::Primary)
+    }
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(rename_all = "camelCase")]
 pub struct TargetEncoding {
@@ -214,6 +229,9 @@ pub struct TargetEncoding {
     /// None centers the portrait crop.
     #[serde(default)]
     pub reframe: Option<Reframe>,
+    /// Separate vertical canvas ingest (`{key}_vertical`) skips reframing and allows zero-GPU copy.
+    #[serde(default, skip_serializing_if = "InputFeed::is_primary")]
+    pub source_feed: InputFeed,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -388,6 +406,13 @@ pub struct Settings {
     /// Zero disables message fading.
     #[serde(default)]
     pub overlay_chat_fade_secs: u32,
+    #[serde(default = "default_overlay_chat_position")]
+    pub overlay_highlight_position: String,
+    /// Zero keeps the highlighted message on screen until manually cleared.
+    #[serde(default)]
+    pub overlay_highlight_duration_secs: u32,
+    #[serde(default = "default_theme")]
+    pub overlay_highlight_theme: String,
     /// Display-only original filename; the stored file is renamed to brb-slate.*.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub brb_slate_file_name: Option<String>,
@@ -567,6 +592,9 @@ impl Default for Settings {
             overlay_chat_platform: true,
             overlay_chat_hide_commands: false,
             overlay_chat_fade_secs: 0,
+            overlay_highlight_position: default_overlay_chat_position(),
+            overlay_highlight_duration_secs: 0,
+            overlay_highlight_theme: default_theme(),
             brb_slate_file_name: None,
             // Both require explicit consent: disk usage and third-party personal data are independent choices.
             record_video: false,
@@ -765,6 +793,16 @@ impl AppConfig {
         s.overlay_duration_secs = s.overlay_duration_secs.clamp(1, 60);
         s.overlay_chat_size = s.overlay_chat_size.clamp(8, 72);
         s.overlay_chat_max = s.overlay_chat_max.clamp(1, 100);
+        s.overlay_highlight_duration_secs = s.overlay_highlight_duration_secs.clamp(0, 300);
+        if !matches!(
+            s.overlay_highlight_position.as_str(),
+            "bottom" | "bottom-left" | "bottom-right" | "top"
+        ) {
+            s.overlay_highlight_position = default_overlay_chat_position();
+        }
+        if !matches!(s.overlay_highlight_theme.as_str(), "dark" | "light") {
+            s.overlay_highlight_theme = default_theme();
+        }
         s.chat_font_size = s.chat_font_size.clamp(8, 44);
         s.alert_font_size = s.alert_font_size.clamp(8, 44);
         s.chat_both_split = s.chat_both_split.clamp(15, 75);
@@ -1144,6 +1182,7 @@ mod tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: InputFeed::Primary,
             },
         });
         assert!(cfg.validate_and_normalize().is_err());
@@ -1164,6 +1203,7 @@ mod tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: InputFeed::Primary,
             },
         }
     }

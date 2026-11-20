@@ -64,6 +64,13 @@ export interface DeckState {
   chatPlatforms: string[];
   /** The streamer's chat names, lowercase, for spotting @mentions. */
   handles: string[];
+  /** Message currently displayed on the OBS highlight overlay, if any. */
+  highlight?: {
+    id: string;
+    author: string;
+    platform: string;
+    text: string;
+  } | null;
   session: {
     startedAt: number | null;
     endedAt: number | null;
@@ -100,15 +107,18 @@ export type DeckNotice = "ingestRestarted";
 
 export type ServerMessage =
   | ({ type: "state" } & DeckState)
+  | { type: "pair-hello"; pub: string }
+  | { type: "hello-ack"; pub: string }
   | { type: "pairing"; code: string; pc: string }
-  | { type: "paired"; device: string; secret: string; name: string }
+  | { type: "paired"; v?: number; device: string; key: string; name: string }
   | {
       type:
         | "refused"
         | "pair-invalid"
         | "pair-expired"
         | "revoked"
-        | "unknown-device";
+        | "unknown-device"
+        | "re-pair-required";
     }
   | { type: "pair-full"; message: string }
   | { type: "chat"; message: DeckChat }
@@ -427,25 +437,53 @@ export function guessDeviceName(userAgent: string): string {
 }
 
 export interface Credentials {
+  v: 2;
   device: string;
-  secret: string;
+  key: string;
 }
 
+export type StoredCredentials =
+  | { status: "v2"; credentials: Credentials }
+  | { status: "legacy" }
+  | { status: "none" };
+
 const CREDENTIALS_KEY = "corneta.deck.device";
+
+export function loadStoredCredentials(
+  storage: Pick<Storage, "getItem">,
+): StoredCredentials {
+  try {
+    const raw = storage.getItem(CREDENTIALS_KEY);
+    if (!raw) return { status: "none" };
+    const value = JSON.parse(raw) as Partial<
+      Credentials & { secret?: unknown }
+    >;
+    if (
+      value.v === 2 &&
+      typeof value.device === "string" &&
+      typeof value.key === "string" &&
+      value.device.length > 0 &&
+      value.key.length > 0
+    ) {
+      return {
+        status: "v2",
+        credentials: { v: 2, device: value.device, key: value.key },
+      };
+    }
+    if (typeof value.device === "string" && typeof value.secret === "string") {
+      return { status: "legacy" };
+    }
+    return { status: "none" };
+  } catch {
+    return { status: "none" };
+  }
+}
 
 export function loadCredentials(
   storage: Pick<Storage, "getItem">,
 ): Credentials | null {
-  try {
-    const raw = storage.getItem(CREDENTIALS_KEY);
-    if (!raw) return null;
-    const value = JSON.parse(raw) as Partial<Credentials>;
-    return typeof value.device === "string" && typeof value.secret === "string"
-      ? { device: value.device, secret: value.secret }
-      : null;
-  } catch {
-    return null;
-  }
+  const stored = loadStoredCredentials(storage);
+  return stored.status === "v2" ? stored.credentials : null;
 }
 
 export function saveCredentials(

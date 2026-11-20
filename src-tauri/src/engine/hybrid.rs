@@ -1,4 +1,4 @@
-use crate::config::{AppConfig, Target, VideoPreset};
+use crate::config::{AppConfig, InputFeed, Target, VideoPreset};
 use crate::platforms::{accepts_codec, recommended_preset, VideoCodec};
 pub use crate::platforms::{copy_limits, CopyLimits};
 
@@ -23,8 +23,8 @@ pub(crate) fn effective_preset(t: &Target) -> VideoPreset {
     )
 }
 
-fn smart_hybrid_action(platform_id: &str) -> &'static str {
-    if crate::platforms::is_vertical(platform_id) {
+fn smart_hybrid_action_for(platform_id: &str, source_feed: InputFeed) -> &'static str {
+    if source_feed == InputFeed::Primary && crate::platforms::is_vertical(platform_id) {
         "transcode"
     } else {
         "copy"
@@ -50,8 +50,12 @@ fn exceeds(signal: &SourceSignal, limits: &CopyLimits) -> bool {
 }
 
 /// Smart copies what a destination accepts and transcodes where the source codec or dimensions exceed it.
-fn signal_hybrid_action(platform_id: &str, signal: Option<&SourceSignal>) -> &'static str {
-    let action = smart_hybrid_action(platform_id);
+fn signal_hybrid_action(
+    platform_id: &str,
+    source_feed: InputFeed,
+    signal: Option<&SourceSignal>,
+) -> &'static str {
+    let action = smart_hybrid_action_for(platform_id, source_feed);
     if action != "copy" {
         return action;
     }
@@ -73,7 +77,11 @@ pub fn apply_source_signal(config: &mut AppConfig, signal: &SourceSignal) -> Vec
         return Vec::new();
     }
     let mut transcoded = Vec::new();
-    for target in config.targets.iter_mut().filter(|t| t.enabled) {
+    for target in config
+        .targets
+        .iter_mut()
+        .filter(|t| t.enabled && t.encoding.source_feed == InputFeed::Primary)
+    {
         if target
             .encoding
             .hybrid_override
@@ -82,8 +90,12 @@ pub fn apply_source_signal(config: &mut AppConfig, signal: &SourceSignal) -> Vec
         {
             continue;
         }
-        if signal_hybrid_action(&target.platform_id, Some(signal)) == "transcode"
-            && smart_hybrid_action(&target.platform_id) == "copy"
+        if signal_hybrid_action(
+            &target.platform_id,
+            target.encoding.source_feed,
+            Some(signal),
+        ) == "transcode"
+            && smart_hybrid_action_for(&target.platform_id, target.encoding.source_feed) == "copy"
         {
             target.encoding.hybrid_override = Some("transcode".into());
             transcoded.push(target.platform_id.clone());
@@ -92,12 +104,16 @@ pub fn apply_source_signal(config: &mut AppConfig, signal: &SourceSignal) -> Vec
     transcoded
 }
 
-/// The tightest limits among the enabled destinations that receive OBS's signal as-is.
+/// The tightest limits among the enabled destinations that receive OBS's primary signal as-is.
 pub fn strictest_copy_limits(config: &AppConfig) -> Option<CopyLimits> {
     config
         .targets
         .iter()
-        .filter(|t| t.enabled && effective_action(&config.mode, t) == "copy")
+        .filter(|t| {
+            t.enabled
+                && t.encoding.source_feed == InputFeed::Primary
+                && effective_action(&config.mode, t) == "copy"
+        })
         .filter_map(|t| copy_limits(&t.platform_id))
         .reduce(|a, b| CopyLimits {
             max_height: a.max_height.min(b.max_height),
@@ -117,7 +133,7 @@ pub fn effective_action<'a>(mode: &str, t: &'a Target) -> &'a str {
         "per-platform" => "transcode",
         _ => match t.encoding.hybrid_override.as_deref() {
             Some(o) if !o.is_empty() => o,
-            _ => smart_hybrid_action(&t.platform_id),
+            _ => smart_hybrid_action_for(&t.platform_id, t.encoding.source_feed),
         },
     }
 }
@@ -153,6 +169,7 @@ mod tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: InputFeed::Primary,
             },
         }
     }
@@ -230,41 +247,83 @@ mod tests {
     #[test]
     fn smart_mode_transcodes_only_what_the_obs_signal_exceeds() {
         let full_hd = signal(1920, 1080, 60.0, Some(6000));
-        assert_eq!(signal_hybrid_action("twitch", Some(&full_hd)), "copy");
-        assert_eq!(signal_hybrid_action("youtube", Some(&full_hd)), "copy");
         assert_eq!(
-            signal_hybrid_action("twitch", Some(&signal(2560, 1440, 60.0, None))),
-            "transcode"
-        );
-        assert_eq!(
-            signal_hybrid_action("youtube", Some(&signal(2560, 1440, 60.0, None))),
+            signal_hybrid_action("twitch", InputFeed::Primary, Some(&full_hd)),
             "copy"
         );
         assert_eq!(
-            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 59.94, None))),
+            signal_hybrid_action("youtube", InputFeed::Primary, Some(&full_hd)),
+            "copy"
+        );
+        assert_eq!(
+            signal_hybrid_action(
+                "twitch",
+                InputFeed::Primary,
+                Some(&signal(2560, 1440, 60.0, None))
+            ),
+            "transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action(
+                "youtube",
+                InputFeed::Primary,
+                Some(&signal(2560, 1440, 60.0, None))
+            ),
+            "copy"
+        );
+        assert_eq!(
+            signal_hybrid_action(
+                "twitch",
+                InputFeed::Primary,
+                Some(&signal(1920, 1080, 59.94, None))
+            ),
             "copy",
             "NTSC rates count as 60"
         );
         assert_eq!(
-            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 120.0, None))),
+            signal_hybrid_action(
+                "twitch",
+                InputFeed::Primary,
+                Some(&signal(1920, 1080, 120.0, None))
+            ),
             "transcode"
         );
         assert_eq!(
-            signal_hybrid_action("twitch", Some(&signal(1920, 1080, 60.0, Some(9000)))),
+            signal_hybrid_action(
+                "twitch",
+                InputFeed::Primary,
+                Some(&signal(1920, 1080, 60.0, Some(9000)))
+            ),
             "transcode"
         );
         assert_eq!(
-            signal_hybrid_action("kick", Some(&signal(1920, 1080, 60.0, Some(8000)))),
+            signal_hybrid_action(
+                "kick",
+                InputFeed::Primary,
+                Some(&signal(1920, 1080, 60.0, Some(8000)))
+            ),
             "copy"
         );
-        assert_eq!(signal_hybrid_action("twitch", None), "copy");
         assert_eq!(
-            signal_hybrid_action("tiktok", Some(&full_hd)),
-            "transcode",
-            "vertical destinations always transcode"
+            signal_hybrid_action("twitch", InputFeed::Primary, None),
+            "copy"
         );
         assert_eq!(
-            signal_hybrid_action("x", Some(&signal(3840, 2160, 60.0, None))),
+            signal_hybrid_action("tiktok", InputFeed::Primary, Some(&full_hd)),
+            "transcode",
+            "vertical destinations fed from primary landscape canvas transcode"
+        );
+        assert_eq!(
+            signal_hybrid_action("tiktok", InputFeed::Vertical, None),
+            "copy",
+            "vertical destinations fed from dedicated vertical canvas copy at 0% GPU"
+        );
+        assert_eq!(
+            signal_hybrid_action(
+                "x",
+                InputFeed::Primary,
+                Some(&signal(3840, 2160, 60.0, None))
+            ),
             "copy",
             "unknown limits keep the copy"
         );
@@ -326,11 +385,17 @@ mod tests {
     {
         for codec in [VideoCodec::Hevc, VideoCodec::Av1] {
             let obs = codec_signal(codec, 2560, 1440, 60.0, Some(7000));
-            assert_eq!(signal_hybrid_action("youtube", Some(&obs)), "copy");
-            assert_eq!(signal_hybrid_action("custom", Some(&obs)), "copy");
+            assert_eq!(
+                signal_hybrid_action("youtube", InputFeed::Primary, Some(&obs)),
+                "copy"
+            );
+            assert_eq!(
+                signal_hybrid_action("custom", InputFeed::Primary, Some(&obs)),
+                "copy"
+            );
             for legacy in ["twitch", "kick", "facebook", "x", "tiktok", "instagram"] {
                 assert_eq!(
-                    signal_hybrid_action(legacy, Some(&obs)),
+                    signal_hybrid_action(legacy, InputFeed::Primary, Some(&obs)),
                     "transcode",
                     "{legacy} must transcode {codec:?}"
                 );
@@ -362,6 +427,7 @@ mod tests {
             let plans = crate::renditions::plan(
                 &config,
                 "rtmp://127.0.0.1:1935/live/obs",
+                "rtmp://127.0.0.1:1935/live/obs_vertical",
                 Some("h264_nvenc"),
             );
             assert_eq!(

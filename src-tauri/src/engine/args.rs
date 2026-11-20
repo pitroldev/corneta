@@ -1,5 +1,5 @@
 use super::hybrid::{effective_action, effective_preset, strictest_copy_limits};
-use crate::config::{AppConfig, CropBox, Reframe, Target};
+use crate::config::{AppConfig, CropBox, InputFeed, Reframe, Target};
 
 /// `auto_codec` must pass a real encode probe; `-encoders` does not prove hardware availability.
 fn ffmpeg_video_codec<'a>(encoder: &str, auto_codec: Option<&'a str>) -> &'a str {
@@ -131,6 +131,28 @@ pub fn ingest_url(config: &AppConfig) -> String {
     )
 }
 
+pub fn has_vertical_feed(config: &AppConfig) -> bool {
+    config
+        .targets
+        .iter()
+        .any(|t| t.enabled && t.encoding.source_feed == InputFeed::Vertical)
+}
+
+pub fn vertical_ingest_url(config: &AppConfig) -> String {
+    format!(
+        "{}://{}:{}/{}/{}_vertical",
+        config.ingest.protocol,
+        config.ingest.host,
+        config.ingest.port,
+        config.ingest.app,
+        config.ingest.key
+    )
+}
+
+pub fn vertical_ingest_path_name(config: &AppConfig) -> String {
+    format!("{}/{}_vertical", config.ingest.app, config.ingest.key)
+}
+
 /// The compositor publishes continuously here, keeping destination connections alive during input loss.
 pub fn program_url(config: &AppConfig) -> String {
     format!(
@@ -182,7 +204,7 @@ pub fn ffmpeg_args_for_target(
         let codec = ffmpeg_video_codec(&t.encoding.encoder, auto_codec);
         let fps = p.fps.max(1);
         let gop = (fps * p.keyframe_sec.max(1)).to_string();
-        let vf = if p.height > p.width {
+        let vf = if p.height > p.width && t.encoding.source_feed != InputFeed::Vertical {
             reframe_filter(t.encoding.reframe.as_ref(), p.width.max(2), p.height.max(2))
         } else {
             format!("scale={}:{}", p.width.max(2), p.height.max(2))
@@ -545,6 +567,11 @@ pub const MEDIAMTX_API_PORT: u16 = 9997;
 
 /// Enable only RTMP ingest and a loopback-only diagnostic API.
 pub fn mediamtx_config(config: &AppConfig) -> String {
+    let vertical_path = if has_vertical_feed(config) {
+        format!("  {}:\n", vertical_ingest_path_name(config))
+    } else {
+        String::new()
+    };
     format!(
         concat!(
             "logLevel: info\n",
@@ -567,11 +594,13 @@ pub fn mediamtx_config(config: &AppConfig) -> String {
             "pprof: no\n",
             "playback: no\n",
             "paths:\n",
+            "{vertical_path}",
             "  all_others:\n",
         ),
         host = config.ingest.host,
         port = config.ingest.port,
-        api_port = MEDIAMTX_API_PORT
+        api_port = MEDIAMTX_API_PORT,
+        vertical_path = vertical_path
     )
 }
 
@@ -606,6 +635,7 @@ mod tests {
                 encoder: "auto".into(),
                 hybrid_override: None,
                 reframe: None,
+                source_feed: InputFeed::Primary,
             },
         }
     }
@@ -643,6 +673,49 @@ mod tests {
         }
         assert!(lines.contains(&"rtmpAddress: 127.0.0.1:1935"));
         assert!(lines.contains(&"apiAddress: 127.0.0.1:9997"));
+        assert!(!yml.contains("live/obs_vertical:"));
+    }
+
+    #[test]
+    fn mediamtx_registers_vertical_path_only_when_an_enabled_target_uses_it() {
+        let mut tt = tgt("tiktok", Some(preset(1080, 1920, 60, 4000)));
+        tt.encoding.source_feed = InputFeed::Vertical;
+        let with_v = cfg("hybrid", vec![tt.clone()]);
+        let yml = mediamtx_config(&with_v);
+        assert!(yml.contains("  live/obs_vertical:\n"));
+        assert!(yml.contains("rtmpAddress: 127.0.0.1:1935"));
+
+        // Hybrid mode copies vertical feed directly (0% GPU) and transcode mode scales without cropping.
+        let copy_args = ffmpeg_args_for_target(
+            &with_v,
+            &tt,
+            "stream_key",
+            None,
+            &vertical_ingest_url(&with_v),
+            None,
+        );
+        assert!(copy_args.windows(2).any(|w| w == ["-c:v", "copy"]));
+        let transcode_cfg = cfg("per-platform", vec![tt.clone()]);
+        let transcode_args = ffmpeg_args_for_target(
+            &transcode_cfg,
+            &tt,
+            "stream_key",
+            None,
+            &vertical_ingest_url(&transcode_cfg),
+            None,
+        );
+        let vf = transcode_args
+            .windows(2)
+            .find(|w| w[0] == "-vf")
+            .map(|w| w[1].as_str())
+            .unwrap();
+        assert_eq!(vf, "scale=1080:1920");
+
+        // Disabled vertical target does not register the vertical path.
+        let mut disabled = tt;
+        disabled.enabled = false;
+        let without_v = cfg("hybrid", vec![disabled]);
+        assert!(!mediamtx_config(&without_v).contains("live/obs_vertical:"));
     }
 
     #[test]
@@ -692,6 +765,7 @@ mod tests {
             crate::renditions::plan(
                 &cfg("per-platform", vec![first.clone(), second]),
                 "source",
+                "vertical",
                 Some("h264_nvenc"),
             )
         };
@@ -713,10 +787,13 @@ mod tests {
             }
             assert!(grouped(different).is_empty(), "must not group {field}");
         }
-        assert!(
-            crate::renditions::plan(&cfg("passthrough", vec![first, second]), "source", None)
-                .is_empty()
-        );
+        assert!(crate::renditions::plan(
+            &cfg("passthrough", vec![first, second]),
+            "source",
+            "vertical",
+            None
+        )
+        .is_empty());
     }
 
     #[test]

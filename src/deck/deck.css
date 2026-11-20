@@ -1055,6 +1055,39 @@ button.row:active {
 .msg.open {
   background: var(--surface);
 }
+.msg.highlighted {
+  background: rgba(255, 179, 35, 0.14);
+  border-left: 3px solid var(--brass);
+  padding-left: 7px;
+}
+.hl-bar {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  margin-bottom: 6px;
+  border-radius: 7px;
+  background: var(--surface);
+  border: 2px solid var(--brass);
+  font-size: 13px;
+}
+.hl-bar > .ic {
+  color: var(--brass-fg);
+}
+.hl-txt {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--ink-muted);
+}
+.hl-txt b {
+  color: var(--ink);
+}
 .msg .pg {
   margin-right: 6px;
   vertical-align: -1px;

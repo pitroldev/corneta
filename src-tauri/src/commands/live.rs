@@ -1,7 +1,7 @@
 use super::encoders::detect_hw_encoder;
 use super::ingest_slate::{
     brb_slate_file, brb_slate_has_audio, first_unavailable_port, log_mediamtx_line,
-    mark_port_failure, mediamtx_api_answers, mediamtx_config_path, mediamtx_paths_with_codec,
+    mark_port_failure, mediamtx_api_answers, mediamtx_config_path, mediamtx_paths_full,
     wait_mediamtx_ready, EngineFailure, MEDIAMTX_READY_TIMEOUT,
 };
 use super::live_status::{
@@ -433,6 +433,7 @@ async fn start_engine_inner(
 
     let running = Arc::new(AtomicBool::new(true));
     let has_signal = Arc::new(AtomicBool::new(false));
+    let has_vertical_signal = Arc::new(AtomicBool::new(false));
     let prog_ready = Arc::new(AtomicBool::new(false));
     let slate_on = Arc::new(AtomicBool::new(false));
     let session_path = session::start_session(&app, &config);
@@ -607,18 +608,22 @@ async fn start_engine_inner(
 
     let run_sig = running.clone();
     let sig = has_signal.clone();
+    let v_sig = has_vertical_signal.clone();
     let prog_sig = prog_ready.clone();
     let app_sig = app.clone();
     let ingest_name = engine::ingest_path_name(&config);
     let program_name = engine::program_path_name(&config);
+    let vertical_name =
+        engine::has_vertical_feed(&config).then(|| engine::vertical_ingest_path_name(&config));
     let auto_reencode_targets: Vec<(String, String)> = if config.mode == "hybrid" {
         enabled
             .iter()
             .filter(|t| {
-                t.encoding
-                    .hybrid_override
-                    .as_deref()
-                    .is_none_or(str::is_empty)
+                t.encoding.source_feed == crate::config::InputFeed::Primary
+                    && t.encoding
+                        .hybrid_override
+                        .as_deref()
+                        .is_none_or(str::is_empty)
                     && engine::effective_action(&config.mode, t) == "copy"
             })
             .map(|t| (t.id.clone(), t.platform_id.clone()))
@@ -632,10 +637,16 @@ async fn start_engine_inner(
         // Two polls without byte changes count as stalled even if MediaMTX still reports ready.
         let mut last_bytes = 0u64;
         let mut stalls = 0u32;
+        let mut v_last_bytes = 0u64;
+        let mut v_stalls = 0u32;
         let mut checked_codec = false;
         while run_sig.load(Ordering::Relaxed) {
-            let (ready, bytes, prog, source_codec) =
-                mediamtx_paths_with_codec(&ingest_name, &program_name, brb_for_codec);
+            let (ready, bytes, prog, v_ready, v_bytes, source_codec) = mediamtx_paths_full(
+                &ingest_name,
+                &program_name,
+                vertical_name.as_deref(),
+                brb_for_codec,
+            );
             let flowing = bytes != last_bytes; // Counter resets also indicate activity.
             last_bytes = bytes;
             if ready && flowing {
@@ -644,6 +655,20 @@ async fn start_engine_inner(
                 stalls = stalls.saturating_add(1);
             }
             let live = ready && stalls < 2;
+            let vertical_live = if vertical_name.is_some() {
+                let v_flowing = v_bytes != v_last_bytes;
+                v_last_bytes = v_bytes;
+                if v_ready && v_flowing {
+                    v_stalls = 0;
+                } else {
+                    v_stalls = v_stalls.saturating_add(1);
+                }
+                let vl = v_ready && v_stalls < 2;
+                v_sig.store(vl, Ordering::Relaxed);
+                Some(vl)
+            } else {
+                None
+            };
             let source_ready = if brb_for_codec { prog } else { live };
             if source_ready && !checked_codec {
                 if let Some(codec) = source_codec {
@@ -662,7 +687,7 @@ async fn start_engine_inner(
             }
             sig.store(live, Ordering::Relaxed);
             prog_sig.store(prog, Ordering::Relaxed);
-            set_ingest_live(&app_sig, live);
+            set_ingest_live(&app_sig, live, vertical_live);
             std::thread::sleep(std::time::Duration::from_millis(700));
         }
     });
@@ -856,6 +881,7 @@ async fn start_engine_inner(
         });
     }
 
+    let vertical_source = engine::vertical_ingest_url(&config);
     let shared_signal = if compositor_on {
         &prog_ready
     } else {
@@ -863,9 +889,10 @@ async fn start_engine_inner(
     };
     let shared_renditions = crate::renditions::start(
         &app,
-        crate::renditions::plan(&config, &out_source, hw_codec.as_deref()),
+        crate::renditions::plan(&config, &out_source, &vertical_source, hw_codec.as_deref()),
         &running,
         shared_signal,
+        &has_vertical_signal,
     );
 
     for &t in &enabled {
@@ -887,15 +914,22 @@ async fn start_engine_inner(
         let auth_flag = auth_flags.get(&t.id).cloned().unwrap_or_default();
         // Provisioned broadcast credentials override the vault and must survive retries.
         let has_provisioned = provisioned.contains_key(&t.id);
-        // Outputs follow program readiness so OBS loss alone does not restart their connections.
-        let signal = if compositor_on {
+        let is_vertical_feed = t.encoding.source_feed == crate::config::InputFeed::Vertical;
+        // Dedicated vertical feeds monitor `{key}_vertical` independently so primary destinations stay unaffected.
+        let signal = if is_vertical_feed {
+            has_vertical_signal.clone()
+        } else if compositor_on {
             prog_ready.clone()
         } else {
             has_signal.clone()
         };
         let brb_flag = slate_on.clone();
         let auto_codec = hw_codec.clone();
-        let out_source = out_source.clone();
+        let out_source = if is_vertical_feed {
+            vertical_source.clone()
+        } else {
+            out_source.clone()
+        };
         let rendition = shared_renditions.get(&t.id).cloned();
         let reencode_flag = reencode_flags.get(&t.id).cloned().unwrap_or_default();
         // A mid-live re-encode follows the destination's preset, as per-platform mode would.

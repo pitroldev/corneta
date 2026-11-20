@@ -19,10 +19,12 @@ function cfg(mode: EncodingMode, platforms: PlatformId[]): AppConfig {
 }
 
 describe("smartHybridAction / effectiveAction", () => {
-  it("copies landscape and transcodes portrait", () => {
+  it("copies landscape, transcodes primary portrait, and copies dedicated vertical feeds", () => {
     expect(smartHybridAction("twitch")).toBe("copy");
     expect(smartHybridAction("tiktok")).toBe("transcode");
     expect(smartHybridAction("instagram")).toBe("transcode");
+    expect(smartHybridAction("tiktok", "h264", "vertical")).toBe("copy");
+    expect(smartHybridAction("instagram", "h264", "vertical")).toBe("copy");
   });
 
   it("applies global mode and explicit hybrid overrides", () => {
@@ -32,6 +34,11 @@ describe("smartHybridAction / effectiveAction", () => {
     expect(effectiveAction("hybrid", t)).toBe("copy");
     t.encoding.hybridOverride = "transcode";
     expect(effectiveAction("hybrid", t)).toBe("transcode");
+
+    const v = makeTarget("tiktok");
+    v.encoding.sourceFeed = "vertical";
+    expect(effectiveAction("hybrid", v)).toBe("copy");
+    expect(effectiveAction("per-platform", v)).toBe("transcode");
   });
 
   it("copies HEVC and AV1 to YouTube and Custom while transcoding H.264-only destinations", () => {
@@ -119,5 +126,15 @@ describe("estimate", () => {
       expect(est.hwTranscodeCount).toBe(1);
       expect(est.uploadKbps).toBe(9000 + 192 + 2 * (6000 + 160));
     }
+  });
+
+  it("reports zero GPU transcode load when a portrait destination uses the dedicated vertical feed", () => {
+    const c = cfg("hybrid", ["twitch", "tiktok"]);
+    c.targets[1].encoding.sourceFeed = "vertical";
+    const est = estimate(c, { anyHwAvailable: true });
+    expect(est.copyCount).toBe(2);
+    expect(est.transcodeCount).toBe(0);
+    expect(est.hwTranscodeCount).toBe(0);
+    expect(est.load).toBe(0);
   });
 });
