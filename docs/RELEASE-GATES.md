@@ -37,7 +37,8 @@ Approval criteria for an official distribution, for maintainers. A release may o
 - A single Tauri CLI run with Rust 1.97.1 produces the executable, the NSIS installer and the updater signature.
   The tag must be exactly `v` + the Tauri version, and `create-updater-manifest.mjs` generates the
   v2 `latest.json` from the contents of the `.exe.sig` and the URL of that same installer.
-- The Rust example `verify-updater` cryptographically verifies the installer with the app's
+- The standalone verifier crate `scripts/distribution-verify` (compiling
+  `src-tauri/examples/verify-updater.rs`) cryptographically verifies the installer with the app's
   public key in 64 KiB blocks. An invalid signature blocks manifest generation.
 - `compliance:prepare` requires reviewed corresponding sources and hashes; it generates a package
   with notices, sources and inventories. `SHA256SUMS.txt` accompanies the other four distribution files.

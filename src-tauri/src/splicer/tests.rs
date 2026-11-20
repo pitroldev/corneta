@@ -723,7 +723,16 @@ fn e2e_enhanced_rtmp_hevc_and_av1_splice_decodes_clean() {
     let p = |n: &str| dir.join(n).to_string_lossy().to_string();
 
     for (label, encoder, extra) in [
-        ("hevc", "hevc_nvenc", &["-bf", "0"][..]),
+        (
+            "hevc",
+            "libx265",
+            &[
+                "-preset",
+                "ultrafast",
+                "-x265-params",
+                "bframes=0:keyint=30:min-keyint=30:scenecut=0:log-level=error",
+            ][..],
+        ),
         ("av1", "libsvtav1", &["-preset", "12"][..]),
     ] {
         let obs = p(&format!("obs_{label}.flv"));

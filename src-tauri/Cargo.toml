@@ -75,8 +75,8 @@ minisign-verify = "=0.3.0"
 [profile.release]
 # Isolate worker panics and allow buffered session writers to flush during unwinding.
 panic = "unwind"
-codegen-units = 1
-lto = true
-# Favor video throughput; LTO and stripping limit binary size.
+codegen-units = 16
+lto = "thin"
+# Favor video throughput; thin LTO and stripping limit binary size without single-threaded link stalls.
 opt-level = 3
 strip = true

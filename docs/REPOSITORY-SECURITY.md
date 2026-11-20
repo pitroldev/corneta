@@ -66,8 +66,9 @@ response does not prove that a control is active.
 - The `Require review and CI on main` ruleset requires a pull request with one
   approval, an up-to-date branch and the `resolve`, `secrets`, `frontend` and
   `rust` checks from [CI](../.github/workflows/ci.yml), bound to GitHub Actions.
-  The `frontend` job requires `browser-smoke` to succeed; a skipped job must not
-  be treated as approval. Repository administrators may bypass this ruleset only,
+  The `frontend` gate job requires both `frontend-checks` and `browser-smoke`
+  (which run in parallel) to succeed; a skipped job must not be treated as
+  approval. Repository administrators may bypass this ruleset only,
   to push directly, and stay responsible for running the checks before they do.
 - In the Vercel project, Deployment Checks hold each production deployment until
   the same four checks pass, so a red commit on `main` never reaches the site.

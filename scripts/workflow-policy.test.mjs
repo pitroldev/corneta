@@ -255,21 +255,26 @@ describe("workflow safety contracts", () => {
     expect(ci).toContain("path: .artifacts/browser-smoke/");
     expect(ci).toContain("retention-days: 7");
   });
-  it("fails the existing frontend check when browser smoke fails or is skipped", () => {
+  it("runs frontend checks and browser smoke in parallel while keeping the frontend gate", () => {
+    const ci = parse(workflow("ci"));
+    expect(ci.jobs["frontend-checks"].needs).toBe("resolve");
+    expect(ci.jobs["browser-smoke"].needs).toBe("resolve");
     const frontend = workflow("ci")
       .split("  frontend:\n")[1]
-      .split("  browser-smoke:\n")[0];
-    expect(frontend).toContain("needs: [resolve, browser-smoke]");
+      .split("  rust:\n")[0];
+    expect(frontend).toContain(
+      "needs: [resolve, frontend-checks, browser-smoke]",
+    );
     expect(frontend).toContain("if: ${{ always() && !cancelled() }}");
     expect(frontend).toContain("RESOLVE_RESULT: ${{ needs.resolve.result }}");
+    expect(frontend).toContain(
+      "FRONTEND_RESULT: ${{ needs.frontend-checks.result }}",
+    );
     expect(frontend).toContain(
       "BROWSER_RESULT: ${{ needs.browser-smoke.result }}",
     );
     expect(frontend).toContain(
-      'if [[ "$RESOLVE_RESULT" != success || "$BROWSER_RESULT" != success ]]; then',
-    );
-    expect(frontend.indexOf("exit 1")).toBeLessThan(
-      frontend.indexOf("uses: actions/checkout@"),
+      'if [[ "$RESOLVE_RESULT" != success || "$FRONTEND_RESULT" != success || "$BROWSER_RESULT" != success ]]; then',
     );
   });
 });
