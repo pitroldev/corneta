@@ -845,4 +845,7 @@ export interface SessionSummary {
   chatTotal: number | null;
   problemWindows: number;
   verdictTone: "ok" | "warn" | "bad";
+  markersCount?: number;
+  /** Per-platform viewer counts at the session's peak sample, excluding embedded external counters. */
+  peakByPlatform?: Record<string, number>;
 }

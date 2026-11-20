@@ -20,6 +20,7 @@ import type {
   EngineSnapshot,
   ObsCheck,
   ObsEnvironment,
+  Reframe,
   RehearsalReport,
   ObsVideo,
   ObsVideoCheck,
@@ -32,6 +33,32 @@ import type {
   SessionMeta,
   Viewers,
 } from "../types";
+
+export interface ClipSegmentSlice {
+  path: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface BatchClipSpec {
+  slug: string;
+  slices: ClipSegmentSlice[];
+}
+
+export type ClipExportFormat = "copy" | "vertical";
+
+export interface ClipProgressEvent {
+  done: number;
+  total: number;
+  currentName: string;
+}
+
+export interface BatchClipResult {
+  dir: string;
+  saved: string[];
+  cancelled: boolean;
+  failed: number;
+}
 
 /** A logged-in account's own channel, offered as a chat source. */
 export interface AccountChatChannel {
@@ -120,6 +147,16 @@ export interface CornetaApi {
     startMs: number,
     endMs: number,
   ): Promise<string | null>;
+  exportClipSlices(slices: ClipSegmentSlice[]): Promise<string | null>;
+  exportClipsBatch(
+    dir: string,
+    clips: BatchClipSpec[],
+    format?: ClipExportFormat,
+    reframe?: Reframe | null,
+  ): Promise<BatchClipResult>;
+  cancelClipsBatch(): Promise<void>;
+  openClipsExportFolder(): Promise<void>;
+  subscribeClipsProgress(cb: (progress: ClipProgressEvent) => void): () => void;
   /** false means the save dialog was cancelled. */
   saveTextFile(file: {
     name: string;

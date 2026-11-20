@@ -25,6 +25,33 @@ export interface MomentTimeline {
   files: number;
 }
 
+export interface ClipSegmentSlice {
+  path: string;
+  startMs: number;
+  endMs: number;
+}
+
+export interface PlannedMomentClip {
+  id: string;
+  /** File stem without extension, formatted as `01-00h18m42s-slug`. */
+  slug: string;
+  label: string;
+  startGlobalMs: number;
+  endGlobalMs: number;
+  durationMs: number;
+  momentCount: number;
+  kinds: MomentKind[];
+  slices: ClipSegmentSlice[];
+}
+
+export interface PlanMomentClipsOptions {
+  preMs: number;
+  postMs: number;
+  /** Merge adjacent windows separated by at most this many milliseconds (default 0: overlap only). */
+  mergeGapMs?: number;
+  fallbackLabel?: string;
+}
+
 export type ChaptersResult =
   { ok: true; text: string; count: number } | { ok: false; reason: "tooFew" };
 
@@ -215,4 +242,178 @@ export function momentsEdl(
     );
   });
   return lines.join("\r\n");
+}
+
+const WINDOWS_RESERVED_NAMES = new Set([
+  "con",
+  "prn",
+  "aux",
+  "nul",
+  "com1",
+  "com2",
+  "com3",
+  "com4",
+  "com5",
+  "com6",
+  "com7",
+  "com8",
+  "com9",
+  "lpt1",
+  "lpt2",
+  "lpt3",
+  "lpt4",
+  "lpt5",
+  "lpt6",
+  "lpt7",
+  "lpt8",
+  "lpt9",
+]);
+
+const MIN_SLICE_MS = 100;
+const MIN_CLIP_MS = 500;
+const MAX_SLUG_LEN = 64;
+
+/** Keep clip file names safe across Windows filesystems, stripping reserved names and control bytes. */
+export function sanitizeClipSlug(
+  label: string,
+  fallback = "clip",
+  maxLen = MAX_SLUG_LEN,
+): string {
+  const cleaned = label
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[<>:"/\\|?*\p{Cc}]/gu, " ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const truncated = cleaned.slice(0, maxLen).replace(/-+$/g, "");
+  const candidate = truncated || fallback;
+  if (WINDOWS_RESERVED_NAMES.has(candidate.toLowerCase())) {
+    return `${candidate}-clip`.slice(0, maxLen).replace(/-+$/g, "");
+  }
+  return candidate;
+}
+
+function fileClockStamp(ms: number): string {
+  const totalSec = Math.max(0, Math.floor(ms / 1000));
+  const h = String(Math.floor(totalSec / 3600)).padStart(2, "0");
+  const m = String(Math.floor((totalSec % 3600) / 60)).padStart(2, "0");
+  const s = String(totalSec % 60).padStart(2, "0");
+  return `${h}h${m}m${s}s`;
+}
+
+/** Map a global recorded interval onto one or more local segment slices. */
+export function slicesForGlobalRange(
+  replay: ReplayIndex,
+  startGlobalMs: number,
+  endGlobalMs: number,
+): ClipSegmentSlice[] {
+  if (!replay.segments.length || replay.totalMs <= 0) return [];
+  const rangeStart = Math.max(0, Math.min(replay.totalMs, startGlobalMs));
+  const rangeEnd = Math.max(0, Math.min(replay.totalMs, endGlobalMs));
+  if (rangeEnd - rangeStart < MIN_SLICE_MS) return [];
+
+  const slices: ClipSegmentSlice[] = [];
+  for (let i = 0; i < replay.segments.length; i++) {
+    const seg = replay.segments[i];
+    const segStart = replay.starts[i];
+    const segDur = Math.max(0, seg.endT - seg.t);
+    const segEnd = segStart + segDur;
+    if (segEnd <= rangeStart) continue;
+    if (segStart >= rangeEnd) break;
+    const localStart = Math.round(Math.max(0, rangeStart - segStart));
+    const localEnd = Math.round(Math.min(segDur, rangeEnd - segStart));
+    if (localEnd - localStart >= MIN_SLICE_MS) {
+      slices.push({ path: seg.path, startMs: localStart, endMs: localEnd });
+    }
+  }
+  return slices;
+}
+
+/** Plan merged MP4 clip windows for a set of recording-based moments. */
+export function planMomentClips(
+  moments: readonly Moment[],
+  replay: ReplayIndex | null,
+  options: PlanMomentClipsOptions,
+): PlannedMomentClip[] {
+  if (!replay || !replay.segments.length || replay.totalMs < MIN_CLIP_MS) {
+    return [];
+  }
+  const preMs = Math.max(0, options.preMs);
+  const postMs = Math.max(0, options.postMs);
+  const mergeGapMs = Math.max(0, options.mergeGapMs ?? 0);
+  const fallback = sanitizeClipSlug(options.fallbackLabel ?? "clip", "clip");
+
+  const sorted = byTime(moments);
+  interface WindowAcc {
+    startGlobalMs: number;
+    endGlobalMs: number;
+    anchorMs: number;
+    label: string;
+    momentCount: number;
+    kinds: MomentKind[];
+  }
+  const merged: WindowAcc[] = [];
+
+  for (const moment of sorted) {
+    if (!Number.isFinite(moment.ms)) continue;
+    const startGlobalMs = Math.max(0, Math.round(moment.ms - preMs));
+    const endGlobalMs = Math.min(
+      replay.totalMs,
+      Math.round(moment.ms + postMs),
+    );
+    if (endGlobalMs - startGlobalMs < MIN_CLIP_MS) continue;
+
+    const prev = merged[merged.length - 1];
+    if (prev && startGlobalMs <= prev.endGlobalMs + mergeGapMs) {
+      prev.endGlobalMs = Math.max(prev.endGlobalMs, endGlobalMs);
+      prev.momentCount++;
+      if (!prev.kinds.includes(moment.kind)) prev.kinds.push(moment.kind);
+      // Prefer an explicit marker label over a generic highlight label when merging.
+      if (!prev.label && moment.label) prev.label = moment.label;
+    } else {
+      merged.push({
+        startGlobalMs,
+        endGlobalMs,
+        anchorMs: Math.max(0, Math.min(replay.totalMs, Math.round(moment.ms))),
+        label: moment.label,
+        momentCount: 1,
+        kinds: [moment.kind],
+      });
+    }
+  }
+
+  const clips: PlannedMomentClip[] = [];
+  for (const window of merged) {
+    const slices = slicesForGlobalRange(
+      replay,
+      window.startGlobalMs,
+      window.endGlobalMs,
+    );
+    if (!slices.length) continue;
+    const durationMs = slices.reduce(
+      (acc, slice) => acc + (slice.endMs - slice.startMs),
+      0,
+    );
+    if (durationMs < MIN_CLIP_MS) continue;
+
+    const index = clips.length + 1;
+    const prefix = `${String(index).padStart(2, "0")}-${fileClockStamp(window.anchorMs)}-`;
+    const bodyMax = Math.max(8, MAX_SLUG_LEN - prefix.length);
+    const body = sanitizeClipSlug(window.label || fallback, fallback, bodyMax);
+    const slug = `${prefix}${body}`;
+
+    clips.push({
+      id: `${index}-${window.startGlobalMs}-${window.endGlobalMs}`,
+      slug,
+      label: window.label,
+      startGlobalMs: window.startGlobalMs,
+      endGlobalMs: window.endGlobalMs,
+      durationMs,
+      momentCount: window.momentCount,
+      kinds: window.kinds,
+      slices,
+    });
+  }
+  return clips;
 }

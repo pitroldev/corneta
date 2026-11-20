@@ -595,6 +595,24 @@ messages! {
     RecordRetryUnavailable = "rust.record.retryUnavailable" =>
         pt: "essa live começou sem gravação, então não tenho o que retomar",
         en: "this stream started without recording, so there's nothing to restart";
+    ClipsLiveBusy = "rust.clips.liveBusy" =>
+        pt: "espere a live ou o ensaio terminar para exportar clipes 9:16 — durante a transmissão só o corte rápido 16:9 está liberado",
+        en: "wait until the stream or rehearsal ends before exporting 9:16 clips — only fast 16:9 copy cuts can run while live";
+    ClipsAlreadyRunning = "rust.clips.alreadyRunning" =>
+        pt: "já existe uma exportação de clipes em andamento",
+        en: "a clip export is already running";
+    ClipsDiskLow = "rust.clips.diskLow" =>
+        pt: "espaço insuficiente no disco escolhido para salvar esses clipes",
+        en: "not enough free disk space in that folder to save these clips";
+    ClipsInvalidDir = "rust.clips.invalidDir" =>
+        pt: "não consigo salvar clipes nessa pasta — confira se ela existe e aceita gravação",
+        en: "I can't save clips to that folder — check that it exists and is writable";
+    ClipsNoFolder = "rust.clips.noFolder" =>
+        pt: "ainda não há nenhuma pasta de clipes exportada nesta sessão",
+        en: "no clips folder has been exported in this session yet";
+    ClipsEmpty = "rust.clips.empty" =>
+        pt: "nenhum clipe válido foi enviado para exportação",
+        en: "no valid clips were queued for export";
 
     OpenExternalRefused = "rust.open.externalRefused" =>
         pt: "Não vou abrir esse link — só abro endereço que começa com https://",

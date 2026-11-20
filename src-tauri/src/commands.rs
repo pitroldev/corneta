@@ -12,6 +12,7 @@ pub use chat_alerts::*;
 pub(crate) use config_vault::save_native_config;
 pub use config_vault::*;
 pub use desktop::*;
+pub(crate) use encoders::detect_hw_encoder;
 pub use encoders::*;
 pub(crate) use ingest_slate::start_rehearsal_ingest;
 pub use ingest_slate::*;

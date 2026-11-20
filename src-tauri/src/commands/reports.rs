@@ -255,6 +255,47 @@ pub async fn export_clip(
 }
 
 #[tauri::command]
+pub async fn export_clip_slices(
+    app: AppHandle,
+    slices: Vec<crate::clips::ClipSegmentSlice>,
+) -> Result<Option<String>, String> {
+    crate::clips::export_single_slices(app, slices).await
+}
+
+#[tauri::command]
+pub async fn export_clips_batch(
+    app: AppHandle,
+    dir: String,
+    clips: Vec<crate::clips::BatchClipSpec>,
+    format: Option<crate::clips::ClipExportFormat>,
+    reframe: Option<crate::config::Reframe>,
+) -> Result<crate::clips::BatchClipResult, String> {
+    crate::clips::export_batch(app, dir, clips, format.unwrap_or_default(), reframe).await
+}
+
+#[tauri::command]
+pub fn cancel_clips_batch() {
+    crate::clips::cancel_batch();
+}
+
+#[tauri::command]
+pub fn open_clips_export_folder() -> Result<(), String> {
+    let dir = crate::clips::last_export_dir().ok_or_else(|| Msg::ClipsNoFolder.now())?;
+    if !dir.is_dir() {
+        return Err(Msg::ClipsInvalidDir.now());
+    }
+    #[cfg(windows)]
+    {
+        let _ = std::process::Command::new("explorer").arg(&dir).spawn();
+    }
+    #[cfg(not(windows))]
+    {
+        let _ = std::process::Command::new("xdg-open").arg(&dir).spawn();
+    }
+    Ok(())
+}
+
+#[tauri::command]
 pub fn open_recording_folder(app: AppHandle) -> Result<(), String> {
     let dir = recording_dir(&app)
         .or_else(|| session::sessions_dir(&app))

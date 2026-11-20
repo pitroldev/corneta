@@ -61,7 +61,7 @@ fn compose_output_url(ingest_url: &str, key: &str) -> String {
 }
 
 // Pan within the remaining source area so crops cannot extend beyond the input.
-fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
+pub(crate) fn reframe_filter(reframe: Option<&Reframe>, out_w: u32, out_h: u32) -> String {
     if let Some(vf) = reframe.and_then(|r| split_filter(r, out_w, out_h)) {
         return vf;
     }

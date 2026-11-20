@@ -1,5 +1,5 @@
-import { useId, useMemo, useState } from "react";
-import { Clapperboard, Copy, Download, Table2 } from "lucide-react";
+import { lazy, Suspense, useId, useMemo, useState } from "react";
+import { Clapperboard, Copy, Download, Film, Table2 } from "lucide-react";
 import { Button } from "../../components/ui";
 import { api } from "../../lib/api";
 import {
@@ -14,6 +14,12 @@ import type { ReplayIndex } from "../../lib/replay";
 import { toast } from "../../lib/toast";
 import type { SessionData } from "../../lib/types";
 import { errMsg } from "../../lib/utils";
+
+const BatchClipsModal = lazy(() =>
+  import("./BatchClipsModal").then((module) => ({
+    default: module.BatchClipsModal,
+  })),
+);
 
 type MomentsFile = "csv" | "edl";
 
@@ -33,6 +39,7 @@ export function ReportMomentsExport({
   const headingId = useId();
   const reasonId = useId();
   const [saving, setSaving] = useState<MomentsFile | null>(null);
+  const [clipsOpen, setClipsOpen] = useState(false);
   const timeline = useMemo(
     () => collectMoments(data, highlights, replayIndex),
     [data, highlights, replayIndex],
@@ -43,6 +50,8 @@ export function ReportMomentsExport({
   ).length;
   const highlightCount = timeline.moments.length - markerCount;
   const hasMoments = timeline.moments.length > 0;
+  const canExportClips =
+    Boolean(replayIndex && replayIndex.segments.length > 0) && hasMoments;
   const counts = [
     highlightCount > 0
       ? tp("reports.moments.export.highlights", highlightCount)
@@ -122,6 +131,17 @@ export function ReportMomentsExport({
         aria-labelledby={headingId}
         className="mt-3 flex flex-wrap gap-2"
       >
+        {canExportClips ? (
+          <Button
+            size="sm"
+            variant="primary"
+            title={t("reports.clips.action.hint")}
+            onClick={() => setClipsOpen(true)}
+          >
+            <Film className="size-4" />
+            {t("reports.clips.action")}
+          </Button>
+        ) : null}
         <Button
           size="sm"
           variant="subtle"
@@ -170,6 +190,15 @@ export function ReportMomentsExport({
             ? ` ${t("reports.moments.chapters.markMore")}`
             : null}
         </p>
+      ) : null}
+      {clipsOpen && replayIndex && replayIndex.segments.length > 0 ? (
+        <Suspense fallback={null}>
+          <BatchClipsModal
+            moments={timeline.moments}
+            replayIndex={replayIndex}
+            onClose={() => setClipsOpen(false)}
+          />
+        </Suspense>
       ) : null}
     </div>
   );

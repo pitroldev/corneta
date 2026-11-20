@@ -5,7 +5,12 @@ import { CornetaApi } from "./api/types";
 export { IS_TAURI, START_CANCELLED } from "./api/runtime";
 export type {
   AccountChatChannel,
+  BatchClipResult,
+  BatchClipSpec,
   ChatReply,
+  ClipExportFormat,
+  ClipProgressEvent,
+  ClipSegmentSlice,
   CornetaApi,
   MesaServerInfo,
   OverlayInfo,

@@ -246,6 +246,55 @@ export function tauriApi(): CornetaApi {
         endMs: integerArg(endMs, "endMs", true),
       });
     },
+    async exportClipSlices(slices) {
+      const { invoke } = await core();
+      return invoke<string | null>("export_clip_slices", {
+        slices: slices.map((slice) => ({
+          path: slice.path,
+          startMs: integerArg(slice.startMs, "startMs", true),
+          endMs: integerArg(slice.endMs, "endMs", true),
+        })),
+      });
+    },
+    async exportClipsBatch(dir, clips, format = "copy", reframe = null) {
+      const { invoke } = await core();
+      return invoke("export_clips_batch", {
+        dir,
+        clips: clips.map((clip) => ({
+          slug: clip.slug,
+          slices: clip.slices.map((slice) => ({
+            path: slice.path,
+            startMs: integerArg(slice.startMs, "startMs", true),
+            endMs: integerArg(slice.endMs, "endMs", true),
+          })),
+        })),
+        format,
+        reframe,
+      });
+    },
+    async cancelClipsBatch() {
+      const { invoke } = await core();
+      await invoke("cancel_clips_batch");
+    },
+    async openClipsExportFolder() {
+      const { invoke } = await core();
+      await invoke("open_clips_export_folder");
+    },
+    subscribeClipsProgress(cb) {
+      let cancelled = false;
+      let unlisten: (() => void) | null = null;
+      void event().then(({ listen }) =>
+        listen<{ done: number; total: number; currentName: string }>(
+          "clips://progress",
+          (e) => cb(e.payload),
+        ).then((u) => (cancelled ? u() : (unlisten = u))),
+      );
+      return () => {
+        cancelled = true;
+        unlisten?.();
+        unlisten = null;
+      };
+    },
     async chatStart() {
       const { invoke } = await core();
       await invoke("chat_start");

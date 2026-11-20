@@ -218,7 +218,7 @@ async fn probe_hw_encoders(app: &AppHandle) -> [bool; 4] {
         .await
 }
 
-pub(super) async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
+pub(crate) async fn detect_hw_encoder(app: &AppHandle) -> Option<String> {
     let ok = probe_hw_encoders(app).await;
     HW_ENCODERS
         .iter()

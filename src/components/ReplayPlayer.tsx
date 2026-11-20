@@ -38,6 +38,7 @@ import {
   pointAtGlobal,
   type ReplayIndex,
 } from "../lib/replay";
+import { slicesForGlobalRange } from "../lib/export/moments";
 import type {
   ReplayChatGap,
   ReplayChatMessage,
@@ -384,21 +385,21 @@ export function ReplayPlayer({
       setClipFrom(null);
       return;
     }
-    const pa = pointAtGlobal(tuned, a);
-    const pb = pointAtGlobal(tuned, b);
-    if (!pa || !pb || pa.index !== pb.index) {
-      // Cross-segment clips require concatenation and are not supported.
-      toast.error(t("replay.clip.crossSegment"));
+    const slices = slicesForGlobalRange(tuned, a, b);
+    if (!slices.length) {
       setClipFrom(null);
       return;
     }
     setBusy(true);
     try {
-      const out = await api.exportClip(
-        tuned.segments[pa.index].path,
-        Math.round(pa.localSec * 1000),
-        Math.round(pb.localSec * 1000),
-      );
+      const out =
+        slices.length === 1
+          ? await api.exportClip(
+              slices[0].path,
+              slices[0].startMs,
+              slices[0].endMs,
+            )
+          : await api.exportClipSlices(slices);
       if (out) toast.success(t("replay.clip.saved"));
     } catch (e) {
       toast.error(errMsg(e));

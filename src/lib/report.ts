@@ -2083,10 +2083,30 @@ export function withReportMarkers(
   return { ...analysis, events };
 }
 
+function peakViewersByPlatform(
+  data: SessionData,
+  peak: number,
+): Record<string, number> | undefined {
+  for (const sample of data.viewerSamples) {
+    if (sample.total !== peak) continue;
+    const byPlatform: Record<string, number> = {};
+    for (const item of sample.items) {
+      if (item.viewers == null) continue;
+      byPlatform[item.platform] =
+        (byPlatform[item.platform] ?? 0) + item.viewers;
+    }
+    if (Object.keys(byPlatform).length > 0) return byPlatform;
+  }
+  return undefined;
+}
+
 export function summarize(
   data: SessionData,
   a: ReportAnalysis,
 ): SessionSummary {
+  const peakByPlatform = a.viewers.hasData
+    ? peakViewersByPlatform(data, a.viewers.peak)
+    : undefined;
   return {
     hasData: data.samples.length > 1 || a.viewers.hasData,
     peakViewers: a.viewers.hasData ? a.viewers.peak : null,
@@ -2094,5 +2114,7 @@ export function summarize(
     chatTotal: a.chat.hasData ? a.chat.total : null,
     problemWindows: a.windows.length,
     verdictTone: a.verdict.tone,
+    markersCount: data.markers.length,
+    ...(peakByPlatform ? { peakByPlatform } : {}),
   };
 }

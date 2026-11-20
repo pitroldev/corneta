@@ -92,6 +92,7 @@ describe("Cinefy report audience", () => {
         (item: { key: string }) => item.key === cinefyKey,
       ).audience.embeddedViewers,
     ).toBe(1200);
+    expect(summarize(data, analysis).peakByPlatform).toEqual({ twitch: 100 });
   });
 
   it.each([
@@ -185,6 +186,7 @@ describe("Cinefy report audience", () => {
     expect(summarize(data, analysis)).toMatchObject({
       peakViewers: 240,
       avgViewers: 180,
+      peakByPlatform: { cinefy: 40, twitch: 200 },
     });
   });
 
@@ -410,12 +412,14 @@ describe("Cinefy report audience", () => {
       { kind: "viewers", t: 4000, total: null },
     ]);
     expect(viewerSeries(data)).toEqual([50, 0, null, null]);
-    expect(analyze(data, t).viewers).toMatchObject({
+    const analysis = analyze(data, t);
+    expect(analysis.viewers).toMatchObject({
       peak: 50,
       avg: 25,
       start: 50,
       end: 0,
     });
+    expect(summarize(data, analysis).peakByPlatform).toBeUndefined();
   });
 
   it("preserves a legacy viewer item without inventing live state or metadata", () => {

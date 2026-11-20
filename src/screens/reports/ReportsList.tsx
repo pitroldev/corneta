@@ -17,6 +17,7 @@ import { toast } from "../../lib/toast";
 import type { SessionMeta, SessionSummary } from "../../lib/types";
 import { cn, errMsg } from "../../lib/utils";
 import { Button, Card, EmptyState, PlatformGlyph } from "../../components/ui";
+import { ReportsTrendsSection } from "./ReportsTrendsSection";
 
 /** Summary states: absent means pending, null means unreadable, otherwise loaded. */
 interface ReportsListProps {
@@ -73,6 +74,11 @@ export function ReportsList({
           <FeaturedSession
             meta={sessions[0]}
             summary={summaries[sessions[0].id]}
+            onSelect={onSelect}
+          />
+          <ReportsTrendsSection
+            sessions={sessions}
+            summaries={summaries}
             onSelect={onSelect}
           />
           {archive.length > 0 ? (

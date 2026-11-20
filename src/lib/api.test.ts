@@ -71,6 +71,46 @@ describe("Tauri telemetry IPC", () => {
       startMs: 500,
       endMs: 12_001,
     });
+
+    await api.exportClipSlices([
+      { path: "1786151052661.mp4", startMs: 1000.4, endMs: 2500.6 },
+      { path: "1786151052661.p2.mp4", startMs: 0, endMs: 4000.2 },
+    ]);
+    await api.exportClipsBatch(
+      "C:/Clips",
+      [
+        {
+          slug: "01-00h01m00s-clutch",
+          slices: [
+            { path: "1786151052661.mp4", startMs: 500.2, endMs: 1500.8 },
+          ],
+        },
+      ],
+      "vertical",
+      { x: 0.5, y: 0.5, zoom: 1, layout: "split", splitRatio: 0.35 },
+    );
+    await api.cancelClipsBatch();
+    await api.openClipsExportFolder();
+
+    expect(invoke).toHaveBeenCalledWith("export_clip_slices", {
+      slices: [
+        { path: "1786151052661.mp4", startMs: 1000, endMs: 2501 },
+        { path: "1786151052661.p2.mp4", startMs: 0, endMs: 4000 },
+      ],
+    });
+    expect(invoke).toHaveBeenCalledWith("export_clips_batch", {
+      dir: "C:/Clips",
+      clips: [
+        {
+          slug: "01-00h01m00s-clutch",
+          slices: [{ path: "1786151052661.mp4", startMs: 500, endMs: 1501 }],
+        },
+      ],
+      format: "vertical",
+      reframe: { x: 0.5, y: 0.5, zoom: 1, layout: "split", splitRatio: 0.35 },
+    });
+    expect(invoke).toHaveBeenCalledWith("cancel_clips_batch");
+    expect(invoke).toHaveBeenCalledWith("open_clips_export_folder");
   });
 
   it("passes chat replies and the Kick opt-in scopes as named arguments", async () => {

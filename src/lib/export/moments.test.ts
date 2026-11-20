@@ -10,6 +10,9 @@ import {
   collectMoments,
   momentsCsv,
   momentsEdl,
+  planMomentClips,
+  sanitizeClipSlug,
+  slicesForGlobalRange,
   youtubeChapters,
   type Moment,
 } from "./moments";
@@ -340,5 +343,95 @@ describe("momentsEdl", () => {
     expect(lines).toContain(
       " |C:ResolveColorBlue |M:Momento / Chat explodiu (85/min) |D:1",
     );
+  });
+});
+
+describe("batch clip planning", () => {
+  it("sanitizes Windows-reserved characters, names, and length limits", () => {
+    expect(sanitizeClipSlug('Clutch 1v4: "insano" <top> / \\ | ? *')).toBe(
+      "clutch-1v4-insano-top",
+    );
+    expect(sanitizeClipSlug("CON")).toBe("con-clip");
+    expect(sanitizeClipSlug("nul")).toBe("nul-clip");
+    expect(sanitizeClipSlug("aux")).toBe("aux-clip");
+    expect(sanitizeClipSlug("   \u0000\u001f   ", "momento")).toBe("momento");
+    expect(sanitizeClipSlug("a".repeat(120)).length).toBeLessThanOrEqual(64);
+  });
+
+  it("maps a clip crossing two segments with a reconnection gap in between", () => {
+    const replay = buildReplayIndex([
+      segment(1, T0, 60_000),
+      segment(2, T0 + 95_000, 60_000),
+    ]);
+    // Global 55s..75s spans the last 5s of S1 and the first 15s of S2.
+    expect(slicesForGlobalRange(replay, 55_000, 75_000)).toEqual([
+      { path: "S1.mp4", startMs: 55_000, endMs: 60_000 },
+      { path: "S2.mp4", startMs: 0, endMs: 15_000 },
+    ]);
+
+    const clips = planMomentClips([moment(60, "Virada na reconexão")], replay, {
+      preMs: 15_000,
+      postMs: 30_000,
+    });
+    expect(clips).toHaveLength(1);
+    expect(clips[0].slug).toBe("01-00h01m00s-virada-na-reconexao");
+    expect(clips[0].slices).toEqual([
+      { path: "S1.mp4", startMs: 45_000, endMs: 60_000 },
+      { path: "S2.mp4", startMs: 0, endMs: 30_000 },
+    ]);
+    expect(clips[0].durationMs).toBe(45_000);
+  });
+
+  it("merges overlapping windows and windows separated by less than mergeGapMs", () => {
+    const replay = buildReplayIndex([segment(1, T0, 300_000)]);
+    // Moment A at 60s -> [45s, 90s]; Moment B at 110s -> [95s, 140s] (gap 5s <= 10s mergeGapMs).
+    // Moment C at 220s -> [205s, 250s] (far away).
+    const clips = planMomentClips(
+      [
+        moment(60, "Clutch 1v4", "marker"),
+        moment(110, "Chat explodiu", "chat"),
+        moment(220, "Raid gigante", "raid"),
+      ],
+      replay,
+      { preMs: 15_000, postMs: 30_000, mergeGapMs: 10_000 },
+    );
+    expect(clips).toHaveLength(2);
+    expect(clips[0].startGlobalMs).toBe(45_000);
+    expect(clips[0].endGlobalMs).toBe(140_000);
+    expect(clips[0].momentCount).toBe(2);
+    expect(clips[0].kinds).toEqual(["marker", "chat"]);
+    expect(clips[1].startGlobalMs).toBe(205_000);
+    expect(clips[1].endGlobalMs).toBe(250_000);
+    expect(clips[1].slug).toBe("02-00h03m40s-raid-gigante");
+  });
+
+  it("applies positive and negative replay offsetMs when collecting and planning clips", () => {
+    const posReplay = buildReplayIndex([segment(1, T0, 120_000)], [], 4_000);
+    const posTimeline = collectMoments(
+      { meta, markers: [marker(T0 + 50_000, "Lance")] },
+      [],
+      posReplay,
+    );
+    const posClips = planMomentClips(posTimeline.moments, posReplay, {
+      preMs: 10_000,
+      postMs: 20_000,
+    });
+    expect(posClips[0].slices).toEqual([
+      { path: "S1.mp4", startMs: 44_000, endMs: 74_000 },
+    ]);
+
+    const negReplay = buildReplayIndex([segment(1, T0, 120_000)], [], -5_000);
+    const negTimeline = collectMoments(
+      { meta, markers: [marker(T0 + 50_000, "Lance")] },
+      [],
+      negReplay,
+    );
+    const negClips = planMomentClips(negTimeline.moments, negReplay, {
+      preMs: 10_000,
+      postMs: 20_000,
+    });
+    expect(negClips[0].slices).toEqual([
+      { path: "S1.mp4", startMs: 35_000, endMs: 65_000 },
+    ]);
   });
 });

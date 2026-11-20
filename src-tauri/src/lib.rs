@@ -2,6 +2,7 @@ mod alerts;
 mod auth;
 mod black_screen;
 mod chat;
+mod clips;
 mod commands;
 mod compositor;
 mod config;
@@ -320,6 +321,10 @@ pub fn run() {
             commands::open_recording_folder,
             commands::add_session_marker,
             commands::export_clip,
+            commands::export_clip_slices,
+            commands::export_clips_batch,
+            commands::cancel_clips_batch,
+            commands::open_clips_export_folder,
             commands::open_external,
             commands::chat_start,
             commands::chat_stop,

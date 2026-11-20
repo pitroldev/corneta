@@ -18,6 +18,7 @@ export interface ChartSeries {
   label: string;
   color: string;
   values: (number | null)[];
+  dashed?: boolean;
 }
 
 export interface ChartMarker {
@@ -149,6 +150,26 @@ export function LineChart({
     if (i != null) onSeek(i);
   };
 
+  const onKeyDown = (e: React.KeyboardEvent<SVGSVGElement>) => {
+    if (!onSeek || n <= 0) return;
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      setHover((cur) => (cur == null ? 0 : Math.min(n - 1, cur + 1)));
+    } else if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      setHover((cur) => (cur == null ? n - 1 : Math.max(0, cur - 1)));
+    } else if (e.key === "Home") {
+      e.preventDefault();
+      setHover(0);
+    } else if (e.key === "End") {
+      e.preventDefault();
+      setHover(n - 1);
+    } else if ((e.key === "Enter" || e.key === " ") && hover != null) {
+      e.preventDefault();
+      onSeek(hover);
+    }
+  };
+
   const renderTooltip = () => {
     if (hover == null) return null;
     const rows = series
@@ -228,12 +249,22 @@ export function LineChart({
         ref={svgRef}
         role="img"
         aria-label={ariaLabel ?? series.map((s) => s.label).join(", ")}
+        tabIndex={onSeek ? 0 : undefined}
         viewBox={`0 0 ${W} ${H}`}
         width="100%"
         height={H}
-        className={cn("overflow-visible", onSeek && "cursor-pointer")}
+        className={cn(
+          "overflow-visible",
+          onSeek &&
+            "cursor-pointer rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brass",
+        )}
         onMouseMove={onMove}
         onMouseLeave={() => setHover(null)}
+        onBlur={() => setHover(null)}
+        onFocus={() => {
+          if (onSeek && hover == null && n > 0) setHover(n - 1);
+        }}
+        onKeyDown={onKeyDown}
         onClick={onClick}
       >
         {ticks.map((tv, i) => (
@@ -315,16 +346,31 @@ export function LineChart({
         ))}
 
         {series.map((s, i) => (
-          <path
-            key={`s${i}`}
-            d={paths[i]}
-            fill="none"
-            stroke={s.color}
-            strokeWidth={2}
-            strokeLinejoin="round"
-            strokeLinecap="round"
-            vectorEffect="non-scaling-stroke"
-          />
+          <g key={`s${i}`}>
+            <path
+              d={paths[i]}
+              fill="none"
+              stroke={s.color}
+              strokeWidth={2}
+              strokeDasharray={s.dashed ? "5 4" : undefined}
+              strokeLinejoin="round"
+              strokeLinecap="round"
+              vectorEffect="non-scaling-stroke"
+            />
+            {n <= 50
+              ? s.values.map((value, idx) =>
+                  value != null && Number.isFinite(value) ? (
+                    <circle
+                      key={`pt-${idx}`}
+                      cx={xAt(idx)}
+                      cy={yAt(value)}
+                      r={hover === idx ? 4 : 2.5}
+                      fill={s.color}
+                    />
+                  ) : null,
+                )
+              : null}
+          </g>
         ))}
 
         {/* Layer the replay cursor above series but below the tooltip. */}
@@ -359,10 +405,17 @@ export function LineChart({
               key={i}
               className="flex items-center gap-1.5 text-[11px] font-semibold text-ink-muted"
             >
-              <span
-                className="size-2.5 rounded-sm"
-                style={{ background: s.color }}
-              />{" "}
+              {s.dashed ? (
+                <span
+                  className="inline-block w-3.5 border-t-2 border-dashed"
+                  style={{ borderColor: s.color }}
+                />
+              ) : (
+                <span
+                  className="size-2.5 rounded-sm"
+                  style={{ background: s.color }}
+                />
+              )}{" "}
               {s.label}
             </span>
           ))}

@@ -183,6 +183,10 @@ export function mockApi(): CornetaApi {
       dropIdx?: number;
       highCpu?: boolean;
       busyApp?: string;
+      viewerScale?: number;
+      omitViewers?: boolean;
+      withRecording?: boolean;
+      extraMarkers?: { min: number; label: string }[];
     },
   ): string => {
     const meta = {
@@ -202,7 +206,10 @@ export function mockApi(): CornetaApi {
     let outputSkipped = 0;
     const raidAtMin = Math.min(mins * 0.35, 11);
     const raidViewers = 90 + Math.floor(Math.random() * 110);
-    const vbase = plats.map((p) => (p.platformId === "youtube" ? 70 : 280));
+    const viewerScale = opts?.viewerScale ?? 1;
+    const vbase = plats.map((p) =>
+      Math.round((p.platformId === "youtube" ? 70 : 280) * viewerScale),
+    );
     for (let k = 0; k < n; k++) {
       const t = startedAt + k * step;
       const minNow = (k * step) / 60000;
@@ -291,7 +298,7 @@ export function mockApi(): CornetaApi {
           targets,
         }),
       );
-      if (k % 15 === 0) {
+      if (k % 15 === 0 && !opts?.omitViewers) {
         const ramp = Math.min(1, minNow / 5);
         const items = plats.map((p, i) => {
           let v = Math.round(vbase[i] * ramp * (0.9 + Math.random() * 0.15));
@@ -375,6 +382,71 @@ export function mockApi(): CornetaApi {
         }),
       );
     }
+    for (const extra of opts?.extraMarkers ?? []) {
+      lines.push(
+        JSON.stringify({
+          kind: "marker",
+          t: startedAt + extra.min * 60000,
+          label: extra.label,
+        }),
+      );
+    }
+    if (opts?.withRecording) {
+      const midMs = Math.round((mins * 60000) / 2);
+      const totalMs = n * step;
+      const seg1Path = `${startedAt}.mp4`;
+      const seg2Path = `${startedAt}.p2.mp4`;
+      lines.push(
+        JSON.stringify({
+          kind: "recording",
+          seg: 1,
+          t: startedAt,
+          path: seg1Path,
+          codec: "h264",
+          estimated: false,
+        }),
+        JSON.stringify({
+          kind: "recSync",
+          seg: 1,
+          t: startedAt + midMs,
+          out: midMs,
+        }),
+        JSON.stringify({
+          kind: "recEnd",
+          seg: 1,
+          t: startedAt + midMs,
+          reason: "reconnect",
+        }),
+        JSON.stringify({
+          kind: "recFinalized",
+          seg: 1,
+        }),
+        JSON.stringify({
+          kind: "recording",
+          seg: 2,
+          t: startedAt + midMs + 5000,
+          path: seg2Path,
+          codec: "h264",
+          estimated: false,
+        }),
+        JSON.stringify({
+          kind: "recSync",
+          seg: 2,
+          t: startedAt + totalMs,
+          out: Math.max(1000, totalMs - midMs - 5000),
+        }),
+        JSON.stringify({
+          kind: "recEnd",
+          seg: 2,
+          t: startedAt + totalMs,
+          reason: "stopped",
+        }),
+        JSON.stringify({
+          kind: "recFinalized",
+          seg: 2,
+        }),
+      );
+    }
     lines.push(JSON.stringify({ kind: "end", endedAt: startedAt + n * step }));
     return lines.join("\n");
   };
@@ -384,15 +456,41 @@ export function mockApi(): CornetaApi {
     if (Object.keys(m).length > 0) return;
     const tw = { id: "t1", name: "Twitch", platformId: "twitch" };
     const yt = { id: "y1", name: "YouTube", platformId: "youtube" };
-    const a = Date.now() - 26 * 3600 * 1000;
-    const b = Date.now() - 3 * 3600 * 1000;
-    m[String(a)] = genSession(a, 35, [tw, yt], t);
-    m[String(b)] = genSession(b, 48, [tw, yt], t, {
-      dropAtMin: 23,
-      dropIdx: 0,
-      highCpu: true,
-      busyApp: "Cyberpunk 2077",
-    });
+    const day = 24 * 3600 * 1000;
+    const now = Date.now();
+    const specs: [number, number, Parameters<typeof genSession>[4]][] = [
+      [now - 14 * day, 42, { viewerScale: 0.72 }],
+      [now - 11 * day, 55, { omitViewers: true }],
+      [now - 8 * day, 38, { viewerScale: 0.88 }],
+      [now - 5 * day, 64, { viewerScale: 0.96 }],
+      [
+        now - 26 * 3600 * 1000,
+        35,
+        {
+          viewerScale: 1.05,
+          withRecording: true,
+          extraMarkers: [
+            { min: 7, label: "Clutch 1v4" },
+            { min: 16, label: "Raid hype" },
+            { min: 28, label: "Match point" },
+          ],
+        },
+      ],
+      [
+        now - 3 * 3600 * 1000,
+        48,
+        {
+          dropAtMin: 23,
+          dropIdx: 0,
+          highCpu: true,
+          busyApp: "Cyberpunk 2077",
+          viewerScale: 1.18,
+        },
+      ],
+    ];
+    for (const [startedAt, mins, opts] of specs) {
+      m[String(startedAt)] = genSession(startedAt, mins, [tw, yt], t, opts);
+    }
     saveSessions(m);
   };
 
@@ -409,6 +507,10 @@ export function mockApi(): CornetaApi {
   const targetPlatforms = new Map<string, string>();
 
   const chatMsgListeners = new Set<(m: ChatMessage) => void>();
+  const clipsProgressListeners = new Set<
+    (p: { done: number; total: number; currentName: string }) => void
+  >();
+  let demoClipsCancelled = false;
   const chatStatusListeners = new Set<(s: ChatStatus) => void>();
   const chatDeleteListeners = new Set<(d: ChatDelete) => void>();
   const chatSideListeners = new Set<(e: ChatSideEvent) => void>();
@@ -820,6 +922,7 @@ export function mockApi(): CornetaApi {
           durationSec: Math.max(0, Math.round((endedAt - startedAt) / 1000)),
           mode: (meta.mode ?? "per-platform") as SessionMeta["mode"],
           platforms: (meta.platforms ?? []) as SessionMeta["platforms"],
+          hasVideo: ndjson.includes('"kind":"recording"'),
         });
       }
       out.sort((a, b) => b.startedAt - a.startedAt);
@@ -866,7 +969,7 @@ export function mockApi(): CornetaApi {
       };
     },
     async recordPickDir() {
-      return null;
+      return "C:\\Videos\\Corneta Clips";
     },
     async recordTest() {
       throw new Error("Recording is unavailable in browser previews");
@@ -897,6 +1000,41 @@ export function mockApi(): CornetaApi {
     async addSessionMarker() {},
     async exportClip() {
       return null;
+    },
+    async exportClipSlices() {
+      return null;
+    },
+    async exportClipsBatch(dir, clips) {
+      demoClipsCancelled = false;
+      const saved: string[] = [];
+      for (let i = 0; i < clips.length; i++) {
+        if (demoClipsCancelled) {
+          return { dir, saved, cancelled: true, failed: 0 };
+        }
+        const name = `${clips[i].slug}.mp4`;
+        clipsProgressListeners.forEach((cb) =>
+          cb({ done: i, total: clips.length, currentName: name }),
+        );
+        await new Promise((resolve) => setTimeout(resolve, 260));
+        if (demoClipsCancelled) {
+          return { dir, saved, cancelled: true, failed: 0 };
+        }
+        saved.push(`${dir}\\${name}`);
+      }
+      clipsProgressListeners.forEach((cb) =>
+        cb({ done: clips.length, total: clips.length, currentName: "" }),
+      );
+      return { dir, saved, cancelled: false, failed: 0 };
+    },
+    async cancelClipsBatch() {
+      demoClipsCancelled = true;
+    },
+    async openClipsExportFolder() {},
+    subscribeClipsProgress(cb) {
+      clipsProgressListeners.add(cb);
+      return () => {
+        clipsProgressListeners.delete(cb);
+      };
     },
     async chatStart(t) {
       // Resolve demo copy once per connection, not on each timer tick.
