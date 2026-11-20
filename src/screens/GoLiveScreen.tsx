@@ -21,7 +21,7 @@ import { useStore } from "../lib/store";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import { api, START_CANCELLED } from "../lib/api";
 import { bandFit, estimate } from "../lib/estimates";
-import { platformName } from "../lib/platforms";
+import { PLATFORMS, platformName } from "../lib/platforms";
 import {
   joinNames,
   obsConfigured,
@@ -50,6 +50,7 @@ import {
   CopyField,
   PlatformGlyph,
   SectionTitle,
+  Toggle,
 } from "../components/ui";
 import { ObsWizard } from "../components/ObsWizard";
 import { Modal } from "../components/Modal";
@@ -749,7 +750,7 @@ function AlertCard({
   );
 }
 
-/** Where the stream goes: one sticker per platform, with what each still needs. */
+/** Where the stream goes: one actionable card per destination with format, status, and inline toggle. */
 function Destinations({
   onFix,
   onAdd,
@@ -758,14 +759,29 @@ function Destinations({
   onAdd: () => void;
 }) {
   const t = useT();
-  const targets = useStore((s) => s.config!.targets);
+  const config = useStore((s) => s.config!);
+  const toggleTarget = useStore((s) => s.toggleTarget);
+  const targets = config.targets;
+  const activeProfile =
+    config.profiles.length > 1
+      ? config.profiles.find((p) => p.id === config.activeProfileId)
+      : null;
   const r = useReadiness();
   const ctx = useReadinessContext();
   const autoYoutube = youtubeAutoTargetId(targets, ctx);
   return (
     <Card className="py-4">
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <h3 className="text-lg">{t("golive.destinations.title")}</h3>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <h3 className="text-lg">{t("golive.destinations.title")}</h3>
+          {activeProfile && (
+            <span className="rounded-sm border border-border-soft bg-surface-2 px-2 py-0.5 text-[11px] font-bold text-ink-muted">
+              {t("golive.destinations.profile", {
+                name: activeProfile.name || t("platforms.profile.untitled"),
+              })}
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={onFix}
@@ -775,9 +791,10 @@ function Destinations({
           <ChevronRight className="size-3.5" />
         </button>
       </div>
-      <div className="flex flex-wrap gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         {targets.map((target, i) => {
           const pending = r.pending.some((p) => p.target.id === target.id);
+          const name = target.name || platformName(target.platformId, t);
           const status = !target.enabled
             ? t("golive.destinations.off")
             : pending
@@ -785,32 +802,56 @@ function Destinations({
               : target.id === autoYoutube && !target.hasKey
                 ? t("golive.destinations.auto")
                 : t("golive.destinations.ready");
+          const preset =
+            target.encoding.preset ?? PLATFORMS[target.platformId]?.recommended;
+          const isPortrait = preset ? preset.height > preset.width : false;
+          const isSplit =
+            isPortrait && target.encoding.reframe?.layout === "split";
+          const formatLabel = isSplit
+            ? t("golive.destinations.format.split")
+            : isPortrait
+              ? t("golive.destinations.format.vertical")
+              : t("golive.destinations.format.landscape");
+
           return (
-            <m.button
+            <m.div
               key={target.id}
-              type="button"
-              onClick={onFix}
-              initial={{ opacity: 0, scale: 0.94 }}
+              initial={{ opacity: 0, scale: 0.97 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.05 + i * 0.03, duration: 0.18 }}
+              transition={{ delay: 0.04 + i * 0.025, duration: 0.18 }}
               className={cn(
-                "flex items-center gap-2.5 rounded-md border-2 bg-surface-2 py-1.5 pl-1.5 pr-3 text-left transition hover:-translate-y-0.5 hover:bg-surface-3",
-                pending ? "border-warn/50" : "border-transparent",
-                !target.enabled && "opacity-55",
+                "flex items-center gap-3 rounded-lg border border-l-4 bg-surface-2 px-3 py-2.5 transition-colors",
+                !target.enabled
+                  ? "border-border-soft border-l-border opacity-60"
+                  : pending
+                    ? "border-warn/45 border-l-warn bg-warn/8"
+                    : "border-border-soft border-l-ok",
               )}
             >
-              <PlatformGlyph id={target.platformId} size={28} />
-              <span className="flex flex-col leading-tight">
-                <span className="font-display text-sm font-bold">
-                  {target.name || platformName(target.platformId, t)}
-                </span>
+              <PlatformGlyph id={target.platformId} size={30} />
+              <div className="min-w-0 flex-1 leading-tight">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <span className="truncate font-display text-sm font-bold text-ink">
+                    {name}
+                  </span>
+                  <span
+                    className={cn(
+                      "rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase",
+                      isPortrait
+                        ? "bg-brass text-brass-ink"
+                        : "bg-surface-3 text-ink-muted",
+                    )}
+                  >
+                    {formatLabel}
+                  </span>
+                </div>
                 <span
                   className={cn(
-                    "flex items-center gap-1 text-xs",
-                    pending
+                    "mt-0.5 flex items-center gap-1 text-xs",
+                    pending && target.enabled
                       ? "font-semibold text-warn"
                       : target.enabled
-                        ? "text-ok"
+                        ? "font-medium text-ok"
                         : "text-ink-faint",
                   )}
                 >
@@ -819,14 +860,27 @@ function Destinations({
                   )}
                   {status}
                 </span>
-              </span>
-            </m.button>
+              </div>
+              {target.enabled && pending && (
+                <Button size="sm" variant="primary" onClick={onFix}>
+                  {t("golive.destinations.fix")}
+                </Button>
+              )}
+              <Toggle
+                checked={target.enabled}
+                onChange={() => toggleTarget(target.id)}
+                label={t("golive.destinations.toggleAria", { name })}
+              />
+            </m.div>
           );
         })}
         <button
           type="button"
           onClick={onAdd}
-          className="flex items-center gap-2 rounded-md border-2 border-dashed border-border px-3 py-2 text-sm font-semibold text-ink-muted transition-colors hover:border-brass hover:text-ink"
+          className={cn(
+            "flex min-h-[3.25rem] items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-3 py-2 text-sm font-semibold text-ink-muted transition-colors hover:border-brass hover:text-ink",
+            targets.length % 2 === 0 && "sm:col-span-2",
+          )}
         >
           <Plus className="size-4" /> {t("golive.destinations.add")}
         </button>

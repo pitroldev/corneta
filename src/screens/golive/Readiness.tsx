@@ -199,8 +199,16 @@ export function ReadinessTiles({
         : t("golive.tile.safety.noneSub"),
   };
 
+  const hasTargets = config.targets.length > 0;
   const tiles: [ReadinessPanel, typeof Tv2, string, TileProps][] = [
-    ["platforms", Tv2, t("golive.tile.platforms.label"), platforms],
+    ...(!hasTargets
+      ? ([["platforms", Tv2, t("golive.tile.platforms.label"), platforms]] as [
+          ReadinessPanel,
+          typeof Tv2,
+          string,
+          TileProps,
+        ][])
+      : []),
     [
       "obs",
       Plug,
@@ -214,7 +222,14 @@ export function ReadinessTiles({
   ];
 
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div
+      className={cn(
+        "grid gap-3",
+        hasTargets
+          ? "grid-cols-1 sm:grid-cols-3"
+          : "grid-cols-2 lg:grid-cols-4",
+      )}
+    >
       {tiles.map(([panel, Icon, label, props], i) => (
         <m.div
           key={panel}
@@ -265,12 +280,14 @@ function Tile({
       onClick={onClick}
       aria-label={t("golive.tile.aria", { label, value, sub })}
       className={cn(
-        "group flex h-full w-full flex-col gap-1 rounded-lg border-2 bg-surface p-3.5 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 active:translate-y-0",
+        "group flex h-full w-full flex-col gap-1 rounded-lg border border-l-4 bg-surface p-3.5 text-left transition hover:-translate-y-0.5 hover:bg-surface-2 active:translate-y-0",
         tone === "warn"
-          ? "border-warn/50"
+          ? "border-warn/40 border-l-warn bg-warn/8"
           : tone === "bad"
-            ? "border-bad/50"
-            : "border-transparent",
+            ? "border-bad/40 border-l-bad bg-bad/8"
+            : tone === "ok"
+              ? "border-border-soft border-l-ok"
+              : "border-border-soft border-l-border",
       )}
     >
       <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-ink-faint">
@@ -280,7 +297,7 @@ function Tile({
           <ToneIcon tone={tone} />
         </span>
       </span>
-      <span className="font-display text-lg font-extrabold leading-tight">
+      <span className="font-display text-lg font-extrabold leading-tight text-ink">
         {value}
       </span>
       <span className="flex items-center gap-1 text-xs text-ink-muted">

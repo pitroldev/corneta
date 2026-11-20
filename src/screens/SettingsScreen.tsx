@@ -369,6 +369,7 @@ export function SettingsScreen() {
         </RTabs.Content>
 
         <RTabs.Content value="safety">
+          <SafetyOverviewCard settings={settings} onToggle={setSettings} />
           <Card accent>
             <h3 className="mb-1 flex items-center gap-2 text-lg">
               <Shield className="size-5 text-brass" />{" "}
@@ -647,5 +648,94 @@ export function SettingsScreen() {
         </RTabs.Content>
       </RTabs.Root>
     </div>
+  );
+}
+
+const SAFETY_BREAKERS: readonly {
+  key: keyof Pick<
+    AppSettings,
+    | "brbEnabled"
+    | "autoBitrate"
+    | "blackScreenAlert"
+    | "frozenFrameAlert"
+    | "silentAudioAlert"
+    | "loudnessNormalize"
+  >;
+  labelKey: MessageKey;
+}[] = [
+  { key: "brbEnabled", labelKey: "settings.safety.overview.brb" },
+  { key: "autoBitrate", labelKey: "settings.safety.overview.bitrate" },
+  { key: "blackScreenAlert", labelKey: "settings.safety.overview.blackScreen" },
+  { key: "frozenFrameAlert", labelKey: "settings.safety.overview.frozen" },
+  { key: "silentAudioAlert", labelKey: "settings.safety.overview.silent" },
+  { key: "loudnessNormalize", labelKey: "settings.safety.overview.loudness" },
+];
+
+function SafetyOverviewCard({
+  settings,
+  onToggle,
+}: {
+  settings: AppSettings;
+  onToggle: (patch: Partial<AppSettings>) => void;
+}) {
+  const t = useT();
+  const armedCount = SAFETY_BREAKERS.filter(
+    (item) => settings[item.key],
+  ).length;
+  return (
+    <Card className="mb-4 border border-border-soft p-4">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <span className="flex items-center gap-2 font-display text-base font-extrabold">
+          <Shield className="size-4 text-brass" aria-hidden />
+          {t("settings.safety.overview.title")}
+        </span>
+        <span
+          className={cn(
+            "rounded-sm border px-2 py-0.5 text-[11px] font-bold tabular-nums",
+            armedCount > 0
+              ? "border-ok/35 bg-ok/12 text-ok"
+              : "border-border-soft bg-surface-2 text-ink-muted",
+          )}
+        >
+          {t("settings.safety.overview.count", {
+            armed: armedCount,
+            total: SAFETY_BREAKERS.length,
+          })}
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {SAFETY_BREAKERS.map((item) => {
+          const on = settings[item.key];
+          return (
+            <button
+              key={item.key}
+              type="button"
+              aria-pressed={on}
+              onClick={() => onToggle({ [item.key]: !on })}
+              className={cn(
+                "flex flex-col gap-0.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                on
+                  ? "border-ok/40 bg-ok/10 hover:bg-ok/15"
+                  : "border-border-soft bg-surface-2 hover:bg-surface-3",
+              )}
+            >
+              <span className="truncate text-xs font-bold text-ink">
+                {t(item.labelKey)}
+              </span>
+              <span
+                className={cn(
+                  "text-[11px] font-bold",
+                  on ? "text-ok" : "text-ink-faint",
+                )}
+              >
+                {on
+                  ? `● ${t("settings.safety.state.armed")}`
+                  : t("settings.safety.state.off")}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

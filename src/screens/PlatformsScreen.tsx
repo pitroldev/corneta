@@ -18,6 +18,7 @@ import {
 } from "lucide-react";
 import { useStore } from "../lib/store";
 import { api } from "../lib/api";
+import { acceptsCodec } from "../lib/estimates";
 import {
   PLATFORM_LIST,
   PLATFORMS,
@@ -193,7 +194,7 @@ function ProfileBar() {
             className={cn(
               "flex h-8 items-center gap-2 rounded-md px-2.5 font-display text-sm font-bold transition",
               on
-                ? "bg-brass text-brass-ink"
+                ? "bg-brass text-brass-ink pop-sm"
                 : "bg-surface text-ink-muted hover:-translate-y-px hover:text-ink",
             )}
           >
@@ -391,8 +392,16 @@ function TargetRow({
                 : t("platforms.target.sub.ready"),
             };
 
+  const obsCodec = useStore((s) =>
+    s.obs && s.obs !== "loading" ? s.obs.videoCodec : undefined,
+  );
   const rec = target.encoding.preset ?? preset.recommended;
   const isPortrait = rec.height > rec.width;
+  const isSplit = isPortrait && target.encoding.reframe?.layout === "split";
+  const codecTag =
+    obsCodec && obsCodec !== "h264" && acceptsCodec(target.platformId, obsCodec)
+      ? obsCodec.toUpperCase()
+      : null;
   const [open, setOpen] = useState(() => !urlOk);
 
   const itemRef = useRef<HTMLLIElement>(null);
@@ -484,12 +493,27 @@ function TargetRow({
                       ?.toLowerCase() ?? preset.protocol}
                   </Badge>
                 )}
+                {codecTag && (
+                  <span className="rounded-sm border border-info/35 bg-info/12 px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase text-info">
+                    {codecTag}
+                  </span>
+                )}
+                {isSplit && (
+                  <span className="rounded-sm bg-brass px-1.5 py-0.5 font-mono text-[10px] font-extrabold uppercase text-brass-ink">
+                    {t("golive.destinations.format.split")}
+                  </span>
+                )}
                 {preset.experimental && <ExperimentalBadge />}
               </div>
               <div className="mt-0.5 truncate px-1 text-xs text-ink-muted">
                 {status.sub}
               </div>
             </div>
+            <FrameThumb
+              isPortrait={isPortrait}
+              isSplit={isSplit}
+              onClick={isPortrait ? onReframe : undefined}
+            />
             <Badge tone={status.tone}>
               {status.tone === "ok" && (
                 <Check className="size-3" strokeWidth={3} />
@@ -733,5 +757,56 @@ function PlatformPicker({
         </>
       )}
     </Modal>
+  );
+}
+
+function FrameThumb({
+  isPortrait,
+  isSplit,
+  onClick,
+}: {
+  isPortrait: boolean;
+  isSplit: boolean;
+  onClick?: () => void;
+}) {
+  const t = useT();
+  const title = isSplit
+    ? t("platforms.target.frame.split")
+    : isPortrait
+      ? t("platforms.target.frame.portrait")
+      : t("platforms.target.frame.landscape");
+
+  if (!isPortrait) {
+    return (
+      <span
+        title={title}
+        aria-label={title}
+        className="hidden h-7 w-11 shrink-0 items-center justify-center rounded border border-border bg-surface-2 font-mono text-[9.5px] font-bold text-ink-muted sm:inline-flex"
+      >
+        16:9
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={title}
+      aria-label={title}
+      className={cn(
+        "hidden h-9 w-6 shrink-0 flex-col gap-0.5 rounded border p-0.5 transition-colors hover:bg-surface-3 sm:flex",
+        isSplit ? "border-brass bg-surface-2" : "border-border bg-surface-2",
+      )}
+    >
+      {isSplit ? (
+        <>
+          <span className="h-[34%] w-full rounded-[2px] bg-brass" />
+          <span className="flex-1 w-full rounded-[2px] bg-info/80" />
+        </>
+      ) : (
+        <span className="size-full rounded-[2px] bg-brass/75" />
+      )}
+    </button>
   );
 }

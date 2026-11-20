@@ -92,7 +92,7 @@ export function ReportTimelineSection({
                 })}
               </span>
               {story.raidMarkers.length > 0 ? (
-                <span className="text-[#7c9cff]">
+                <span className="text-info">
                   {t("reports.viewers.raidsLegend")}
                 </span>
               ) : null}

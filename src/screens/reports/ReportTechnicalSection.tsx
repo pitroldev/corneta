@@ -228,13 +228,11 @@ function TechnicalWorkspace({
           >
             {technical.markers.length > 0 ? (
               <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] font-semibold text-ink-faint">
-                <span className="text-[#f97316]">
+                <span className="text-warn">
                   {t("reports.marker.reconnect")}
                 </span>
-                <span className="text-[#ef4444]">
-                  {t("reports.marker.error")}
-                </span>
-                <span className="text-[#a855f7]">
+                <span className="text-bad">{t("reports.marker.error")}</span>
+                <span className="text-info">
                   {t("reports.marker.noSignal")}
                 </span>
               </div>

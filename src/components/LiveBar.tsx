@@ -37,7 +37,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
   // An aria-label would replace the visible status; append the action as sr-only text instead.
   if (error && !errDismissed) {
     return (
-      <div className="flex items-center border-b-2 border-bad bg-bad text-white">
+      <div className="flex items-center border-b-2 border-bad bg-bad text-night">
         <button
           onClick={onOpen}
           className="flex min-w-0 flex-1 items-center gap-3 px-4 py-1.5 text-left"
@@ -46,7 +46,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
           <span className="font-display text-sm font-extrabold uppercase tracking-wide">
             {t("golive.bar.error.title")}
           </span>
-          <span className="min-w-0 flex-1 truncate text-xs text-white/85">
+          <span className="min-w-0 flex-1 truncate text-xs opacity-90">
             {t("golive.bar.error.hint")}
           </span>
           <span className="flex items-center font-display text-xs font-extrabold uppercase">
@@ -57,7 +57,7 @@ export function LiveBar({ onOpen }: { onOpen: () => void }) {
         <button
           onClick={() => setErrDismissed(true)}
           aria-label={t("golive.bar.dismiss.aria")}
-          className="grid size-8 shrink-0 place-items-center text-white/70 transition-colors hover:text-white"
+          className="grid size-8 shrink-0 place-items-center opacity-80 transition-opacity hover:opacity-100"
         >
           <X className="size-4" />
         </button>

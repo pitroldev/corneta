@@ -14,11 +14,15 @@ export function FilterChip({
   label,
   id,
   on,
+  dotClass,
+  viewers,
   onClick,
 }: {
   label: string;
   id: ChatPlatform;
   on: boolean;
+  dotClass?: string;
+  viewers?: string | null;
   onClick: () => void;
 }) {
   return (
@@ -33,7 +37,19 @@ export function FilterChip({
           : "border-border bg-surface text-ink-faint hover:text-ink-muted",
       )}
     >
-      <PlatformGlyph id={id} size={14} /> {label}
+      <PlatformGlyph id={id} size={14} />
+      {dotClass && (
+        <span
+          className={cn("size-2 shrink-0 rounded-full", dotClass)}
+          aria-hidden
+        />
+      )}
+      <span>{label}</span>
+      {viewers && (
+        <span className="font-mono text-[11px] font-semibold tabular-nums text-ink-muted">
+          {viewers}
+        </span>
+      )}
     </button>
   );
 }

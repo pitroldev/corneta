@@ -205,7 +205,7 @@ export function RecordingSettings() {
               {freeGb != null && (
                 <>
                   <div
-                    className="mt-2 h-2 overflow-hidden rounded-full bg-surface-3"
+                    className="mt-2.5 flex h-3.5 overflow-hidden rounded-md border border-border bg-surface-3"
                     role="img"
                     aria-label={t("settings.record.dir.free", {
                       size: fmt.dec(freeGb, 1),
@@ -214,7 +214,7 @@ export function RecordingSettings() {
                   >
                     <div
                       className={cn(
-                        "h-full rounded-full transition-[width] duration-200",
+                        "h-full transition-[width] duration-200",
                         keepOverFree ? "bg-bad" : "bg-brass",
                       )}
                       style={{
@@ -222,17 +222,48 @@ export function RecordingSettings() {
                       }}
                     />
                   </div>
-                  <p
-                    className={cn(
-                      "mt-1.5 text-xs",
-                      check?.lowSpace ? "text-warn" : "text-ink-faint",
-                    )}
-                  >
-                    {t("settings.record.dir.free", {
-                      size: fmt.dec(freeGb, 1),
-                      hours: fmt.dec(freeGb / Math.max(gbPerHour, 0.1), 1),
-                    })}
-                  </p>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs">
+                    <div className="flex flex-wrap items-center gap-3 text-ink-muted">
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className={cn(
+                            "inline-block size-2.5 rounded-[2px]",
+                            keepOverFree ? "bg-bad" : "bg-brass",
+                          )}
+                          aria-hidden
+                        />
+                        <span className="tabular-nums font-semibold text-ink">
+                          {t("settings.record.space.limit", {
+                            gb: fmt.num(keepGb),
+                          })}
+                        </span>
+                      </span>
+                      <span className="inline-flex items-center gap-1.5">
+                        <span
+                          className="inline-block size-2.5 rounded-[2px] border border-border bg-surface-3"
+                          aria-hidden
+                        />
+                        <span className="tabular-nums">
+                          {t("settings.record.space.freeLegend", {
+                            gb: fmt.dec(freeGb, 1),
+                          })}
+                        </span>
+                      </span>
+                    </div>
+                    <span
+                      className={cn(
+                        "tabular-nums font-semibold",
+                        check?.lowSpace || keepOverFree
+                          ? "text-warn"
+                          : "text-ok",
+                      )}
+                    >
+                      {t("settings.record.dir.free", {
+                        size: fmt.dec(freeGb, 1),
+                        hours: fmt.dec(freeGb / Math.max(gbPerHour, 0.1), 1),
+                      })}
+                    </span>
+                  </div>
                 </>
               )}
 

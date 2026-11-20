@@ -204,7 +204,7 @@ export function ReportsTrendsSection({
 
         <TrendCard
           icon={MessageSquare}
-          iconClass="text-[#7c9cff]"
+          iconClass="text-info"
           label={t("reports.trends.stat.chat")}
           value={
             trends.chat.avgPerMin != null

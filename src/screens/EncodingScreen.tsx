@@ -10,7 +10,13 @@ import {
   Wand2,
 } from "lucide-react";
 import { useStore } from "../lib/store";
-import type { EncoderKind, EncodingAction } from "../lib/types";
+import type {
+  EncoderKind,
+  EncodingAction,
+  EncodingMode,
+  Target,
+  VideoCodec,
+} from "../lib/types";
 import { PLATFORMS } from "../lib/platforms";
 import {
   acceptsCodec,
@@ -22,7 +28,7 @@ import {
 } from "../lib/estimates";
 import { toast } from "../lib/toast";
 import { bold, rich, useI18n, type I18n, type MessageKey } from "../lib/i18n";
-import { cn, fmtResolution } from "../lib/utils";
+import { cn, fmtResolution, readableOn } from "../lib/utils";
 import {
   Badge,
   Button,
@@ -154,27 +160,45 @@ export function EncodingScreen() {
 
       <QualityModeCards />
 
-      <p className="mt-3 min-h-4 truncate text-xs text-ink-faint">
-        {uploadMbps == null
-          ? t("encoding.upload.unmeasured")
-          : bold(t, "encoding.upload.measured", { mbps: fmt.dec(uploadMbps) })}
-        {onAir ? (
-          <span>{t("encoding.upload.onair")}</span>
-        ) : (
-          <button
-            type="button"
-            onClick={measure}
-            disabled={measuring}
-            className="font-bold text-brass hover:underline disabled:opacity-60"
-          >
-            {measuring
-              ? t("encoding.upload.measuring")
-              : uploadMbps == null
-                ? t("encoding.upload.measureNow")
-                : t("encoding.upload.measureAgain")}
-          </button>
-        )}
-      </p>
+      {anyEnabled ? (
+        <UploadRulerCard
+          targets={config.targets.filter((x) => x.enabled)}
+          mode={config.mode}
+          sourceCodec={sourceCodec}
+          lcdVideoKbps={lcd.videoKbps}
+          totalKbps={activeEst.uploadKbps}
+          uploadMbps={uploadMbps}
+          fit={activeFit}
+          anyHw={anyHw}
+          onAir={onAir}
+          measuring={measuring}
+          onMeasure={measure}
+        />
+      ) : (
+        <p className="mt-3 min-h-4 truncate text-xs text-ink-faint">
+          {uploadMbps == null
+            ? t("encoding.upload.unmeasured")
+            : bold(t, "encoding.upload.measured", {
+                mbps: fmt.dec(uploadMbps),
+              })}
+          {onAir ? (
+            <span>{t("encoding.upload.onair")}</span>
+          ) : (
+            <button
+              type="button"
+              onClick={measure}
+              disabled={measuring}
+              className="font-bold text-brass hover:underline disabled:opacity-60"
+            >
+              {measuring
+                ? t("encoding.upload.measuring")
+                : uploadMbps == null
+                  ? t("encoding.upload.measureNow")
+                  : t("encoding.upload.measureAgain")}
+            </button>
+          )}
+        </p>
+      )}
 
       {verticalCopies.length > 0 && (
         <Card className="mt-4 flex gap-3 border-2 border-bad/40 bg-bad/10">
@@ -759,5 +783,240 @@ function PerTargetRow({ targetId }: { targetId: string }) {
         )}
       </AnimatePresence>
     </>
+  );
+}
+
+function UploadRulerCard({
+  targets,
+  mode,
+  sourceCodec,
+  lcdVideoKbps,
+  totalKbps,
+  uploadMbps,
+  fit,
+  anyHw,
+  onAir,
+  measuring,
+  onMeasure,
+}: {
+  targets: Target[];
+  mode: EncodingMode;
+  sourceCodec: VideoCodec;
+  lcdVideoKbps: number | null;
+  totalKbps: number;
+  uploadMbps: number | null;
+  fit: "unknown" | "ok" | "warn" | "bad";
+  anyHw: boolean;
+  onAir: boolean;
+  measuring: boolean;
+  onMeasure: () => void;
+}) {
+  const { t, fmt } = useI18n();
+  const usedMbps = totalKbps / 1000;
+  const scaleMbps = Math.max(uploadMbps ?? 0, usedMbps, 1);
+  const safePct =
+    uploadMbps != null
+      ? Math.min(100, (uploadMbps / 1.2 / scaleMbps) * 100)
+      : null;
+
+  const rows = targets.map((target) => {
+    const action = effectiveAction(mode, target, sourceCodec);
+    const rec = PLATFORMS[target.platformId].recommended;
+    const preset = target.encoding.preset ?? rec;
+    const videoKbps =
+      action === "copy"
+        ? (lcdVideoKbps ?? rec.videoBitrateKbps)
+        : preset.videoBitrateKbps;
+    const kbps = videoKbps + preset.audioBitrateKbps;
+    const usesHw =
+      action === "transcode" &&
+      (target.encoding.encoder === "software"
+        ? false
+        : target.encoding.encoder === "auto"
+          ? anyHw
+          : true);
+    const color = PLATFORMS[target.platformId].color;
+    return {
+      target,
+      action,
+      preset,
+      kbps,
+      mbps: kbps / 1000,
+      usesHw,
+      color,
+      isPortrait: preset.height > preset.width,
+    };
+  });
+
+  const fitBadge =
+    uploadMbps != null
+      ? t(
+          fit === "ok"
+            ? "encoding.ruler.fit.ok"
+            : fit === "warn"
+              ? "encoding.ruler.fit.warn"
+              : "encoding.ruler.fit.bad",
+          {
+            used: fmt.dec(usedMbps, 1),
+            total: fmt.dec(uploadMbps, 1),
+          },
+        )
+      : t("encoding.ruler.unmeasuredTotal", {
+          used: fmt.dec(usedMbps, 1),
+        });
+
+  const fitToneCls =
+    fit === "ok"
+      ? "border-ok/35 bg-ok/12 text-ok"
+      : fit === "warn"
+        ? "border-warn/40 bg-warn/15 text-warn"
+        : fit === "bad"
+          ? "border-bad/40 bg-bad/15 text-bad"
+          : "border-border-soft bg-surface-2 text-ink-muted";
+
+  return (
+    <Card className="mt-4 border border-border-soft p-4">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
+          <span className="font-bold uppercase tracking-wide text-ink-faint">
+            {t("encoding.ruler.title")}
+          </span>
+          {uploadMbps != null && (
+            <span className="text-ink-muted">
+              ·{" "}
+              {t("encoding.ruler.measured", {
+                mbps: fmt.dec(uploadMbps, 1),
+              })}
+            </span>
+          )}
+          {onAir ? (
+            <span className="text-ink-faint">{t("encoding.upload.onair")}</span>
+          ) : (
+            <button
+              type="button"
+              onClick={onMeasure}
+              disabled={measuring}
+              className="font-bold text-brass hover:underline disabled:opacity-60"
+            >
+              {measuring
+                ? t("encoding.upload.measuring")
+                : uploadMbps == null
+                  ? t("encoding.upload.measureNow")
+                  : t("encoding.upload.measureAgain")}
+            </button>
+          )}
+        </div>
+        <span
+          className={cn(
+            "rounded-sm border px-2 py-0.5 font-mono text-[11px] font-bold tabular-nums",
+            fitToneCls,
+          )}
+        >
+          {fitBadge}
+        </span>
+      </div>
+
+      <div
+        className="relative mt-2.5 flex h-5 w-full overflow-hidden rounded-md border border-border bg-surface-2"
+        role="img"
+        aria-label={fitBadge}
+      >
+        {rows.map((row) => {
+          const widthPct = Math.max(4, (row.mbps / scaleMbps) * 100);
+          return (
+            <div
+              key={row.target.id}
+              className="flex h-full items-center justify-center overflow-hidden px-1 font-mono text-[10px] font-extrabold transition-[width] duration-200"
+              style={{
+                width: `${widthPct}%`,
+                backgroundColor: row.color,
+                color: readableOn(row.color),
+              }}
+              title={`${row.target.name}: ${fmt.dec(row.mbps, 1)} Mbps`}
+            >
+              <span className="truncate">
+                {row.target.name} {fmt.dec(row.mbps, 1)}
+              </span>
+            </div>
+          );
+        })}
+        {safePct != null && (
+          <div
+            aria-hidden
+            className="pointer-events-none absolute inset-y-0 border-l-2 border-dashed border-ink/80"
+            style={{ left: `${safePct}%` }}
+          />
+        )}
+      </div>
+
+      {uploadMbps != null && (
+        <div className="mt-1 flex items-center justify-between text-[11px] text-ink-faint">
+          <span className="font-mono tabular-nums">0 Mbps</span>
+          <span className="font-semibold text-ink-muted">
+            {t("encoding.ruler.safeLine", {
+              mbps: fmt.dec(uploadMbps / 1.2, 1),
+            })}
+          </span>
+          <span className="font-mono tabular-nums">
+            {fmt.dec(scaleMbps, 0)} Mbps
+          </span>
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-col gap-1.5 border-t border-border-soft pt-3">
+        {rows.map((row) => {
+          const routeText =
+            row.action === "copy"
+              ? t("encoding.ruler.route.copy", {
+                  mbps: fmt.dec(row.mbps, 1),
+                })
+              : t("encoding.ruler.route.transcode", {
+                  size: fmtResolution(
+                    row.preset.width,
+                    row.preset.height,
+                    row.preset.fps,
+                  ),
+                  mbps: fmt.dec(row.mbps, 1),
+                });
+          const chipLabel =
+            row.action === "copy"
+              ? t("encoding.ruler.badge.zeroGpu")
+              : row.usesHw
+                ? t("encoding.ruler.badge.gpu")
+                : t("encoding.ruler.badge.cpu");
+          const chipCls =
+            row.action === "copy"
+              ? "border-ok/35 bg-ok/12 text-ok"
+              : row.isPortrait
+                ? "bg-brass text-brass-ink border-transparent"
+                : "border-warn/35 bg-warn/12 text-warn";
+          return (
+            <div
+              key={row.target.id}
+              className="flex items-center justify-between gap-2 text-xs"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                <PlatformGlyph id={row.target.platformId} size={20} />
+                <span className="shrink-0 font-display font-bold text-ink">
+                  {row.target.name}
+                </span>
+                <span className="text-ink-faint" aria-hidden>
+                  →
+                </span>
+                <span className="truncate text-ink-muted">{routeText}</span>
+              </div>
+              <span
+                className={cn(
+                  "shrink-0 rounded-sm border px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide",
+                  chipCls,
+                )}
+              >
+                {chipLabel}
+              </span>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }

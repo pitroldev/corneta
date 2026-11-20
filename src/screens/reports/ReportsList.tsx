@@ -37,6 +37,13 @@ export function ReportsList({
 }: ReportsListProps) {
   const { t, tp } = useI18n();
   const archive = sessions?.slice(1) ?? [];
+  const measuredAvgs = (sessions ?? [])
+    .map((session) => summaries[session.id]?.avgViewers)
+    .filter((v): v is number => typeof v === "number" && v > 0);
+  const baselineAvgViewers =
+    measuredAvgs.length >= 3
+      ? measuredAvgs.reduce((sum, v) => sum + v, 0) / measuredAvgs.length
+      : null;
 
   return (
     <div className="mx-auto max-w-5xl">
@@ -97,6 +104,7 @@ export function ReportsList({
                     key={session.id}
                     meta={session}
                     summary={summaries[session.id]}
+                    baselineAvgViewers={baselineAvgViewers}
                     onSelect={onSelect}
                   />
                 ))}
@@ -279,17 +287,37 @@ function FeaturedMetric({
 const SessionRow = memo(function SessionRow({
   meta,
   summary,
+  baselineAvgViewers,
   onSelect,
 }: {
   meta: SessionMeta;
   summary?: SessionSummary | null;
+  baselineAvgViewers: number | null;
   onSelect: (id: string) => void;
 }) {
-  const { t, fmt } = useI18n();
+  const { t, tp, fmt } = useI18n();
+  const deltaPct =
+    summary?.avgViewers != null &&
+    baselineAvgViewers != null &&
+    baselineAvgViewers > 0
+      ? Math.round(
+          ((summary.avgViewers - baselineAvgViewers) / baselineAvgViewers) *
+            100,
+        )
+      : null;
+  const markersCount = summary?.markersCount ?? 0;
+
   return (
     <button
       onClick={() => onSelect(meta.id)}
-      className="group flex items-center gap-4 rounded-lg border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-brass"
+      className={cn(
+        "group flex items-center gap-4 rounded-lg border-2 border-l-4 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-brass",
+        deltaPct != null && deltaPct >= 10
+          ? "border-l-ok"
+          : deltaPct != null && deltaPct <= -15
+            ? "border-l-warn"
+            : "border-l-border",
+      )}
     >
       <div className="flex w-24 shrink-0 flex-col">
         <span className="font-display text-lg font-extrabold leading-none">
@@ -299,11 +327,11 @@ const SessionRow = memo(function SessionRow({
           {fmt.time(meta.startedAt)}
         </span>
       </div>
-      <div className="flex flex-1 flex-col gap-1">
+      <div className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="text-sm font-bold">
           {t("reports.row.onAir", { dur: fmt.dur(meta.durationSec) })}
         </span>
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
           {meta.platforms.map((platform) => (
             <PlatformGlyph
               key={platform.id}
@@ -320,6 +348,11 @@ const SessionRow = memo(function SessionRow({
               title={t("reports.row.hasVideo.title")}
             >
               <Play className="size-3" /> {t("reports.row.hasVideo")}
+              {markersCount > 0
+                ? ` · ${tp("reports.list.moments", markersCount, {
+                    count: fmt.num(markersCount),
+                  })}`
+                : null}
             </span>
           ) : null}
         </div>
@@ -327,6 +360,21 @@ const SessionRow = memo(function SessionRow({
       {summary?.hasData &&
       (summary.peakViewers != null || summary.chatTotal != null) ? (
         <div className="hidden shrink-0 items-center gap-3 text-xs text-ink-muted sm:flex">
+          {deltaPct != null ? (
+            <span
+              title={t("reports.list.deltaHint")}
+              className={cn(
+                "rounded px-1.5 py-0.5 font-mono text-[11px] font-bold tabular-nums",
+                deltaPct > 0
+                  ? "bg-ok/15 text-ok"
+                  : deltaPct < 0
+                    ? "bg-warn/15 text-warn"
+                    : "bg-surface-3 text-ink-muted",
+              )}
+            >
+              {deltaPct > 0 ? `+${deltaPct}%` : `${deltaPct}%`}
+            </span>
+          ) : null}
           {summary.peakViewers != null ? (
             <span
               className="flex items-center gap-1"

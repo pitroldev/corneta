@@ -1,6 +1,15 @@
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { bold, useI18n } from "../lib/i18n";
-import { Camera, Check, Crosshair, X } from "lucide-react";
+import {
+  Camera,
+  Check,
+  Crosshair,
+  Heart,
+  MessageCircle,
+  Share2,
+  Smartphone,
+  X,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { useStore } from "../lib/store";
 import { toast } from "../lib/toast";
@@ -62,6 +71,7 @@ export function ReframeEditor({
   const [active, setActive] = useState<RegionId>("main");
   const [frame, setFrame] = useState<string | null>(null);
   const [capturing, setCapturing] = useState(false);
+  const [showSafeZones, setShowSafeZones] = useState(true);
 
   const heights =
     layout === "split" ? splitHeights(preset.height, ratio) : null;
@@ -369,7 +379,7 @@ export function ReframeEditor({
             </Button>
           </div>
           {split && (
-            <div className="mt-2 flex items-center gap-3">
+            <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5">
               <span className="w-28 shrink-0 text-xs font-bold uppercase tracking-wide text-ink-faint">
                 {t("platforms.reframe.split.ratio")}
               </span>
@@ -381,11 +391,33 @@ export function ReframeEditor({
                 value={Math.round(ratio * 100)}
                 aria-label={t("platforms.reframe.split.ratio")}
                 onChange={(e) => setRatio(Number(e.target.value) / 100)}
-                className="flex-1 accent-ok"
+                className="min-w-28 flex-1 accent-ok"
               />
               <span className="w-9 text-right text-xs font-bold tabular-nums text-ink-muted">
                 {fmt.num(Math.round(ratio * 100))}%
               </span>
+              <div className="inline-flex rounded border border-border bg-surface-2 p-0.5">
+                {[0.3, 0.38, 0.5].map((presetRatio) => {
+                  const pct = Math.round(presetRatio * 100);
+                  const isActive = Math.round(ratio * 100) === pct;
+                  return (
+                    <button
+                      key={pct}
+                      type="button"
+                      aria-pressed={isActive}
+                      onClick={() => setRatio(presetRatio)}
+                      className={cn(
+                        "rounded px-1.5 py-0.5 font-mono text-[10px] font-bold transition-colors",
+                        isActive
+                          ? "bg-brass text-brass-ink"
+                          : "text-ink-muted hover:text-ink",
+                      )}
+                    >
+                      {pct}/{100 - pct}
+                    </button>
+                  );
+                })}
+              </div>
             </div>
           )}
         </div>
@@ -394,7 +426,7 @@ export function ReframeEditor({
           <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
             {t("platforms.reframe.result")}
           </span>
-          <div className="relative flex h-56 flex-col overflow-hidden rounded-md border-2 border-border bg-surface-2 [aspect-ratio:9/16] [@media(max-height:640px)]:h-48">
+          <div className="relative flex h-56 flex-col overflow-hidden rounded-md border-2 border-border bg-night [aspect-ratio:9/16] [@media(max-height:640px)]:h-48">
             {heights ? (
               <>
                 <div
@@ -426,7 +458,23 @@ export function ReframeEditor({
                 )}
               </div>
             )}
+            {showSafeZones && <MobileSafeZones />}
           </div>
+          <button
+            type="button"
+            aria-pressed={showSafeZones}
+            onClick={() => setShowSafeZones((v) => !v)}
+            title={t("platforms.reframe.safeZones.hint")}
+            className={cn(
+              "inline-flex items-center gap-1.5 rounded-md border px-2 py-1 text-[11px] font-bold transition-colors",
+              showSafeZones
+                ? "border-brass bg-brass/15 text-ink"
+                : "border-border bg-surface-2 text-ink-muted hover:text-ink",
+            )}
+          >
+            <Smartphone className="size-3.5 text-brass" aria-hidden />
+            {t("platforms.reframe.safeZones.label")}
+          </button>
         </div>
       </div>
 
@@ -569,5 +617,31 @@ function ThirdsGrid() {
         strokeWidth="1"
       />
     </svg>
+  );
+}
+
+/** Overlay marking where TikTok, Shorts, and Reels place live headers, action buttons, and captions. */
+function MobileSafeZones() {
+  const { t } = useI18n();
+  return (
+    <div
+      className="pointer-events-none absolute inset-0 z-20 select-none text-white"
+      aria-hidden
+    >
+      <div className="absolute inset-x-0 top-0 flex h-[12%] items-center justify-between border-b border-dashed border-warn bg-night/75 px-1.5 text-[8px] font-extrabold uppercase tracking-wide">
+        <span className="flex items-center gap-1">
+          <span className="size-1.5 rounded-full bg-live" />
+          {t("platforms.reframe.safeZones.live")}
+        </span>
+      </div>
+      <div className="absolute bottom-[20%] right-0 flex h-[34%] w-[20%] flex-col items-center justify-evenly border-y border-l border-dashed border-warn bg-night/75">
+        <Heart className="size-2.5" />
+        <MessageCircle className="size-2.5" />
+        <Share2 className="size-2.5" />
+      </div>
+      <div className="absolute inset-x-0 bottom-0 flex h-[20%] items-center border-t border-dashed border-warn bg-night/80 px-1.5 text-[8px] font-bold leading-tight text-white/95">
+        {t("platforms.reframe.safeZones.bottom")}
+      </div>
+    </div>
   );
 }

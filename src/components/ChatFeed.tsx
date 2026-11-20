@@ -58,6 +58,7 @@ export function ChatFeed({
   onModerate,
   canReply,
   onReply,
+  mentionHandles,
   disconnectedHint,
   emptyAction,
 }: {
@@ -78,6 +79,8 @@ export function ChatFeed({
   onModerate?: (m: ChatMessage, action: string) => void;
   canReply?: (m: ChatMessage) => boolean;
   onReply?: (m: ChatMessage) => void;
+  /** Broadcaster channel handles used to subtly highlight direct @mentions. */
+  mentionHandles?: readonly string[];
 }) {
   const t = useT();
   const ref = useRef<HTMLDivElement>(null);
@@ -252,6 +255,7 @@ export function ChatFeed({
                   onModerate={stableModerate}
                   canReply={onReply ? stableCanReply : undefined}
                   onReply={stableReply}
+                  mentionHandles={mentionHandles}
                 />
               </div>
             ))}
@@ -279,6 +283,31 @@ interface MsgRowProps {
   onModerate?: (m: ChatMessage, action: string) => void;
   canReply?: (m: ChatMessage) => boolean;
   onReply?: (m: ChatMessage) => void;
+  mentionHandles?: readonly string[];
+}
+
+function classifyRegularMessage(
+  m: ChatMessage,
+  handles?: readonly string[],
+): "mention" | "question" | null {
+  if (m.own || m.highlight || m.action) return null;
+  const text = m.fragments
+    .map((f) =>
+      f.kind === "text" || f.kind === "mention" ? (f.text ?? "") : "",
+    )
+    .join("")
+    .trim();
+  if (!text) return null;
+  if (handles && handles.length > 0) {
+    const lower = text.toLowerCase();
+    for (const h of handles) {
+      if (h.length >= 2 && lower.includes(`@${h}`)) return "mention";
+    }
+  }
+  if (text.length >= 8 && text.endsWith("?") && !text.includes("http")) {
+    return "question";
+  }
+  return null;
 }
 
 const MsgRow = memo(function MsgRow({
@@ -288,6 +317,7 @@ const MsgRow = memo(function MsgRow({
   onModerate,
   canReply,
   onReply,
+  mentionHandles,
 }: MsgRowProps) {
   const t = useT();
   if (m.deleted) {
@@ -325,11 +355,18 @@ const MsgRow = memo(function MsgRow({
   }
   const accent =
     m.accent ?? (m.highlight ? HIGHLIGHT_ACCENT[m.highlight] : undefined);
+  const cue = classifyRegularMessage(m, mentionHandles);
   return (
     <div
       className={cn(
         "group relative px-3 py-1 pr-16 leading-snug hover:bg-surface-2",
         m.highlight && "border-l-[3px] bg-surface-2/60",
+        !m.highlight &&
+          cue === "mention" &&
+          "border-l-[3px] border-l-brass bg-brass/10",
+        !m.highlight &&
+          cue === "question" &&
+          "border-l-[3px] border-l-info bg-info/8",
       )}
       style={accent ? { borderLeftColor: accent } : undefined}
     >
@@ -390,7 +427,7 @@ const MsgRow = memo(function MsgRow({
         <span
           className={cn(
             "min-w-0 break-words",
-            m.action ? "italic" : "text-ink-muted",
+            m.action ? "italic" : cue ? "text-ink" : "text-ink-muted",
           )}
           style={m.action && m.color ? { color: m.color } : undefined}
         >
@@ -457,7 +494,8 @@ function areRowPropsEqual(prev: MsgRowProps, next: MsgRowProps) {
     prev.modLevel === next.modLevel &&
     prev.onModerate === next.onModerate &&
     prev.canReply === next.canReply &&
-    prev.onReply === next.onReply
+    prev.onReply === next.onReply &&
+    prev.mentionHandles === next.mentionHandles
   );
 }
 
@@ -568,16 +606,16 @@ function ChatFunnel() {
 function badgeColor(kind: string): string {
   switch (kind) {
     case "broadcaster":
-      return "bg-tomato text-white";
+      return "bg-tomato text-night";
     case "moderator":
-      return "bg-[#22c55e] text-white";
+      return "bg-[#15803d] text-white";
     case "vip":
-      return "bg-[#e879f9] text-white";
+      return "bg-[#a21caf] text-white";
     case "subscriber":
       return "bg-brass text-brass-ink";
     case "staff":
     case "partner":
-      return "bg-[#7c9cff] text-white";
+      return "bg-[#2563eb] text-white";
     default:
       return "bg-surface-3 text-ink-muted";
   }

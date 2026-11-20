@@ -482,7 +482,76 @@ export function BatchClipsModal({
             </div>
           </div>
 
-          <div className="rounded-lg border border-border-soft bg-surface-2/60 px-3.5 py-2.5 text-xs text-ink-muted">
+          <div className="space-y-2.5 rounded-lg border border-border-soft bg-surface-2/60 px-3.5 py-2.5 text-xs text-ink-muted">
+            {planned.length > 0 && replayIndex.totalMs > 0 ? (
+              <div>
+                <div className="mb-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px]">
+                  <span className="font-bold uppercase tracking-wide text-ink-faint">
+                    {t("reports.clips.timeline.label", {
+                      dur: fmt.dur(Math.round(replayIndex.totalMs / 1000)),
+                    })}
+                  </span>
+                  <span className="flex items-center gap-3 text-ink-muted">
+                    <span className="inline-flex items-center gap-1">
+                      <span
+                        className="inline-block size-2 rounded-[2px] bg-brass"
+                        aria-hidden
+                      />
+                      {t("reports.clips.timeline.single")}
+                    </span>
+                    {mergedCount > 0 ? (
+                      <span className="inline-flex items-center gap-1">
+                        <span
+                          className="inline-block size-2 rounded-[2px] bg-tomato"
+                          aria-hidden
+                        />
+                        {t("reports.clips.timeline.merged")}
+                      </span>
+                    ) : null}
+                  </span>
+                </div>
+                <div
+                  className="relative h-5 w-full overflow-hidden rounded border border-border bg-surface"
+                  role="img"
+                  aria-label={t("reports.clips.timeline.label", {
+                    dur: fmt.dur(Math.round(replayIndex.totalMs / 1000)),
+                  })}
+                >
+                  {planned.map((clip) => {
+                    const leftPct = Math.max(
+                      0,
+                      Math.min(
+                        98,
+                        (clip.startGlobalMs / replayIndex.totalMs) * 100,
+                      ),
+                    );
+                    const widthPct = Math.max(
+                      1.8,
+                      Math.min(
+                        100 - leftPct,
+                        (clip.durationMs / replayIndex.totalMs) * 100,
+                      ),
+                    );
+                    const merged = clip.momentCount > 1;
+                    return (
+                      <span
+                        key={clip.id}
+                        title={`${clip.label} (${formatClock(clip.startGlobalMs)}–${formatClock(clip.endGlobalMs)})`}
+                        className={cn(
+                          "absolute inset-y-1 rounded-[2px] transition-[left,width] duration-150",
+                          merged ? "bg-tomato" : "bg-brass",
+                        )}
+                        style={{
+                          left: `${leftPct}%`,
+                          width: `${widthPct}%`,
+                        }}
+                      />
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+
             {planned.length > 0 ? (
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <span className="font-semibold text-ink">

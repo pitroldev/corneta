@@ -1,12 +1,14 @@
 import { GUIDE_KEY, TOPIC_KEY } from "../../lib/platformCheckText";
-import { memo, useMemo, useState, type ReactNode } from "react";
+import { memo, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useShallow } from "zustand/react/shallow";
 import { AnimatePresence, m } from "framer-motion";
 import {
   AlertTriangle,
   BadgeCheck,
   ChevronRight,
+  Circle,
   ExternalLink,
+  Eye,
   MessageSquare,
   Pause,
   Play,
@@ -14,7 +16,14 @@ import {
   Send,
 } from "lucide-react";
 import { api } from "../../lib/api";
+import {
+  audienceTooltip,
+  audienceTotal,
+  showAudience,
+} from "../../lib/audience";
 import { useStore } from "../../lib/store";
+import { useNow } from "../../lib/useNow";
+import { acceptsCodec } from "../../lib/estimates";
 import { PLATFORMS, platformName } from "../../lib/platforms";
 import { resolveSendTargets } from "../../lib/chatSend";
 import {
@@ -35,7 +44,7 @@ import { LiveChatFeed } from "../chat/LiveFeeds";
 import { Button, Card, PlatformGlyph } from "../../components/ui";
 import { MiniStat, StatePill, Usage } from "./parts";
 
-/** While on air: platform numbers and machine load on the left, the unified chat beside them. */
+/** While on air: unified vital strip + per-platform status on the left, unified chat beside them. */
 export function LiveCockpit({
   targets,
   onNavigate,
@@ -46,26 +55,127 @@ export function LiveCockpit({
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_20rem]">
       <div className="flex min-w-0 flex-col gap-3">
+        <VitalsStrip />
         <LiveTargetList targets={targets} onNavigate={onNavigate} />
-        <MachineUsage />
       </div>
       <LiveChatPanel onNavigate={onNavigate} />
     </div>
   );
 }
 
-function MachineUsage() {
-  const t = useT();
+function VitalsStrip() {
+  const { t, fmt } = useI18n();
+  const state = useStore((s) => s.snapshot.state);
+  const startedAt = useStore((s) => s.snapshot.startedAt);
   const cpu = useStore((s) => s.snapshot.cpu);
   const gpu = useStore((s) => s.snapshot.gpu);
+  const recordVideo = useStore((s) => s.config?.settings.recordVideo ?? false);
+  const viewers = useStore((s) => s.viewers);
+  const totalKbps = useStore((s) =>
+    Object.values(s.snapshot.targets).reduce(
+      (sum, item) =>
+        item.state === "live" || item.state === "brb"
+          ? sum + (item.bitrateKbps ?? 0)
+          : sum,
+      0,
+    ),
+  );
+  const live = state === "live";
+  const now = useNow(live);
+  const audience = live && showAudience(viewers);
+
   return (
-    <Card className="flex flex-wrap items-center gap-x-6 gap-y-2 bg-surface-2 py-3">
-      <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
-        {t("golive.machine.label")}
-      </span>
-      <Usage label="CPU" value={cpu} />
-      <Usage label="GPU" value={gpu} />
+    <Card className="flex flex-wrap items-center justify-between gap-x-5 gap-y-2.5 border border-border-soft bg-surface-2 px-4 py-2.5">
+      <div className="flex flex-wrap items-center gap-2">
+        {live && startedAt ? (
+          <span className="inline-flex items-center gap-1.5 rounded-sm bg-live px-2 py-0.5 font-display text-xs font-extrabold uppercase tracking-wide text-white tabular-nums">
+            <span className="live-dot size-2 rounded-full bg-white" />
+            {t("sidebar.state.live")} · {fmtUptime((now - startedAt) / 1000)}
+          </span>
+        ) : (
+          <span className="text-xs font-bold uppercase tracking-wide text-ink-faint">
+            {t("golive.machine.label")}
+          </span>
+        )}
+        {live && recordVideo && (
+          <span className="inline-flex items-center gap-1 rounded-sm border border-bad/35 bg-bad/12 px-2 py-0.5 text-[11px] font-extrabold uppercase tracking-wide text-bad">
+            <Circle className="size-2 fill-current" aria-hidden />
+            {t("golive.vitals.rec")}
+          </span>
+        )}
+        {audience && (
+          <span
+            className="inline-flex items-center gap-1 rounded-sm border border-ok/35 bg-ok/12 px-2 py-0.5 text-[11px] font-bold tabular-nums text-ok"
+            title={audienceTooltip(viewers.items, { t, fmt })}
+          >
+            <Eye className="size-3.5" aria-hidden />
+            {audienceTotal(viewers, fmt)}
+          </span>
+        )}
+      </div>
+
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5">
+        {live && totalKbps > 0 && (
+          <span className="flex items-baseline gap-1.5 text-xs">
+            <span className="font-bold uppercase tracking-wide text-ink-faint">
+              {t("golive.vitals.upload")}
+            </span>
+            <span className="font-display text-sm font-extrabold tabular-nums text-ink">
+              {fmt.bitrate(totalKbps)}
+            </span>
+          </span>
+        )}
+        <Usage label="CPU" value={cpu} />
+        <Usage label="GPU" value={gpu} />
+      </div>
     </Card>
+  );
+}
+
+const VU_SLOTS = 6;
+
+function BitrateMeter({
+  samples,
+  flowing,
+  hasDrops,
+}: {
+  samples: readonly number[];
+  flowing: boolean;
+  hasDrops: boolean;
+}) {
+  const t = useT();
+  const peak = Math.max(1000, ...samples);
+  const padded = [
+    ...Array<number>(Math.max(0, VU_SLOTS - samples.length)).fill(0),
+    ...samples.slice(-VU_SLOTS),
+  ];
+
+  return (
+    <div
+      className="hidden h-5 items-end gap-0.5 rounded bg-surface-2 px-1.5 py-0.5 sm:inline-flex"
+      role="img"
+      aria-label={t("golive.stability.aria")}
+    >
+      {padded.map((kbps, i) => {
+        const ratio = flowing && kbps > 0 ? kbps / peak : 0;
+        const pct = ratio > 0 ? Math.max(22, Math.round(ratio * 100)) : 16;
+        const tone =
+          !flowing || kbps <= 0
+            ? "bg-surface-3"
+            : ratio < 0.45
+              ? "bg-bad"
+              : ratio < 0.72 || hasDrops
+                ? "bg-warn"
+                : "bg-ok";
+        return (
+          <span
+            key={i}
+            className={cn("w-1 rounded-[1px] transition-[height]", tone)}
+            style={{ height: `${pct}%` }}
+          />
+        );
+      })}
+    </div>
   );
 }
 
@@ -103,6 +213,25 @@ const LiveTargetList = memo(function LiveTargetList({
   );
 });
 
+function useBitrateHistory(targetId: string): number[] {
+  const [samples, setSamples] = useState<number[]>(() => {
+    const initial = useStore.getState().snapshot.targets[targetId]?.bitrateKbps;
+    return initial && initial > 0 ? [initial] : [];
+  });
+  useEffect(
+    () =>
+      useStore.subscribe((state, prev) => {
+        const next = state.snapshot.targets[targetId]?.bitrateKbps;
+        const before = prev.snapshot.targets[targetId]?.bitrateKbps;
+        if (next === before) return;
+        if (next == null || next <= 0) return;
+        setSamples((list) => [...list.slice(-(VU_SLOTS - 1)), next]);
+      }),
+    [targetId],
+  );
+  return samples;
+}
+
 const LiveTargetRow = memo(function LiveTargetRow({
   target,
   onNavigate,
@@ -114,6 +243,11 @@ const LiveTargetRow = memo(function LiveTargetRow({
   const st = useStore(
     useShallow((s) => {
       const metrics = s.snapshot.targets[target.id];
+      const cfg = s.config?.targets.find((item) => item.id === target.id);
+      const preset =
+        cfg?.encoding.preset ?? PLATFORMS[target.platformId]?.recommended;
+      const obsCodec =
+        s.obs && s.obs !== "loading" ? s.obs.videoCodec : undefined;
       return {
         state: metrics?.state,
         message: metrics?.message,
@@ -124,22 +258,79 @@ const LiveTargetRow = memo(function LiveTargetRow({
         platform: metrics?.platform,
         action: metrics?.action ?? "copy",
         reencoded: metrics?.reencoded ?? false,
+        isPortrait: preset ? preset.height > preset.width : false,
+        videoCodec:
+          obsCodec &&
+          obsCodec !== "h264" &&
+          acceptsCodec(target.platformId, obsCodec)
+            ? obsCodec
+            : undefined,
       };
     }),
   );
+  const samples = useBitrateHistory(target.id);
   const paused = st.state === "paused";
   // Show only observed metrics, never preset values for a destination that is not transmitting.
   const flowing = st.state === "live" || st.state === "brb";
+  const isError = st.state === "error" || st.state === "signal-lost";
+  const isWarn =
+    st.state === "reconnecting" ||
+    st.state === "connecting" ||
+    (flowing && (st.droppedFrames ?? 0) > 0);
+  const accentCls = isError
+    ? "border-l-bad border-bad/35 bg-bad/8"
+    : isWarn
+      ? "border-l-warn border-warn/35 bg-warn/8"
+      : st.state === "brb"
+        ? "border-l-brass border-border-soft"
+        : flowing
+          ? "border-l-ok border-border-soft"
+          : "border-l-border border-border-soft";
+
+  const codecTag =
+    st.videoCodec === "av1" ? "AV1" : st.videoCodec === "hevc" ? "HEVC" : null;
+  const routeLabel =
+    st.action === "copy" && !st.reencoded
+      ? codecTag
+        ? `${t("golive.route.copy")} · ${codecTag}`
+        : t("golive.route.copy")
+      : st.isPortrait
+        ? `${t("golive.route.vertical")} · ${t("golive.route.gpu")}`
+        : codecTag
+          ? `${t("golive.route.gpu")} · ${codecTag}`
+          : t("golive.route.gpu");
+  const routeTone =
+    st.action === "copy" && !st.reencoded
+      ? codecTag
+        ? "bg-info/15 text-info"
+        : "bg-surface-3 text-ink-muted"
+      : st.isPortrait
+        ? "bg-brass text-brass-ink"
+        : "bg-surface-3 text-ink-muted";
+
   return (
     <Card
       className={cn(
-        "flex items-center gap-4 py-3 transition-opacity",
+        "flex items-center gap-3.5 border border-l-4 py-3 pl-3.5 transition-colors",
+        accentCls,
         paused && "opacity-70",
       )}
     >
       <PlatformGlyph id={target.platformId} size={36} />
       <div className="min-w-28 flex-1">
-        <div className="font-display font-bold">{target.name}</div>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className="font-display font-bold">{target.name}</span>
+          {flowing && (
+            <span
+              className={cn(
+                "rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide",
+                routeTone,
+              )}
+            >
+              {routeLabel}
+            </span>
+          )}
+        </div>
         <StatePill state={st.state ?? "idle"} />
         {flowing && (st.platform || st.reencoded) && (
           <PlatformCheckNote
@@ -151,7 +342,9 @@ const LiveTargetRow = memo(function LiveTargetRow({
           />
         )}
         {st.message && (
-          <div className="mt-0.5 text-xs text-bad">{st.message}</div>
+          <div className="mt-0.5 text-xs font-medium text-bad">
+            {st.message}
+          </div>
         )}
         {st.state === "error" && (
           <div className="mt-0.5 flex flex-wrap gap-x-3">
@@ -174,7 +367,12 @@ const LiveTargetRow = memo(function LiveTargetRow({
           </div>
         )}
       </div>
-      <div className="flex gap-5">
+      <div className="flex items-center gap-4">
+        <BitrateMeter
+          samples={samples}
+          flowing={flowing}
+          hasDrops={(st.droppedFrames ?? 0) > 0}
+        />
         <MiniStat
           label={t("golive.stat.bitrate")}
           value={flowing ? fmt.bitrate(st.bitrateKbps ?? 0) : "—"}

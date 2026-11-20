@@ -7,6 +7,7 @@ import {
   Clock,
   Eye,
   LogIn,
+  MapPin,
   PictureInPicture2,
   Reply,
   Plus,
@@ -21,7 +22,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { type ChatView } from "../components/ChatFeed";
 import { AudienceDetails } from "../components/AudienceDetails";
 import { LegalLink } from "../components/legal";
@@ -38,6 +39,7 @@ import {
   SectionTitle,
 } from "../components/ui";
 import { api, IS_TAURI, type AccountChatChannel } from "../lib/api";
+import { announceMark } from "../lib/markMoment";
 import { sameChatChannel } from "../lib/chatChannel";
 import { audienceTooltip, audienceTotal, showAudience } from "../lib/audience";
 import {
@@ -101,6 +103,8 @@ export function ChatScreen() {
   const clearChat = useStore((s) => s.clearChat);
   const clearAlerts = useStore((s) => s.clearAlerts);
   const viewers = useStore((s) => s.viewers);
+  const isLive = useStore((s) => s.snapshot.state === "live");
+  const [marking, setMarking] = useState(false);
   const setAlertToken = useStore((s) => s.setAlertToken);
   const alertStatuses = useStore((s) => s.alertStatuses);
   const chatAuth = useStore((s) => s.chatAuth);
@@ -189,6 +193,20 @@ export function ChatScreen() {
       cancelled = true;
     };
   }, [needsAccountChannels, loginStates]);
+  const mentionHandles = useMemo(() => {
+    const set = new Set<string>();
+    for (const p of ACCOUNT_PLATFORMS) {
+      const login = chatLogin[p].login?.trim().toLowerCase();
+      if (login) set.add(login);
+    }
+    for (const src of config?.settings.chatSources ?? []) {
+      if (!src.enabled) continue;
+      const clean = src.value.trim().replace(/^@/, "").toLowerCase();
+      if (clean && !clean.includes("/")) set.add(clean);
+    }
+    return [...set];
+  }, [chatLogin, config?.settings.chatSources]);
+
   if (!config) return null;
   const s = config.settings;
   const sources = s.chatSources ?? [];
@@ -964,17 +982,64 @@ export function ChatScreen() {
         </Modal>
       )}
 
-      <div className="mb-2 flex items-center gap-2">
+      <div className="mb-2 flex flex-wrap items-center gap-2">
         {showFilters &&
-          feedPlatforms.map((p) => (
-            <FilterChip
-              key={p}
-              id={p}
-              label={chatProvider(p)?.name ?? p}
-              on={filter[p]}
-              onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
-            />
-          ))}
+          feedPlatforms.map((p) => {
+            const platStatuses = Object.values(statuses).filter(
+              (st) => st.platform === p,
+            );
+            const worst = platStatuses.find((st) => st.status === "error")
+              ? "error"
+              : platStatuses.find((st) => st.status === "connecting")
+                ? "connecting"
+                : platStatuses.find((st) => st.status === "connected")
+                  ? "connected"
+                  : null;
+            const platViewers = viewers.items
+              .filter(
+                (item) =>
+                  item.platform === p &&
+                  typeof item.viewers === "number" &&
+                  item.viewers > 0,
+              )
+              .reduce((sum, item) => sum + (item.viewers ?? 0), 0);
+            return (
+              <FilterChip
+                key={p}
+                id={p}
+                label={chatProvider(p)?.name ?? p}
+                on={filter[p]}
+                dotClass={worst ? statusDot(worst) : undefined}
+                viewers={
+                  (s.chatShowViewers ?? true) && platViewers > 0
+                    ? fmt.num(platViewers)
+                    : null
+                }
+                onClick={() => setFilter((f) => ({ ...f, [p]: !f[p] }))}
+              />
+            );
+          })}
+        {isLive && (
+          <Button
+            variant="subtle"
+            size="sm"
+            loading={marking}
+            disabled={marking}
+            title={t("chat.markMoment.title")}
+            onClick={() => {
+              if (marking) return;
+              setMarking(true);
+              void api
+                .markMoment()
+                .then((marks) => announceMark(marks, { t, locale }))
+                .catch((error: unknown) => toast.error(errMsg(error)))
+                .finally(() => setMarking(false));
+            }}
+          >
+            {!marking && <MapPin className="size-3.5 text-brass" />}{" "}
+            {t("chat.markMoment")}
+          </Button>
+        )}
         <Button
           variant={showAlerts ? "primary" : "ghost"}
           size="sm"
@@ -1019,6 +1084,7 @@ export function ChatScreen() {
             onModerate={onModerate}
             canReply={canReply}
             onReply={startReply}
+            mentionHandles={mentionHandles}
             disconnectedHint={
               configured
                 ? t("chat.feed.hint.ready")
